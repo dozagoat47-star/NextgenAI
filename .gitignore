@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+model/
+*.log
+.vscode/
+test_chat.py
+test_debug.py
+scraped_intents.json

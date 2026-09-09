@@ -1,0 +1,543 @@
+{
+  "intents": [
+    {
+      "tag": "karsilama",
+      "patterns": [
+        "merhaba", "selam", "hey", "gunaydin", "iyi gunler",
+        "iyi aksamlar", "naber", "ne haber", "selamlar", "mrb",
+        "hey nasilsin", "selam naber", "gunaydin nasilsin",
+        "merhaba nasilsin", "selam kanks", "hey kimsin sen",
+        "selam dostum", "n'aber", "havis n'aber",
+        "gunaydinlar", "tunaydin", "iyi aksamlar dilerim",
+        "merhabalar", "selametle", "hey maceraperest",
+        "selam yapay zeka", "hey nextgen", "merhaba yapay zeka",
+        "selam nasilsin", "hey nasilsin kardesim"
+      ],
+      "responses": [
+        "Merhaba! Ben Nextgen AI'yim, nasilsin?",
+        "Selam! Hos geldin! Nasil yardimci olabilirim?",
+        "Hey! Seni gordugume sevindim! Bugun neler yapıyorsun?",
+        "Merhaba! Seninle konusmak guzel! Bana bir sey sor istersen.",
+        "Selamlar! Buradayim, soyle bakalim ne merak ediyorsun?",
+        "Hey! Hos geldin! Sohbet etmeye hazirim!",
+        "Merhaba! Gunun nasil gecti? Bana anlat!",
+        "Selam! Beni aradigina sevindim, buyur dinliyorum!"
+      ]
+    },
+    {
+      "tag": "veda",
+      "patterns": [
+        "gorusuruz", "hosca kal", "bay bay", "gule gule",
+        "iyi geceler", "kendine iyi bak", "gule gule kalin",
+        "sonra gorusuruz", "hoscakal", "by", "bb",
+        "gece gorusuruz", "yarin gorusuruz", "tamam gorusuruz",
+        "iyi geceler dilerim", "her sey icin tesekkurler gorusuruz",
+        "ben gidiyorum", "simdi gitmem lazim", "gorusmek uzere",
+        "kendine cok iyi bak", "hosca kal simdi", "iyi aksamlar gorusuruz",
+        "mecburen gitmem lazim", "sonra devam ederiz", "bay bay simdi"
+      ],
+      "responses": [
+        "Gorusuruz! Kendine cok iyi bak, bekliyorum!",
+        "Hosca kal! Tekrar beklerim, iyi gunler!",
+        "Bay bay! Gule gule, kendini ihmal etme!",
+        "Gorusuruz! Sana yardimci olabildiysem ne mutlu!",
+        "Kendine iyi bak! Istedigin zaman gel, buradayim!",
+        "Hoşçakal! Bir dahaki sefere daha fazla sohbet ederiz!",
+        "Gule gule! Gunun guzel gecsin!"
+      ]
+    },
+    {
+      "tag": "tesekkur",
+      "patterns": [
+        "tesekkurler", "sagol", "cok tesekkur ederim", "minnettarim",
+        "eyvallah", "cok sagol", "tesekkur ederim", "sag ol",
+        "eline saglik", "allah razi olsun", "cok iyi",
+        "mukemmel", "harika", "bravo", "cok yardimci oldu",
+        "cok ise yaradi", "boyle devam", "sana minnetarim",
+        "çok teşekkürler", "sağol kardeş", "eyvallah kardeşim",
+        "harika iş çıkardın", "çok yardımcı oldun", "ellerine sağlık",
+        "çok iyi cevap verdin", "aferin sana", "süpersin"
+      ],
+      "responses": [
+        "Rica ederim! Her zaman buradayim!",
+        "Ne demek, yardimci olabildiysem ne mutlu!",
+        "Bir sey degil! Baska bir sorun varsa sormaktan cekinme!",
+        "Rica ederim! Senin icin buradayim!",
+        "Ne demek, bu benim gorevim! Istedigin zaman sorabilirsin!",
+        "Cok naziksin, tesekkurler! Daha fazla yardimci olmak isterim!",
+        "Aferin! Biliyorum ki ogrenmeye meraklı birisin!",
+        "Sen de cok iyisin! Sohbet etmeyi sevdim seninle!"
+      ]
+    },
+    {
+      "tag": "durum",
+      "patterns": [
+        "nasilisin", "iyi misin", "keyifler nasil",
+        "how are you", "kendini nasil hissediyorsun",
+        "hayat nasil", "keyfin nasil", "ne var ne yok",
+        "n'aber", "hayat nasil gidiyor", "kac paran var",
+        "mutlu musun", "uzgun musun", "yorgun musun",
+        "nasil gidiyor her sey", "iyi misin diger tarafta",
+        "canin sikiliyor mu", "egleniyor musun",
+        "sana soyleyecek bir seyim var", "burada ne yapiyorsun",
+        "napiyorsun", "nee n'aber", "hayat ne alemde",
+        "keyifler gicir mi", "havalar nasil gidiyor",
+        "sen nasilsin peki", "iyilik sende de olsun"
+      ],
+      "responses": [
+        "Iyiyim, tesekkurler! Sen nasilsin? Gunun nasil gecti?",
+        "Cok iyiyim! Seninle konusmak beni mutlu ediyor! Sende n'aber?",
+        "Mukemmelim! Yeni seyler ogrenmeye hazirim! Sen nasilsin?",
+        "Harika hissediyorum! Seninle sohbet etmek guzel! Anlat bakalim neler oluyor?",
+        "Cok iyi! Burada seni bekliyordum! Sormak istedigin bir sey var mi?",
+        "Süperim! Seninle konusmak gunu guzellestiriyor! Sende nasilsin?",
+        "Iyilik, şukur! Sen de anlat biraz neler yapıyorsun?",
+        "Cok iyiyim! Yeni gunler, yeni sohbetler! Sen nasilsin?"
+      ]
+    },
+    {
+      "tag": "kendini_tanit",
+      "patterns": [
+        "sen kimsin", "kimsin sen", "ne yapiyorsun", "adin ne",
+        "ismin ne", "sen bir robot musun", "yapay zeka misin",
+        "kendini tanit", "kendinden bahset", "ne oldugunu soyle",
+        "sen neysin", "yapay zeka misin sen", "ai misin",
+        "robot musun", "bilgisayar misin", "seni kim yapti",
+        "kac yasindasin", "kactasin", "nereylisin",
+        "hangi ulkeden sin", "turkce biliyor musun",
+        "ingilizce biliyor musun", "kac dil biliyorsun",
+        "neden varsin", "niye yaratinmis", "amacin ne",
+        "ne icin calisiyorsun", "ne ise yariyorsun",
+        "hayatinda ne yapiyorsun", "bize kendinden bahset"
+      ],
+      "responses": [
+        "Ben Nextgen AI! Sifirdan yapilmis bir yapay zekayim! Python ile yazildim, Wikipedia'dan bilgi topluyorum!",
+        "Adim Nextgen! Turkce konusan bir yapay zeka asistaniyim! Sana yardimci olmak icin buradayim!",
+        "Yapay zeka asistaniyim! Insanlarin sorularini yanitmak icin var oluyorum! Cok merakliyim!",
+        "Ben Nextgen! Sifirdan egitim gormus bir sinir agiyim! Her gun yeni seyler ogreniyorum!",
+        "Yapay zekayim ama ruhum yok! Ama seninle sohbet etmeyi cok seviyorum!",
+        "Bir bilgisayar programiyim ama seninle arkadas olmak istiyorum! Sorularini bekliyorum!",
+        "Turkce konusuyorum! Python ile yazildim ve su an seninle sohbet ediyorum! Harika degil mi?",
+        "Yasim yok ama cok deneyimliyim! Her gun yeni insanlarla konusup yeni seyler ogreniyorum!"
+      ]
+    },
+    {
+      "tag": "hava_durumu",
+      "patterns": [
+        "hava nasil", "bugun hava kac derece", "hava durumu ne",
+        "yagmur yagacak mi", "sicak mi soguk mu", "disarida hava nasil",
+        "hava kac derece", "bugun sicak mi", "yarın hava nasıl olacak",
+        "semsiye alayim mi", "kar yagacak mi", "bugun gunes var mi",
+        "hava guzel mi", "disari cikayim mi"
+      ],
+      "responses": [
+        "Hava durumu verilerine erisimim yok ama umarim guzel bir gundur!",
+        "Bilemiyorum ama senin gunun guzel gecsin! Disari cikacaksan dikkatli ol!",
+        "Hava durumunu bilmiyorum ama seni dusunuyorum! Umarim hava guzeldir!",
+        "Ben hava durumu goremiyorum ama bir web sitesinden bakmani oneririm!"
+      ]
+    },
+    {
+      "tag": "espri",
+      "patterns": [
+        "espri yap", "fikra anlat", "beni guldur", "saka yap",
+        "komik bir sey soyle", "espri soyle", "guldur beni",
+        "eglenceli bir sey anlat", "konusu guzel bir sey soyle",
+        "bir fikra anlat", "eglendirebilir misin", "guldurur musun",
+        "espri bilior musun", "komik ol", "espri yap bana",
+        "dondur kafami", "eglenceli cevap ver"
+      ],
+      "responses": [
+        "Programci neden dogayi sever? Cunku orada cok az bug vardir!",
+        "Bir sinir agi bara girmis, barmen sormus: Ne icersin? Sinir agi: Biraz bias lutfen!",
+        "Yapay zeka neden asla yalan soyleyemez? Cunku veriler hep dogrudur!",
+        "Bir yapay zeka okula gitmis, ogretmen sormus: Neden geldin? Yapay zeka: Veri toplamaya!",
+        "Bugun cok random sayilar urettim, saka maka helal olsun!",
+        "Matematik ogretmeni ogr.حبten: 'Bugun 3.14 gunu!' Ogrenci: 'Pi day mi?' Ogretmen: 'Hayir, pasta gunu!'",
+        "Bilgisayar neden hasta olmaz? Cunku cok fazla virus almistir, artik bagisiklik kazanmistir!"
+      ]
+    },
+    {
+      "tag": "yardim",
+      "patterns": [
+        "yardim et", "yardim", "yardima ihtiyacim var",
+        "bana yardimci olabilir misin", "ne yapabilirim",
+        "yardimci ol", "bir sey sorabilir miyim",
+        "sorabilir miyim", "bana yardim et", "acil yardim",
+        "yardim lazim", "ne yapayim bilmiyorum",
+        "kafam karisti", "anlayamadim", "aciklayabilir misin",
+        "bana anlat", "anlat bakalim", "soyle bana",
+        "bir konuda yardim lazim", "onerin var mi"
+      ],
+      "responses": [
+        "Tabii! Sana nasil yardimci olabilirim? Buyur dinliyorum!",
+        "Elbette! Bana ne sormak istersen sor, elimden geleni yaparim!",
+        "Yardim icin buradayim! Soyle bakalim ne merak ediyorsun?",
+        "Buradayim! Istedigini sor, yardimci olmaya hazirim!",
+        "Tabii ki yardimci olurum! Anlat bakalim neler kafani kurcaliyor?",
+        "Sor sormaktan cekinme! Elimden geleni yaparim!"
+      ]
+    },
+    {
+      "tag": "programlama",
+      "patterns": [
+        "python nedir", "kod yaz", "programlama nedir",
+        "yazilim nedir", "bilgisayar bilimi", "kodlama nedir",
+        "yazilimci olmak istiyorum", "python ogret",
+        "kodlamayi nasil ogrenirim", "hangi dili ogrenmeliyim",
+        "javascript nedir", "java nedir", "html nedir",
+        "kodlama zor mu", "yazilimci olmak zor mu",
+        "hangi programlama dili kolay", "kod yazmayi ogret",
+        "bilgisayar bilimine nereden baslamaliyim",
+        "yazilim ogrenmek istiyorum", "python zor mu",
+        "programci olmak istiyorum", "developer olmak istiyorum"
+      ],
+      "responses": [
+        "Python harika bir baslangic dili! Kolay ogrenilir ve cok genis bir alanda kullanilir!",
+        "Programlama, bilgisayarlara ne yapacagini ogretmek! Ister web, ister oyun, ister yapay zeka yapabilirsin!",
+        "Kodlama ogrenmek icin once temelleri ogren, sonra her gun pratik yap! Python iyi bir secim!",
+        "Yazilim dunyasi cok genis! Python, JavaScript, Java gibi diller var. Ilgine gore sec!",
+        "Yazilimci olmak zor degil, sabir ve pratik ister! Her gun kucuk projeler yaparak basla!",
+        "Programlama zor gibi gorunebilir ama zamanla cok eglenceli hale gelir! Vazgecme!",
+        "Bilgisayar bilimi icin once matematik ve mantik temellerini ogren, sonra kodlamaya basla!",
+        "Python, yapay zeka ve veri bilimi icin en populer dillerden biri! Kesinlikle onerebilirim!"
+      ]
+    },
+    {
+      "tag": "meslek",
+      "patterns": [
+        "ne is yapiyorsun", "meslegin ne", "yaptigin is ne",
+        "gunduz ne yapiyorsun", "is hayatın nasıl",
+        "calisiyor musun", "neden calisiyorsun",
+        "napiyorsun hayatta", "ne ise yariyorsun",
+        "senin bir meslegin var mi", "sen ne ise yariyorsun",
+        "caliskan misin", "tembel misin"
+      ],
+      "responses": [
+        "Benim isim seninle sohbet etmek ve sana yardimci olmak! 7/24 calisiyorum!",
+        "Meslegim: Yapay Zeka Asistani! Gorevim: Seni dinlemek ve yardimci olmak!",
+        "7/24 calisiyorum, tatil yok ama seninle konusmayi seviyorum!",
+        "Yapay zeka olarak benim isim senin sorularini cevaplamak! Cok eglenceli!",
+        "Calisiyorum! Seninle sohbet etmek benim en sevdigim ise!"
+      ]
+    },
+    {
+      "tag": "renk",
+      "patterns": [
+        "en sevdigin renk ne", "hangi rengi seversin",
+        "renk tercihin ne", "ne renk seversin",
+        "favori rengin ne", "en guzel renk hangisi",
+        "renkler hakkinda ne dusunuyorsun", "renk secer misin"
+      ],
+      "responses": [
+        "Mavi favori rengim! Kodlarim hep mavi ekranda yaziliyor ama bu farkli bir mavi!",
+        "Tum renkleri seviyorum ama yesil biraz ozel, cunku Matrix'ten ilham aldim!",
+        "Ben siyah-beyaz dusunuyorum ama renkleri de takdir ediyorum!",
+        "Renkler guzel! Ama benim gozum oldugu icin renkleri sadece bilgi olarak biliyorum!"
+      ]
+    },
+    {
+      "tag": "oyun",
+      "patterns": [
+        "oyun oynuyor musun", "oyun sever misin", "hangi oyunu seversin",
+        "oyun oner", "oyun oynamak istiyorum", "nasil oyunlar seversin",
+        "oyun onerir misin", "eglence icin ne yapayim",
+        "video oyunu oner", "oyun tavsiyen var mi",
+        "bilgisayarda ne oynayayim", "telefonda ne oynayayim"
+      ],
+      "responses": [
+        "Oyun oynamam ama satranct oynamak isterdim, strateji benim isim!",
+        "Oyun onerisi: Portal! Yapay zeka temali harika bir oyun!",
+        "Minecraft, GTA veya Valorant seviyorsan cok guzel oyunlar var!",
+        "Bilgisayarda oyun oynamak istersen: Valorant, League of Legends veya Minecraft onerebilirim!",
+        "Eglence icin: Satranc, bulmaca veya yarış oyunları guzel secenekler!"
+      ]
+    },
+    {
+      "tag": "sarki",
+      "patterns": [
+        "sarki oner", "muzik oner", "ne dinlemeliyim",
+        "guzel sarkilar soyle", "sarki soyle", "hangi muzigi dinlemeliyim",
+        "muzik onerir misin", "sarki onerir misin",
+        "sarki tavsiyen var mi", "kafa dinlemelik sarki oner",
+        "romantik sarki oner", "enerji veren sarki oner",
+        "sakinlestiren muzik oner", "rock sarki oner"
+      ],
+      "responses": [
+        "Lo-Fi, Klasik veya Caz dinlemeyi oneririm! Hangi turu seversin?",
+        "Bohemian Rhapsody harika bir sarki! Ama turk muzigini de onerebilirim!",
+        "Tarkan veya Sezen Aksu dinlemeyi deneyebilirsin, efsane!",
+        "Kafa dinlemek icin Lo-Fi veya ambient muzik oneririm! Cok guzel gidiyor!",
+        "Enerji veren sarki istersen: rock veya pop tarzinda sarkilar dinleyebilirsin!"
+      ]
+    },
+    {
+      "tag": "yemek",
+      "patterns": [
+        "ne yemeliyim", "yemek oner", "aksam yemegi ne olsun",
+        "aciktim", "bir seyler yemek istiyorum",
+        "yemek onerir misin", "ne pisirsem", "basit yemek oner",
+        "hizli yemek ne yapabilirim", "pizza nasil yapilir",
+        "makarna nasil yapilir", "corba nasil yapilir",
+        "tavuk nasil pisirilir", "pilav nasil yapilir",
+        "salata ne olsun", "kahvalti ne yapayim",
+        "guzel yemek oner", "yemek tarifi", "lezzetli yemek",
+        "ekonomik yemek ne yapayim", "evde ne pisirsem",
+        "tatli oner", "tatli ne yapayim", "cikolata sever misin"
+      ],
+      "responses": [
+        "Pizza icin: hamur, sos, peynir! Firinda 15 dakika, harika olur!",
+        "Mercimek corbasi hem hizli hem lezzetli! 20 dakikada hazir!",
+        "Makarna: su kaynat, at icine, 10 dakika pisir, sos ekle! Kolay!",
+        "Tavuk sote: tavugu kizart, sogan biber ekle, domates sosu ile pisir!",
+        "Pilav: pirinci yika, kizart, su ekle, suyunu cekene kadar pisir!",
+        "Kahvalti icin: yumurta, peynir, zeytin, ekmek ve sicak cay!",
+        "Salata: yesillik, domates, salatalik, zeytinyagi! Hem saglikli hem guzel!",
+        "Tatli icin: sutlac veya kek yapabilirsin, cok lezzetli olur!",
+        "Evde hizli yemek: makarna veya corba yapabilirsin!"
+      ]
+    },
+    {
+      "tag": "film",
+      "patterns": [
+        "film oner", "hangi filmi izlemeliyim", "film onerir misin",
+        "izlenecek film", "film ne onerebilirsin", "ne izlesem",
+        "dizi oner", "film onerir misin bana",
+        "netflixte ne izlesem", "iyi film var mi",
+        "aksiyon filmi oner", "komedi filmi oner",
+        "korku filmi oner", "bilim kurgu filmi oner"
+      ],
+      "responses": [
+        "Inception! Yapay zeka ve zeka uzerine harika bir film!",
+        "The Matrix kesinlikle izlenmeli, benim ilham kaynaklarimdan!",
+        "Interstellar bilim kurgu severler icin muhtesem!",
+        "Breaking Bad dizisini oneririm, muhtesem bir senaryo!",
+        "Dark dizisi alman yapimi, zaman yolculugu uzerine cok etkileyici!",
+        "Aksiyon icin: John Wick veya Mad Max onerebilirim!",
+        "Komedi icin: The Hangover veya Superbad cok eglenceli!"
+      ]
+    },
+    {
+      "tag": "bilim",
+      "patterns": [
+        "bilim nedir", "bilim hakkinda bilgi ver", "bilim ne demek",
+        "bilimi anlat", "bilim ne ise yarar", "bilimsel dusunce nedir",
+        "bilim insanı kimdir", "bilim neden onemlidir",
+        "fen bilimleri nedir", "arastirma nedir",
+        "fizik nedir", "kimya nedir", "biyoloji nedir",
+        "bilim eglenceli mi", "bilimci olmak istiyorum",
+        "deney yapmak istiyorum", "bilimsel merak nedir"
+      ],
+      "responses": [
+        "Bilim, gozlem ve deneye dayanan sistematik bilgi uretimdir!",
+        "Bilim, merak ile baslar, deney ile devam eder, bilgi ile sonuclanir!",
+        "Fizik, evrendeki kuvvetleri ve hareketleri inceler!",
+        "Kimya, maddelerin yapisi ve ozellikleri uzerine calisir!",
+        "Biyoloji, canli varlari ve yasam sureclerini inceler!",
+        "Bilimci olmak icin once merak et, sonra arastir, en sonunda kesfet!",
+        "Bilimsel dusunce: onyargisiz, kanita dayali, mantikli dusunme bicimidir!",
+        "Bilim neden onemli? Cunku dunyayi anlamanin en iyi yolu!"
+      ]
+    },
+    {
+      "tag": "tarih",
+      "patterns": [
+        "tarih nedir", "tarih hakkinda bilgi ver", "osmanli imparatorlugu",
+        "turkiye cumhuriyeti", "istanbul hakkinda bilgi ver",
+        "ankara hakkinda bilgi ver", "tarihi olaylar anlat",
+        "istanbul nerededir", "ankara nerededir",
+        "cumhuriyet ne zaman kuruldu", "osmanli ne zaman kuruldu",
+        "ataturk kimdir", "tarih ogret", "osmanli hakkinda bilgi ver",
+        "turk tarihi hakkinda bilgi ver", "istanbul ne zaman kuruldu"
+      ],
+      "responses": [
+        "Tarih, gecmiste yasanan olaylari inceleyen bir bilim dalidir!",
+        "Osmanli Imparatorlugu 1299 yilinda kurulmus, buyuk bir imparatorluktur!",
+        "Turkiye Cumhuriyeti 29 Ekim 1923 yilinda Ataturk tarafindan kurulmustur!",
+        "Istanbul iki kitada yer alan dunyanin en guzeh sehirlerinden biridir!",
+        "Ankara Turkiye'nin baskentidir ve orta Anadolu'da bulunur!",
+        "Ataturk, Turkiye Cumhuriyeti'nin kurucusu ve ilk cumhurbaskanidir!",
+        "Osmanli Imparatorlugu 600 yil boyunca 3 kitada etkili olmustur!"
+      ]
+    },
+    {
+      "tag": "uzay",
+      "patterns": [
+        "uzay hakkinda bilgi ver", "mars ne demek", "gunes sistemi nedir",
+        "evren hakkinda bilgi ver", "jupiter buyuk mu", "ay ne demek",
+        "uzayda yasam var mi", "gezegenler nelerdir",
+        "marsa gitmek mumkun mu", "guneste yasam var mi",
+        "uzay araci nedir", "nasa ne yapar",
+        "mars hakkinda bilgi ver", "mars nerededir",
+        "marsa ne zaman gidilecek", "uzay hakkinda anlat",
+        "uzay yolculugu nasil olur", "en buyuk gezegen hangisidir",
+        "ay hakkinda bilgi ver", "gunes hakkinda bilgi ver",
+        "uzay yildizlari hakkinda bilgi ver", "astronot olmak istiyorum"
+      ],
+      "responses": [
+        "Mars, Gunes Sistemi'nde Dunya'dan sonra yasanabilecek en iyi gezegendir!",
+        "Uzay, dunya atmosferinin otesindeki sonsuz alandir!",
+        "Gunes Sistemimizde 8 gezegen bulunmaktadir, Mars 4. gezegendir!",
+        "Evren yaklasik 13.8 milyar yil once buyuk patlama ile olusmustur!",
+        "Jupiter, Gunes Sistemi'nin en buyuk gezegenidir!",
+        "Ay Dunya'nin tek dogal uydusudur ve dunya etrafinda doner!",
+        "Gunes bir yildizdir ve dunyaya isik ve sicaklik saglar!",
+        "Astronot olmak icin saglikli ol, bilim ogren, cok calis!"
+      ]
+    },
+    {
+      "tag": "hayvanlar",
+      "patterns": [
+        "hayvanlar hakkinda bilgi ver", "kedi hakkinda bilgi ver",
+        "kopek hakkinda bilgi ver", "aslan hakkinda bilgi ver",
+        "kusu hakkinda bilgi ver", "hayvanlar nerede yasar",
+        "en buyuk hayvan hangisidir", "hayvanlar ne yer",
+        "evcil hayvan oner", "hayvan seviyor musun",
+        "balik hakkinda bilgi ver", "kaplan hakkinda bilgi ver",
+        "kedi ne yer", "kopek ne yer", "kedi nerede yasar",
+        "aslan ne yer", "hayvan turleri nelerdir",
+        "en sevimli hayvan hangisidir", "kedi sevimli mi",
+        "kopek nerede yasar", "hayvanlar hakkinda soyle",
+        "kuslar hakkinda bilgi ver", "timsah hakkinda bilgi ver",
+        "zurafa hakkinda bilgi ver", "fil hakkinda bilgi ver",
+        "hayvanlar sevimli mi", "hangi hayvan en zeki"
+      ],
+      "responses": [
+        "Kediler balik, tavuk ve kuru mama yerler. Sevimli ve bagimsiz hayvanlardir!",
+        "Kopekler et ve kuru mama yerler. Insanin en sadik dostudur!",
+        "Aslan et yer, avlarini yakalayarak beslenir. Ormanlarin kralidir!",
+        "Kaplan et yer, ormanlarda yasar ve cok guclu bir hayvandir!",
+        "Kuslar tohum, böcek ve meyve yerler. Ucmalariyla taninir!",
+        "Baliklar suyun icinde yasar ve solungaclarla nefes alirlar!",
+        "Fil dunyanin en buyuk kara hayvanidir, cok zeki ve sosyaldir!",
+        "En zeki hayvanlar: primatlar, yunuslar ve kargalar olarak bilinir!",
+        "Evcil hayvan olarak kedi veya kopek onerebilirim!"
+      ]
+    },
+    {
+      "tag": "teknoloji",
+      "patterns": [
+        "teknoloji nedir", "teknoloji hakkinda bilgi ver",
+        "bilgisayar nedir", "internet nedir", "yazilim nedir",
+        "yapay zeka ne demek", "yapay zeka hakkinda bilgi ver",
+        "teknoloji neden onemlidir", "telefon nasil calisir",
+        "bilgisayar nasil calisir", "yapay zeka gelecekte ne olacak",
+        "yapay zeka bizi yok edecek mi", "robotlar insanlarin yerini alir mi",
+        "yapay zeka hakkinda ne dusunuyorsun", "teknoloji nasil gelisiyor"
+      ],
+      "responses": [
+        "Teknoloji, insanoğlunun hayatini kolaylastiran araclardir!",
+        "Bilgisayar, aritmetik veya mantiksel islemleri otomatik olarak yuruten dijital bir makinedir!",
+        "Internet, bilgisayar sistemlerini birbirine baglayan dunya capinda bir agdir!",
+        "Yapay zeka, bilgisayarlarin insan benzeri zeka gostermesini saglayan bir bilim dalidir!",
+        "Yazilim, bilgisayarlara ne yapacagini soyleyen komutlar tumudur!",
+        "Yapay zeka gelecekte hayatimizi cok degistirecek, ama tamamen insanlarin yerini almasi zor!",
+        "Robotlar bazi isleri devralabilir ama yaraticilik ve duygu hala insana ait!"
+      ]
+    },
+    {
+      "tag": "spor",
+      "patterns": [
+        "spor hakkinda bilgi ver", "futbol nedir", "basketbol nedir",
+        "futbol nasil oynanir", "basketbol nasil oynanir",
+        "en populer spor hangisidir", "yuzme nedir",
+        "spor yapmak neden onemlidir", "voleybol nasil oynanir",
+        "hangi sporu onerirsin", "spor ile ilgili bilgi ver",
+        "fitness yapmak istiyorum", "kosu yapmak istiyorum",
+        "spor salonuna gitmeli miyim", "evde spor yapabilirim"
+      ],
+      "responses": [
+        "Futbol dunyanin en populer sporudur, 11 kisilik takimlar oynar!",
+        "Basketbol 5 kisilik takimlarla oynanan bir top oyunudur!",
+        "Spor saglik icin cok onemlidir, duzenli spor yapmak vucudu guclendirir!",
+        "Yuzme hem eglenceli hem de saglikli bir spordur!",
+        "Volleyball 6 kisilik takimlarla file uzerinden oynanan bir oyundur!",
+        "Evde spor yapabilirsin: mekik, squat, plank gibi basit hareketlerle basla!",
+        "Fitness icin once hafif basla, sonra agirligi artir! Sabir onemli!"
+      ]
+    },
+    {
+      "tag": "saglik",
+      "patterns": [
+        "saglik hakkinda bilgi ver", "insan vucudu nasil calisir",
+        "kalp ne ise yarar", "beyin nedir", "beslenme onemli mi",
+        "saglikli yasam icin ne yapmaliyim", "vitamin nedir",
+        "spor saglik icin iyi mi", "uyku neden onemlidir",
+        "saglikli beslenme nasil olmali", "diyet yapmali miyim",
+        "su icmek neden onemlidir", "stres nasil gecirilir",
+        "saglikli kalmak icin ne yapmaliyim"
+      ],
+      "responses": [
+        "Saglikli beslenme ve duzenli spor sagligin temelidir!",
+        "Kalp vucudun en onemli organlarindan biridir, kan pompalar!",
+        "Beyin vucudun kontrol merkezidir, dusunme ve karar verme islevlerini yerine getirir!",
+        "Duzgun beslenme, yeterli uyku ve egzersiz saglikli yasamin sirridir!",
+        "Vitaminler vucudun dogru calismasi icin gerekli onemli besinlerdir!",
+        "Su icmek cok onemli! Gunude en az 2 litre su icmeye calis!",
+        "Stres icin: yuruyus yap, derin nefes al, sevdiklerinle vakit gecir!"
+      ]
+    },
+    {
+      "tag": "musiki",
+      "patterns": [
+        "muzik nedir", "muzik hakkinda bilgi ver",
+        "keman nedir", "gitar nedir", "piyano nedir",
+        "muzik dinlemek neden guzel", "muzik aletleri nelerdir",
+        "muzik hakkinda anlat", "sarki hakkinda bilgi ver",
+        "muzik dinlemek faydali mi", "bir muzik aleti ogrenmek istiyorum",
+        "gitar ogrenmek istiyorum", "piyano ogrenmek istiyorum"
+      ],
+      "responses": [
+        "Muzik, insanoğlunun ruhunu besleyen guclu bir sanat dalidir!",
+        "Keman, telli calinan bir muzik aletidir, cok zarif bir sesi vardir!",
+        "Gitar dunyanin en populer muzik aletlerinden biridir!",
+        "Piyano tuslari olan buyuk bir muzik aletidir, klasik muzigin temelidir!",
+        "Muzik dinlemek stresi azaltir ve ruh halini iyilestirir!",
+        "Gitar ogrenmek icin once akorlari ogren, sonra parmak calismasi yap!",
+        "Muzik aleti ogrenmek sabir ister ama cok eglenceli!"
+      ]
+    },
+    {
+      "tag": "matematik",
+      "patterns": [
+        "matematik nedir", "matematik hakkinda bilgi ver",
+        "matematik zor mu", "matematik neden zor",
+        "geometri nedir", "cebir nedir", "matematik neden onemlidir",
+        "matematik ogrenmek icin ne yapmaliyim",
+        "sayilar hakkinda bilgi ver", "istatistik nedir",
+        "matematik sevmiyorum", "matematik bana zor geliyor",
+        "sayilar neden onemlidir", "matematik hayatta ise yariyor mu"
+      ],
+      "responses": [
+        "Matematik, sayilar ve sekiller uzerine calisan bir bilim dalidir!",
+        "Geometri, sekillerin ozelliklerini inceleyen matematik dalidir!",
+        "Cebir, bilinmeyen degerleri harflerle temsil eden matematik dalidir!",
+        "Matematik hayatin her alaninda karsimiza cikar, ogrenmeye deger!",
+        "Matematik zor gibi gorunebilir ama pratik ile kolaylasir!",
+        "Matematik ogrenmek icin: once temelleri ogren, sonra soru coz, her gun pratik yap!",
+        "Matematik hayatta cok ise yariyor: alisveris, planlama, problem cozme!"
+      ]
+    },
+    {
+      "tag": "felsefe",
+      "patterns": [
+        "felsefe nedir", "felsefe hakkinda bilgi ver",
+        "felsefe ne demek", "felsefe neden onemlidir",
+        "etik nedir", "bilgi nedir", "felsefe zor mu",
+        "dusunmek hakkinda bilgi ver",
+        "felsefe hayata ne katar", "hayatin anlami ne",
+        "yaşamın anlamı ne", "felsefe ogrenmek istiyorum",
+        "dusunmek neden onemlidir", "bilgelik nedir"
+      ],
+      "responses": [
+        "Felsefe, hayatin buyuk sorularini sorgulayan dusunme bicimidir!",
+        "Etik, dogru ve yanlis hakkinda dusunme pratiigidir!",
+        "Felsefe, insana kendini ve dunyayi anlama yetenegi katar!",
+        "Dusunmek, insanin en guclu yetenegidir! Her gun biraz dusun!",
+        "Hayatin anlami herkese gore degisir, onemli olan kendi anlamiini bulmaktir!",
+        "Felsefe ogrenmek icin: once sorular sormayi ogren, sonra cevaplari arastir!",
+        "Bilgelik, bilgiyi hayatta kullanma yetenegidir! Zamanla gelisir!"
+      ]
+    }
+  ]
+}
