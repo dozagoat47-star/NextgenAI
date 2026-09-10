@@ -8,3 +8,5 @@ test_debug.py
 scraped_intents.json
 *.xlsx
 *.xlsm
+train_out.txt
+train_err.txt

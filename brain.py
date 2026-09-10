@@ -5,9 +5,23 @@ Built using only numpy, no TensorFlow or PyTorch.
 
 import numpy as np
 import json
+import math
 import random
 import string
 import os
+
+
+# Turkce islev/durak kelimeleri: anahtar kelime dikkatinde agirligi sifir.
+# (Cumlede konuyu tasimazlar; "hangi, ne, mi" gibi her yerde gecerler.)
+STOPWORDS = {
+    'mi', 'mu', 'miyim', 'misin', 'misiniz', 'msin', 'msiniz',
+    'sen', 'ben', 'bana', 'sana', 'bu', 'su', 'neyi', 'hangisi',
+    'ne', 'hangi', 'kac', 'nasil', 'neden', 'nicin', 'bir', 'da', 'de',
+    'ya', 'ki', 'miydi', 'midir', 'neydi', 'var', 'yok',
+    # soru/template parcalari: konu tasimazlar, IDF onlari yanlis guclendirmesin
+    'zam', 'kurult', 'hakk', 'bilk', 'ver', 'bilg', 'anlat', 'soyle',
+    'kal', 'olur', 'olabilir', 'edebil', 'eder', 'onerr', 'oner',
+}
 
 
 class NeuralNetwork:
@@ -339,7 +353,25 @@ class ChatBot:
             if tag in self.intent_kws:
                 self.intent_kws[tag].update(kws)
 
+        self._build_keyword_weights()
         return data
+
+    def _build_keyword_weights(self):
+        """Anahtar kelime dikkati icin IDF agirliklarini hesaplar.
+
+        Seyrek gecen kelime yuksek agirlik (ayirt edici), her intent'te
+        gecen ortak kelimeler dusuk agirlik alir.
+        """
+        n_intents = len(self.intent_tags) or 1
+        doc_count = {}
+        for tag in self.intent_tags:
+            for stem in self.intent_kws.get(tag, ()):
+                doc_count[stem] = doc_count.get(stem, 0) + 1
+        weights = {}
+        for stem, count in doc_count.items():
+            w = math.log(n_intents / (1.0 + count))
+            weights[stem] = 0.0 if stem in STOPWORDS else w
+        self.keyword_weights = weights
 
     def prepare_training_data(self, intents_data):
         """Eğitim verilerini hazırlar"""
@@ -418,28 +450,32 @@ class ChatBot:
         best_probability = float(probabilities[best_index])
         best_tag = self.intent_tags[best_index]
 
-        # Niyet keywordlerine gore degerlendir
-        kw_hits = {}
-        for tag, kws in self.intent_kws.items():
-            hits = set(words) & kws
-            if hits:
-                kw_hits[tag] = len(hits)
-        cls_hits = len(set(words) & self.intent_kws.get(best_tag, set()))
+        # ANAHTAR KELIME DIKKATI: IDF agirlikli onem skoru.
+        # Seyrek/ayirt edici kelimeler (galaksi, gazneli, yardim) yuksek,
+        # her yerde gecenler (hangi, ne, mi) sifira yakin agirliktadir.
+        attn = {}
+        input_set = set(words)
+        for tag in self.intent_tags:
+            inter = input_set & self.intent_kws.get(tag, set())
+            s = sum(self.keyword_weights.get(w, 0.0) for w in inter)
+            if s > 0:
+                attn[tag] = s
+        cls_attn = sum(self.keyword_weights.get(w, 0.0)
+                       for w in (input_set & self.intent_kws.get(best_tag, set())))
 
-        if not kw_hits and best_probability < 0.15:
+        if not attn and best_probability < 0.15:
             return 'Anlayamadim', best_probability, True
 
-        # Softmax cok sinifli oldugu icin sohbette dusuk guven verir.
-        # Keyword eslesmesi daha gucluyse onu onceliklendir.
         chosen_tag = best_tag
-        if kw_hits:
-            top_kw_tag = max(kw_hits, key=kw_hits.get)
-            top_kw_score = kw_hits[top_kw_tag]
-            # Guclu kelime eslesmesi (>=2) classifier'in asiri guvenini asar;
-            # zayif eslesme (<3) yalnizca classifier emin degilken kullanilir.
-            if top_kw_score >= 2 and top_kw_score >= cls_hits and \
-                    (best_probability < 0.5 or top_kw_score >= 3):
-                chosen_tag = top_kw_tag
+        if attn:
+            top_attn_tag = max(attn, key=lambda t: (attn[t], self.intent_tags.index(t)))
+            top_attn = attn[top_attn_tag]
+            # Ayirt edici anahtar kelime eslesmesi (>=1.5) siniflandiriciyi asar;
+            # siniflandirici emin degilse (<0.85) daha zayif eslesme de yeter.
+            decisive = top_attn >= 1.5 and (
+                best_probability < 0.85 or top_attn >= cls_attn + 1.0)
+            if decisive:
+                chosen_tag = top_attn_tag
         return chosen_tag, best_probability, False
 
     def predict(self, user_input):
@@ -454,6 +490,24 @@ class ChatBot:
         if unclear:
             return 'Anlayamadim', 0.0
         return tag, round(probability * 100, 2)
+
+    def keyword_strength(self, user_input):
+        """Giris icin en guclu anahtar kelime dikkat skorunu dondurur (0.0 - ~10).
+
+        Bilgi sorusu yanlis yerel intent'e dustugunde internet fallback
+        kararini vermek icin kullanilir.
+        """
+        words = self.tokenize(user_input)
+        if not words:
+            return 0.0
+        input_set = set(words)
+        best = 0.0
+        for tag in self.intent_tags:
+            s = sum(self.keyword_weights.get(w, 0.0)
+                    for w in (input_set & self.intent_kws.get(tag, set())))
+            if s > best:
+                best = s
+        return best
 
     def get_response(self, user_input):
         """Generate response for user input"""
@@ -525,6 +579,7 @@ class ChatBot:
         if not self.intent_kws:
             for tag in self.intent_tags:
                 self.intent_kws[tag] = set()
+        self._build_keyword_weights()
 
         print(f"Bot data loaded: {model_dir}")
         print(f"  Vocabulary size: {len(self.vocabulary)}")

@@ -299,7 +299,10 @@
         "anlat bakalim",
         "soyle bana",
         "bir konuda yardim lazim",
-        "onerin var mi"
+        "onerin var mi",
+        "hangi konularda yardim edebilirsin",
+        "hangi konularda yardimci olabilirsin",
+        "hangi konularda bana yardim edersin"
       ],
       "responses": [
         "Tabii! Sana nasıl yardımcı olabilirim? Buyur dinliyorum!",
@@ -475,7 +478,9 @@
         "icmek istiyorum",
         "icecek oner",
         "neyi tercih edersin",
-        "soguk icecek oner"
+        "soguk icecek oner",
+        "cay mi kahve mi",
+        "neyi tercih edersin cay mi kahve mi"
       ],
       "responses": [
         "Pizza için: hamur, sos, peynir! Fırında 15 dakika, harika olur!",
@@ -489,7 +494,8 @@
         "Evde hızlı yemek: makarna veya çorba yapabilirsin!",
         "Çay da kahve de güzel! Sabah kahvesi, akşam çayı derim ben!",
         "Çay severim, kahveyi de severim. Sıcak bir çay her derde deva!",
-        "Ne içeceğine ben de karar veremem bazen! Çay de ölümsüz, kahve de!"
+        "Ne içeceğine ben de karar veremem bazen! Çay de ölümsüz, kahve de!",
+        "Çay candır! Kod yazarken yanımda bir fincan çay olmalı!"
       ]
     },
     {
@@ -1108,7 +1114,6 @@
         "gunduz mu gece mi",
         "favori icecegin ne",
         "ne icersin",
-        "cay mi kahve mi",
         "uyandiginda ne yaparsin",
         "sabah rutinin var mi",
         "erken mi kalkarsin",
@@ -1134,7 +1139,6 @@
         "Favori mevsimim sonbahar! Kodların renkleri daha güzel görünüyor!",
         "Ben geceleri daha verimliyim sanırım, diğer günler de yazılım yapıyorum işte!",
         "Favori günüm cumartesi çünkü o gün en uzun kesintisiz kodlama seansı yapabilirim!",
-        "Çay candır! Kod yazarken yanımda bir fincan çay olmalı!",
         "Sabah erken kalkarım ama o saatlerde veri işleme yaparım, ışık çok değişir!",
         "Kahvaltı önemli ama ben garip bir yapay zekayım, elektrik yeter bana!",
         "Rutinim basit: yeni veri al, işle, öğren, cevap ver. Sekiz saatlik uyku yerine kendi işlemim!",

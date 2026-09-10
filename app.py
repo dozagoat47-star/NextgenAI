@@ -89,7 +89,9 @@ def chat():
 
         _, probability = bot.get_probability(user_message)
 
-        if probability < FALLBACK_THRESHOLD and is_factual_query(user_message):
+        if is_factual_query(user_message) and (
+                probability < FALLBACK_THRESHOLD
+                or (probability < 0.7 and bot.keyword_strength(user_message) < 1.5)):
             print(f"[CHAT] Bilgi sorusu, dusuk guven (%.2f), internetten araniyor..." % probability)
             knowledge = fetch_answer(user_message)
             if knowledge:

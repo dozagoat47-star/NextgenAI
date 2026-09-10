@@ -6,12 +6,20 @@ Trains and saves the neural network.
 import os
 import sys
 import io
+import argparse
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 from brain import ChatBot
 
 def main():
+    parser = argparse.ArgumentParser(description='Nextgen AI model egitimi')
+    parser.add_argument('--epochs', type=int, default=3000,
+                        help='epoch sayisi (varsayilan 3000)')
+    parser.add_argument('--no-demo', action='store_true',
+                        help='egitim sonrasi test sohbetini atla (hizli CI icin)')
+    args = parser.parse_args()
+
     print("=" * 50)
     print("  NEXTGEN AI - MODEL TRAINING")
     print("  Built from Scratch AI")
@@ -29,10 +37,10 @@ def main():
     bot = ChatBot()
 
     print("Training parameters:")
-    print("  - Epochs: 3000")
+    print(f"  - Epochs: {args.epochs}")
     print("  - Learning Rate: 0.01")
     print()
-    losses = bot.train_model(intents_file, epochs=3000, learning_rate=0.01)
+    losses = bot.train_model(intents_file, epochs=args.epochs, learning_rate=0.01)
 
     print()
     print("=" * 50)
@@ -43,6 +51,10 @@ def main():
     print("Training completed!")
     print(f"Model saved: {model_dir}")
     print()
+
+    if args.no_demo:
+        return
+
     print("Start the web interface:")
     print("  python app.py")
     print()
