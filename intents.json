@@ -1815,7 +1815,9 @@
       "responses": [
         "yüzyılda teoremi, istatistiksel mekaniğin gizli zaman cetvelini ortaya koymak amacıyla kullanmışlardır.",
         "Sonsuz maymun teoremi, bir daktilonun tuşlarına sonsuz bir süre boyunca gelişigüzel basan bir maymunun belirli bir metni (örneğin William Shakespeare'in tüm yapıtlarını) neredeyse kesin olarak yazabileceğini ortaya koyan matematik teoremidir.",
-        "Bu bağlamda, \"neredeyse kesin\" söz öbeği matematiksel bir terimdir ve \"maymun\" da gerçek bir maymundan çok, rastgele harflerden oluşan bir diziyi sonsuza dek üreten soyut bir aygıtı ifade eder."
+        "Bu bağlamda, \"neredeyse kesin\" söz öbeği matematiksel bir terimdir ve \"maymun\" da gerçek bir maymundan çok, rastgele harflerden oluşan bir diziyi sonsuza dek üreten soyut bir aygıtı ifade eder.",
+        "Émile Borel ve Arthur Eddington 20.",
+        "Teoremin çok ya da sonsuz sayıda yazıcı içeren uyarlamaları olduğu gibi, hedef metnin büyüklüğü de bütün bir kütüphane ile tek bir cümle arasında değişebilmektedir."
       ]
     },
     {
@@ -3165,7 +3167,9 @@
       "responses": [
         "555), yaklaşık 541 yılından suikasta uğradığı 555 yılına kadar Lazika'ya hükmeden kraldır.",
         "İlk başta Bizans İmparatorluğu'nun vasalı olarak tahta çıktı ancak Bizans makamlarının ağır uygulamaları sonucunda Bizans'ın başlıca rakibi Sasani İmparatorluğu'ndan yardım almaya çalıştı.",
-        "İki imparatorluk Lazika'nın kontrolü için savaşırken, Petra Kalesi mücadelenin odak noktası olmuştu."
+        "İki imparatorluk Lazika'nın kontrolü için savaşırken, Petra Kalesi mücadelenin odak noktası olmuştu.",
+        "Sonunda Gubaz, savaştan bir sonuç alınamaması üzerine Bizans generalleriyle kavga etti ve sonrasında generaller tarafından öldürüldü.",
+        "Lazika Savaşı'nın liderlerinden biriydi."
       ]
     },
     {
@@ -3245,6 +3249,150 @@
         "Neron'un saltanatını gerçekle kurguyu birbirinden tamamen ayırarak ele almak mümkün değildir.",
         "Bu hikâyeler, bazı erken dönem Hristiyan yazarlarla birlikte tarihçiler Tacitus, Suetonius ve Cassius Dio'un anlattıklarına dayanır.",
         "Öte yandan bazı eski kaynaklara göre Neron, halkın gözünde hükümdarlığı sırasında ve sonrasında oldukça popülerdi."
+      ]
+    },
+    {
+      "tag": "1896 yaz olimpiyatlari'nda isvec",
+      "patterns": [
+        "1896 yaz olimpiyatlari'nda isvec nedir",
+        "1896 yaz olimpiyatlari'nda isvec hakkinda bilgi ver",
+        "1896 yaz olimpiyatlari'nda isvec ne demek",
+        "1896 yaz olimpiyatlari'nda isvec anlat",
+        "bana 1896 yaz olimpiyatlari'nda isvec hakkinda bilgi ver",
+        "1896 yaz olimpiyatlari'nda isvec hakkinda konus"
+      ],
+      "responses": [
+        "İsveç, Yunanistan'ın başkenti Atina'da düzenlenen ve modern Olimpiyat Oyunları'nın ilki olma niteliği taşıyan 1896 Yaz Olimpiyatları'na bir sporcuyla katıldı.",
+        "Oyunlardaki 14 ülkeden biri olan İsveç'i temsil eden Henrik Sjöberg; atletizm ve jimnastikte, toplamda beş farklı branşta mücadele etti.",
+        "İlk olarak atletizm etkinlikleri kapsamında yapılan 100 metre yarışlarına katılan Sjöberg, eleme turunu geçemeyerek final aşamasına katılamadı."
+      ]
+    },
+    {
+      "tag": "anitkabir tarihi",
+      "patterns": [
+        "anitkabir tarihi nedir",
+        "anitkabir tarihi hakkinda bilgi ver",
+        "anitkabir tarihi ne demek",
+        "anitkabir tarihi anlat",
+        "bana anitkabir tarihi hakkinda bilgi ver",
+        "anitkabir tarihi hakkinda konus"
+      ],
+      "responses": [
+        "6 Haziran 1951'de gerçekleştirilen inşaatın dördüncü ve son kısmının ihalesini, Muzaffer Budak'ın şirketi kazandı.",
+        "Kompleksteki heykel, kabartma ve yazıların konuları, oluşturulan komisyonlar tarafından belirlenirken bunların tasarımları ve uygulamaları için sırasıyla yarışma ve ihale yöntemleri izlendi.",
+        "Bu kısım; Şeref Holü ile tonozların alt döşemeleri, Şeref Holü çevresi taş profilleri ile saçak süslemeleri ve mermer işlerinin yapılmasını kapsıyordu."
+      ]
+    },
+    {
+      "tag": "bab-i ali tercumani",
+      "patterns": [
+        "bab-i ali tercumani nedir",
+        "bab-i ali tercumani hakkinda bilgi ver",
+        "bab-i ali tercumani ne demek",
+        "bab-i ali tercumani anlat",
+        "bana bab-i ali tercumani hakkinda bilgi ver",
+        "bab-i ali tercumani hakkinda konus"
+      ],
+      "responses": [
+        "Bâb-ı Âli tercümanı, resmi dairelerdeki yazışmaların tercüme ve yazımını yapmakla görevliydi.",
+        "Makam, 1661'de oluşturulmasından 1821'de Yunan İsyanı'nın patlak vermesine kadar büyük ölçüde Fenerli Rumlar tarafından yönetildi ve Osmanlı İmparatorluğu'ndaki gayrimüslimlerin erişmiş olduğu en yüksek kamu göreviydi.",
+        "Özetle diplomatik işlerin idaresinde Reis-ül küttabdan sonra gelen en önemli görevliydi."
+      ]
+    },
+    {
+      "tag": "fil",
+      "patterns": [
+        "fil nedir",
+        "fil hakkinda bilgi ver",
+        "fil ne demek",
+        "fil anlat",
+        "bana fil hakkinda bilgi ver",
+        "fil hakkinda konus"
+      ],
+      "responses": [
+        "Diğer hayvanlar fillerden uzak durur ve aslan, kaplan, sırtlan ile yabani köpekler gibi yırtıcılar yalnızca yavru fillere saldırır.",
+        "Testosteron salgılanmasının arttığı ve aşırı saldırgan davranışların görüldüğü mest adı verilen durum erkek fillerin baskın olmalarına olanak verir ve üreme başarısını artırır.",
+        "Karada yaşayan en büyük hayvan olan Afrika filinin erkeği 4 m boya ve 7.000 kg ağırlığa ulaşabilir."
+      ]
+    },
+    {
+      "tag": "malmo arena",
+      "patterns": [
+        "malmo arena nedir",
+        "malmo arena hakkinda bilgi ver",
+        "malmo arena ne demek",
+        "malmo arena anlat",
+        "bana malmo arena hakkinda bilgi ver",
+        "malmo arena hakkinda konus"
+      ],
+      "responses": [
+        "Malmö Arena, İskandinav ülkelerinden İsveç'in Malmö şehrinde yer alan çok amaçlı bir kapalı arena; aynı zamanda Hockeyallsvenskan liginden buz hokeyi kulübü Malmö Redhawks'a ev sahipliği yapan yer.",
+        "19 Kasım 2010'da Amerikalı şarkıcı Lady Gaga, arenada 11.300 kişiye konser verdi ve böylece burada yapılan konserler arasındaki en büyük doluluk rakamına ulaşıldı.",
+        "MM Matsson Konsult AB'den Mats Matson, Pöyry Mimarlık'tan Hannu Helkiö ve Wingårdh arkitektkontor'dan Gert Wingårdh tarafından tasarlanan arena, sahibi Parkfast AB tarafından işletilir."
+      ]
+    },
+    {
+      "tag": "northrop yf-23",
+      "patterns": [
+        "northrop yf-23 nedir",
+        "northrop yf-23 hakkinda bilgi ver",
+        "northrop yf-23 ne demek",
+        "northrop yf-23 anlat",
+        "bana northrop yf-23 hakkinda bilgi ver",
+        "northrop yf-23 hakkinda konus"
+      ],
+      "responses": [
+        "Finalist olarak Northrop ve Lockheed'in önerileri seçildi.",
+        "Northrop/McDonnell Douglas YF-23, Amerika Birleşik Devletleri Hava Kuvvetleri için tasarlanmış tek kişilik, çift motorlu hayalet avcı uçağı ve teknoloji göstericisidir.",
+        "YF-23 rakibine göre radara daha az görünür ve daha hızlı olsa da aynı derecede çevik değildi."
+      ]
+    },
+    {
+      "tag": "sm ub-14",
+      "patterns": [
+        "sm ub-14 nedir",
+        "sm ub-14 hakkinda bilgi ver",
+        "sm ub-14 ne demek",
+        "sm ub-14 anlat",
+        "bana sm ub-14 hakkinda bilgi ver",
+        "sm ub-14 hakkinda konus"
+      ],
+      "responses": [
+        "Bir dönem Avusturya-Macaristan İmparatorluğu'nda da görev yapan denizaltı, bu dönemde SM U-26 adını taşımıştı.",
+        "Enkazı dalgıçlar tarafından bulundu ve pervanesindeki işaretler sayesinde geminin kimliği tespit edilebildi.",
+        "Savaşın sonuna kadar kaldığı bu görev kapsamında üç gemi batırdı."
+      ]
+    },
+    {
+      "tag": "samsun",
+      "patterns": [
+        "samsun nedir",
+        "samsun hakkinda bilgi ver",
+        "samsun ne demek",
+        "samsun anlat",
+        "bana samsun hakkinda bilgi ver",
+        "samsun hakkinda konus"
+      ],
+      "responses": [
+        "Samsun, Türkiye'nin Samsun ilinin merkezi olan şehirdir.",
+        "Yerleşim geçmişi MÖ 60.000 yılına dek uzanan Samsun'da varlığı bilinen en eski halk MÖ 12.",
+        "Perslerin ardından Makedonya, Pontus, Roma, Bizans egemenliği gören Samsun, bunların ardından bir Ceneviz kolonisi hâline gelmiştir."
+      ]
+    },
+    {
+      "tag": "istanbul profesyonel ligi",
+      "patterns": [
+        "istanbul profesyonel ligi nedir",
+        "istanbul profesyonel ligi hakkinda bilgi ver",
+        "istanbul profesyonel ligi ne demek",
+        "istanbul profesyonel ligi anlat",
+        "bana istanbul profesyonel ligi hakkinda bilgi ver",
+        "istanbul profesyonel ligi hakkinda konus"
+      ],
+      "responses": [
+        "Toplamda sekiz sezon düzenlenen ligde Fenerbahçe ve Galatasaray üçer, Beşiktaş ise 2 şampiyonluk elde etti.",
+        "Ligi olarak da anılmaya başlandı.",
+        "1956-57 sezonunda İstanbul Profesyonel 2."
       ]
     }
   ]
