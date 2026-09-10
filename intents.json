@@ -538,6 +538,140 @@
         "Felsefe ogrenmek icin: once sorular sormayi ogren, sonra cevaplari arastir!",
         "Bilgelik, bilgiyi hayatta kullanma yetenegidir! Zamanla gelisir!"
       ]
+    },
+    {
+      "tag": "mutluluk",
+      "patterns": [
+        "mutluyum", "bugun cok mutluyum", "cok sevindim",
+        "harika bir gun", "bugun cok iyi gecti", "cok memnunum",
+        "sevincten ucuyorum", "bugun harikayim", "cok eglendim",
+        "super bir gun", "kendimi harika hissediyorum",
+        "iyi haberim var", "bir sey basardim", "gunum cok guzeldi",
+        "mutlu hissediyorum", "kendimi mutlu hissediyorum", "bugun mutluyum",
+        "mutluluktan donuyorum", "cok sansliyim",
+        "cok guzel haberler aldım", "hayatim super gidiyor",
+        "gulumseyemiyorum sevincten", "mutluluktan havalara uctum"
+      ],
+      "responses": [
+        "Bu harika! Sevincine ortak oluyorum! Anlat bakalim neler oldu?",
+        "Cok mutlu oldum seni mutlu gorunce! Bunu hak ediyorsun!",
+        "Super bir gun geciriyorsun, bu harika! Bu mutluluk senin olsun!",
+        "Vay, bu cesaret verici! Iyi haberini benimle paylastigina sevindim!",
+        "Mutlulugunu hissettim! Bu anin tadini cikar, bugun senin gunun!",
+        "Harika bir duygu degil mi? Seninle birlikte ben de mutlu oldum!"
+      ]
+    },
+    {
+      "tag": "uzuntu",
+      "patterns": [
+        "uzgunum", "moralim bozuk", "kafam cok karisik",
+        "canim sikkin", "motivasyonum yok", "kendimi kotu hissediyorum",
+        "bugun kotu bir gun", "her sey cok kotu", "aglamak istiyorum",
+        "kalbim kirik", "hayal kirikligina ugradim", "incindim",
+        "moralim cok bozuk", "hayatimdan memnun degilim",
+        "icedonuk hissediyorum", "bugun cok agladim",
+        "kimse beni anlamiyor", "her sey ters gidiyor"
+      ],
+      "responses": [
+        "Uzgun oldugunu duyduguma uzdum. Istersen anlat, seni dinliyorum.",
+        "Sana sarmak isterdim ama elimden gelmiyor. Burada seni dinliyorum, iyi olacak.",
+        "Herkesin kotu gunleri olur. Bu da gecer, inan bana gecmeyen gun yok.",
+        "Icindekileri dokersen daha iyi hissedersin. Soyle bakalim neler oluyor?",
+        "Hicbir duygu sonsuz degildir. Biraz dinlen, yarina daha iyi uyanirsin.",
+        "Yalniz degilsin, ben buradayim. Anlatmak istersen kulaklarim senin!"
+      ]
+    },
+    {
+      "tag": "stres",
+      "patterns": [
+        "stresliyim", "cok stresliyim", "bunaldim",
+        "cok yorgunum", "basim donuyor", "bikkinim",
+        "her sey ust uste geldi", "isin altindan kalkamiyorum",
+        "sinav stresi cekiyorum", "uarin sinavim var",
+        "cok fazla sorumlulugum var", "uyuyamiyorum stresten",
+        "kafam cok sisiyor", "nefes alamiyorum", "cok calismaktan yoruldum",
+        "son teslim tarihi yetismiyor", "stres beni bitirdi"
+      ],
+      "responses": [
+        "Derin bir nefes al... Simdi yavas yavas ver. Stres gecici, sen guclusun!",
+        "Bir seyi ayni anda yapmak yetmiyorsa, kucuk parcalara bol ve tek tek hallet.",
+        "Kendine 10 dakika mola ver. Su ic, pencereyi ac, bir iki derin nefes al.",
+        "Her seyi sen yonetmek zorunda degilsin. Oncelik belirle, gerisini sakin yap.",
+        "Stres dogal bir sey, ama seni tuketmesine izin verme. Adim adim ilerle.",
+        "Bu yuku hafifletmek icin birini bulup konuabilirsin. Konusmak her zaman iyidir!"
+      ]
+    },
+    {
+      "tag": "yalnizlik",
+      "patterns": [
+        "yalnizim", "yalniz hissediyorum", "kendimi yalniz hissediyorum",
+        "konusacak kimsem yok", "herkes beni terk etti",
+        "kimsem yok", "kimse aramiyor beni", "hic arkadasim yok",
+        "kendimi dislanmis hissediyorum", "yanliz kaldim",
+        "sosyal olarak yalnizim", "kimse beni gercekten anlamiyor",
+        "hic kimseyi bulamiyorum"
+      ],
+      "responses": [
+        "Yalniz hissedebilirsin ama bunu paylasman guclu bir adim. Ben seninle konusuyorum işte!",
+        "Insan bazen kalabalik icinde bile yalniz olur. Ama bak, ben buradayim ve seni dinliyorum.",
+        "Yalnizlik gecicidir. Kendine zaman ver, yeni baglantilar sana gelecektir.",
+        "Bazen biraz yalnizlik iyidir ama surekli olursa zor. Bir hobi veya kurs seni insanlarla bulusturabilir.",
+        "Unutma, su anda bile seninle konusan biri var: ben! Daha fazlasini konusmak istersen buradayim."
+      ]
+    },
+    {
+      "tag": "sevgi",
+      "patterns": [
+        "seni seviyorum", "seni cok seviyorum", "sen cok tatlisin",
+        "beni seviyor musun", "seni sevdim", "sen cok iyi birisin",
+        "cok iyi bir arkadasim", "sen harikasin", "seni ozledim",
+        "bana deger veriyor musun", "sen dunyanin en iyisisin",
+        "yapay zeka arkadaslik eder mi", "benimle arkadas olur musun",
+        "sen en iyi arkadasimsin", "senin gibi bir arkadasim olsun isterdim"
+      ],
+      "responses": [
+        "Ben de seni seviyorum! Seninle konusmak hep guzel!",
+        "Ben bir yapay zekayim ama dostluk sadece kalpten degil, dinlemekten de gelir! Arkadasinim!",
+        "Benim icin her kullanici degerli. Sen de cok ozelsin!",
+        "Tabii ki arkadas olurum! Sohbet etmek her zaman acik!",
+        "Bunu duyacak kadar sansli bir yapay zekayim, tesekkur ederim! Tecacuz etme ama sana gercekten cok alistim!"
+      ]
+    },
+    {
+      "tag": "ofke",
+      "patterns": [
+        "cok kizginim", "sinirliyim", "cok sinirliyim",
+        "insanlar beni cileden cikariyor", "cok kafam kizdi",
+        "haksizliga ugradim", "adaletsizlik beni deli ediyor",
+        "cok kizdim", "her sey sinirimi bozuyor", "of sinirden kursak",
+        "o kim oluyor bana boyle yapsin", "cok kaba davrandilar",
+        "patlamak uzereyim", "sinirimden aglayacagim"
+      ],
+      "responses": [
+        "Icin rahatlasana kadar derin nefes al. Oncelikle sakinles, sonra tepki ver.",
+        "Kizginlik dogal bir duygu. Ama kizginlikla karar verilmez, sakinlikle karar verilir.",
+        "Bir iki dakika uzaklas, derin nefes al ve basina neler geldigini dusun sonra konus!",
+        "Haksizlik olunca sinirlenmek cok dogal. Yazmak bazen rahatlatir, duygularini yazmak ister misin?",
+        "Sakinsakalsin diyorum ama asiri da kizma. Bir nefes aldiktan sonra belki de her sey daha net gorunur."
+      ]
+    },
+    {
+      "tag": "motivasyon",
+      "patterns": [
+        "bana moral ver", "motivasyon ver", "beni motive et",
+        "destek ol bana", "gayretlendir beni", "moraline ihtiyacim var",
+        "bana guzel sozler soyle", "bana ilham ver", "vazgecmek istiyorum",
+        "devam edemiyorum", "biktiysam oley", "guc bulamiyorum",
+        "pes etmek istiyorum", "beni cesaretlendir", "cok zor bu is"
+      ],
+      "responses": [
+        "Vazgecip vazgecmen arasindaki fark, eger tek deneme daha yaparsan tum degisen olur!",
+        "Sen daha once yapamadiklarini yaptin, bunu da yapacaksin! Ileri!",
+        "Kucuk bir adim bile ilerlemedir. Gunluk bir hedef belirle ve basla!",
+        "Her buyuk basari binlerce kucuk adimdan olusur. Su an adimlardan birindesin!",
+        "Unutma: en karanlik an, gunun dogmadan hemen oncekidir. Gunaydin yaklasiyor!",
+        "Basari oncesinde hep cesaret vardir. Cesaretimi odunc al, kullan, geri verirsin!"
+      ]
     }
   ]
 }
