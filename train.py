@@ -29,10 +29,10 @@ def main():
     bot = ChatBot()
 
     print("Training parameters:")
-    print("  - Epochs: 2000")
+    print("  - Epochs: 3000")
     print("  - Learning Rate: 0.01")
     print()
-    losses = bot.train_model(intents_file, epochs=2000, learning_rate=0.01)
+    losses = bot.train_model(intents_file, epochs=3000, learning_rate=0.01)
 
     print()
     print("=" * 50)

@@ -27,7 +27,7 @@ if sys.stdout.encoding.lower() not in ('utf-8', 'utf8'):
 
 API_BASE = "https://tr.wikipedia.org/w/api.php"
 USER_AGENT = "NextgenAI/1.0 (educational chatbot; local test) requests/2.0"
-AUTOGROW_MAX_INTENTS = 250
+AUTOGROW_MAX_INTENTS = 500
 MAX_PATTERNS = 6
 MAX_RESPONSES = 3
 
