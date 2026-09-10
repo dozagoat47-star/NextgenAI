@@ -30,13 +30,14 @@ jobs:
         run: python autogrow.py --minutes 20 --source mixed --count 8
 
       - name: Train model
-        run: python train.py
+        run: python train.py --epochs 400
 
       - name: Commit and push if changed
         run: |
           git config user.name "dozagoat47-star"
           git config user.email "dozagoat47-star@users.noreply.github.com"
           if [ -n "$(git status --porcelain)" ]; then
+            git pull --rebase origin main
             git add intents.json
             git commit -m "autogrow: Wikipedia'dan yeni bilgiler eklendi [skip ci]"
             git push -q
