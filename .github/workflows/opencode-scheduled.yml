@@ -22,12 +22,12 @@ jobs:
           persist-credentials: false
 
       - name: Run OpenCode
-        uses: anomalyco/opencode/github@latest
+        uses: anomalyco/opencode/github@2.0
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          model: groq/groq/compound
+          model: groq/llama-3.3-70b-versatile
           use_github_token: true
           prompt: |
             Sen otonom bir QA muhendisisin. Bu oturumda:
