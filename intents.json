@@ -1216,6 +1216,22 @@
         "Kasaba Mora'nın doğusunda, kıyıya yakın bir noktadaki ada üzerinde yer almaktadır.",
         "Monemvasya, Osmanlı döneminde Menevşiye/Benefşe/Menekşe, Mora Yarımadası'nın Lakonya iline bağlı Monemvasia belediyesinde bir kasabadır."
       ]
+    },
+    {
+      "tag": "stalag 381",
+      "patterns": [
+        "stalag 381 nedir",
+        "stalag 381 hakkinda bilgi ver",
+        "stalag 381 ne demek",
+        "stalag 381 anlat",
+        "bana stalag 381 hakkinda bilgi ver",
+        "stalag 381 hakkinda konus"
+      ],
+      "responses": [
+        "Tapa'daki \"Stalag 381 XXI-B\" adındaki şube Ekim 1941 - Mayıs 1943 tarihleri arasında faaliyet yürüttü.",
+        "Nazilerin Sovyet savaş esirlerine karşı işledikleri suçlar kapsamında pek çok kişi burada öldürüldü.",
+        "Sovyet savaş esirlerini toplamak için inşa edilen 381 numaralı Stalag iki şube halinde Tallinn ve Tapa'da kuruldu."
+      ]
     }
   ]
 }
