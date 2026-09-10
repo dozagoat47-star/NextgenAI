@@ -26,8 +26,8 @@ jobs:
       - name: Install dependencies
         run: pip install requests numpy
 
-      - name: Grow knowledge from Wikipedia
-        run: python autogrow.py --count 5
+      - name: Browse knowledge for 20 minutes
+        run: python autogrow.py --minutes 20 --source mixed --count 8
 
       - name: Train model
         run: python train.py
