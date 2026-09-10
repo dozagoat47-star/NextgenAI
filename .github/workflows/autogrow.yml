@@ -2,7 +2,7 @@ name: Autogrow Knowledge
 
 on:
   schedule:
-    - cron: '20 */4 * * *'
+    - cron: '20 */2 * * *'
   workflow_dispatch:
 
 jobs:
