@@ -404,11 +404,11 @@ class ChatBot:
         best_index = int(np.argmax(probabilities))
         return self.intent_tags[best_index], float(probabilities[best_index])
 
-    def get_response(self, user_input):
-        """Generate response for user input"""
-        if self.model is None:
-            return "Model not trained yet! Please run train.py first."
+    def _classify(self, user_input):
+        """Input icin secilen intent etiketini, guveni ve belirsizlik bayragini dondurur.
 
+        Keyword override dahil get_response ile birebir ayni secim mantigini kullanir.
+        """
         words = self.tokenize(user_input)
         bag = self.bag_of_words(words)
         X = np.array([bag])
@@ -426,6 +426,9 @@ class ChatBot:
                 kw_hits[tag] = len(hits)
         cls_hits = len(set(words) & self.intent_kws.get(best_tag, set()))
 
+        if not kw_hits and best_probability < 0.15:
+            return 'Anlayamadim', best_probability, True
+
         # Softmax cok sinifli oldugu icin sohbette dusuk guven verir.
         # Keyword eslesmesi daha gucluyse onu onceliklendir.
         chosen_tag = best_tag
@@ -437,8 +440,31 @@ class ChatBot:
             if top_kw_score >= 2 and top_kw_score >= cls_hits and \
                     (best_probability < 0.5 or top_kw_score >= 3):
                 chosen_tag = top_kw_tag
-        elif best_probability < 0.15:
+        return chosen_tag, best_probability, False
+
+    def predict(self, user_input):
+        """Disa aktarmadan tahmin kullanimi icin (Excel taramalari gibi).
+
+        Returns:
+            (etiket, guven_yuzdesi) ; anlayamazsa ('Anlayamadim', 0.0)
+        """
+        if self.model is None:
+            return 'Model yok', 0.0
+        tag, probability, unclear = self._classify(user_input)
+        if unclear:
+            return 'Anlayamadim', 0.0
+        return tag, round(probability * 100, 2)
+
+    def get_response(self, user_input):
+        """Generate response for user input"""
+        if self.model is None:
+            return "Model not trained yet! Please run train.py first."
+
+        chosen_tag, _, unclear = self._classify(user_input)
+        if unclear:
             return "Anlayamadim, baska sekilde soyler misin?"
+
+        words = self.tokenize(user_input)
 
         responses = self.intents.get(chosen_tag, ["Bir hata olustu."])
 
