@@ -1,8 +1,8 @@
-name: Autogrow Knowledge
+name: Autogrow Deep Knowledge
 
 on:
   schedule:
-    - cron: '17 * * * *'
+    - cron: '0 3 * * *'
   workflow_dispatch:
 
 concurrency:
@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  autogrow:
+  autogrow-deep:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -26,8 +26,8 @@ jobs:
       - name: Install dependencies
         run: pip install requests numpy
 
-      - name: Grow knowledge from Wikipedia
-        run: python autogrow.py --count 5
+      - name: Deep browse knowledge for 20 minutes
+        run: python autogrow.py --minutes 20 --source mixed --count 6
 
       - name: Train model
         run: python train.py
@@ -38,7 +38,7 @@ jobs:
           git config user.email "dozagoat47-star@users.noreply.github.com"
           if [ -n "$(git status --porcelain)" ]; then
             git add intents.json
-            git commit -m "autogrow: Wikipedia'dan yeni bilgiler eklendi [skip ci]"
+            git commit -m "autogrow: 20 dakikalik derin tarama ile yeni bilgiler eklendi [skip ci]"
             git push -q
             echo "New knowledge committed and pushed."
           else

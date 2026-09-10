@@ -4,9 +4,10 @@ Wikipedia'dan konular ceker, intents.json'a ekler.
 GitHub Actions'ta zamanlanmis olarak calisir ve modelin kendi kendine buyumesini saglar.
 
 Kullanim:
-    python autogrow.py                       # 4 konu (seckin maddeler)
-    python autogrow.py --count 10            # 10 konu
-    python autogrow.py --source random       # rastgele sayfalar
+    python autogrow.py                       # tek tur, seckin maddeler
+    python autogrow.py --count 10            # tek turda 10 konu
+    python autogrow.py --minutes 20          # 20 dakika boyunca surekli gez (her saat/tur)
+    python autogrow.py --source mixed        # seckin + rastgele karisik
     python autogrow.py --topics "Fizik,Denizel_biyoloji"  # belirli konular
 """
 
@@ -182,40 +183,30 @@ def build_intent(title, extract):
     }
 
 
-def main():
-    parser = argparse.ArgumentParser(description='Autonomous knowledge growth')
-    parser.add_argument('--count', type=int, default=4, help='kac konu eklenecek')
-    parser.add_argument('--topics', type=str, default='',
-                        help='virgulle ayrilmis belirli konular')
-    parser.add_argument('--source', type=str, default='featured',
-                        choices=['featured', 'random', 'mixed'],
-                        help='hangi kaynaktan konu cekilecek')
-    args = parser.parse_args()
+def grow_once(source, count):
+    """
+    Tek bir buyume turu calistirir.
 
+    Returns:
+        (added, updated) veya None (cap'a ulasildi, duz dur)
+    """
     with open(INTENTS_FILE, 'r', encoding='utf-8') as f:
         existing_count = len(json.load(f)['intents'])
 
     if existing_count >= AUTOGROW_MAX_INTENTS:
-        print(f"[DUR] Zaten {existing_count} intent var, cap {AUTOGROW_MAX_INTENTS}. Ekleme yapilmedi.")
-        return
+        print(f"[DUR] Zaten {existing_count} intent var, cap {AUTOGROW_MAX_INTENTS}. Ekleme yapilamaz.")
+        return None
 
-    print("=" * 50)
-    print("  NEXTGEN AI - AUTONOMOUS KNOWLEDGE GROWTH")
-    print("  Wikipedia'dan kendini buyutme")
-    print("=" * 50)
-
-    if args.topics:
-        candidates = [t.strip() for t in args.topics.split(',') if t.strip()]
-    elif args.source == 'featured':
+    if source == 'featured':
         candidates = fetch_category_titles(
-            ['Kategori:Seçkin maddeler', 'Kategori:Kaliteli maddeler'], args.count * 3)
-    elif args.source == 'mixed':
+            ['Kategori:Seçkin maddeler', 'Kategori:Kaliteli maddeler'], count * 3)
+    elif source == 'mixed':
         candidates = fetch_category_titles(
-            ['Kategori:Seçkin maddeler', 'Kategori:Kaliteli maddeler'], args.count * 3)
-        candidates += fetch_random_titles(args.count * 3)
+            ['Kategori:Seçkin maddeler', 'Kategori:Kaliteli maddeler'], count * 3)
+        candidates += fetch_random_titles(count * 3)
         random.shuffle(candidates)
     else:
-        candidates = fetch_random_titles(args.count * 3)
+        candidates = fetch_random_titles(count * 3)
 
     qualified = [t for t in candidates if is_quality_title(t)]
     print(f"  Aday sayisi: {len(candidates)}, kalite filtre: {len(qualified)}")
@@ -223,7 +214,7 @@ def main():
     extracts = fetch_batch_extracts(qualified)
     if not extracts:
         print("  Ozet alinamadi (muhtemelen Wikipedia kisitlamasi). Birazdan tekrar deneyin.")
-        return
+        return (0, 0)
 
     new_intents = []
     for title, extract in extracts.items():
@@ -236,7 +227,7 @@ def main():
 
     if not new_intents:
         print("  Eklenebilecek yeni konu bulunamadi.")
-        return
+        return (0, 0)
 
     print("\n  INTENTS DOSYASI GUNCELLENIYOR")
     merged, added, updated = merge_intents(INTENTS_FILE, new_intents)
@@ -244,8 +235,71 @@ def main():
     with open(INTENTS_FILE, 'w', encoding='utf-8') as f:
         json.dump(merged, f, ensure_ascii=False, indent=2)
 
-    print(f"\nYeni konular: {added}, Guncellenen: {updated}")
-    print(f"Toplam intent sayisi: {len(merged['intents'])}")
+    print(f"  Bu tur: yeni {added}, guncellenen {updated} | toplam {len(merged['intents'])} intent")
+    return (added, updated)
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Autonomous knowledge growth')
+    parser.add_argument('--count', type=int, default=4,
+                        help='her turda cekilecek konu sayisi')
+    parser.add_argument('--minutes', type=float, default=0,
+                        help='kac dakika boyunca gezilsin (0 = tek tur)')
+    parser.add_argument('--topics', type=str, default='',
+                        help='virgulle ayrilmis belirli konular')
+    parser.add_argument('--source', type=str, default='featured',
+                        choices=['featured', 'random', 'mixed'],
+                        help='hangi kaynaktan konu cekilecek')
+    args = parser.parse_args()
+
+    print("=" * 50)
+    print("  NEXTGEN AI - AUTONOMOUS KNOWLEDGE GROWTH")
+    print("  Wikipedia'dan kendini buyutme")
+    print("=" * 50)
+
+    if args.topics:
+        candidates = [t.strip() for t in args.topics.split(',') if t.strip()]
+        extracts = fetch_batch_extracts([t for t in candidates if is_quality_title(t)])
+        new_intents = []
+        for title, extract in extracts.items():
+            intent = build_intent(title, extract)
+            if intent:
+                new_intents.append(intent)
+        if new_intents:
+            merged, added, updated = merge_intents(INTENTS_FILE, new_intents)
+            with open(INTENTS_FILE, 'w', encoding='utf-8') as f:
+                json.dump(merged, f, ensure_ascii=False, indent=2)
+            print(f"Yeni konular: {added}, Guncellenen: {updated}")
+            print(f"Toplam intent sayisi: {len(merged['intents'])}")
+            print("Sira: python train.py")
+        else:
+            print("Eklenebilecek yeni konu bulunamadi.")
+        return
+
+    start = time.time()
+    total_added = total_updated = 0
+    round_no = 0
+    sep = "=" * 50
+    while True:
+        round_no += 1
+        print("\n" + sep + "\n  TUR " + str(round_no) + "\n" + sep)
+        result = grow_once(args.source, args.count)
+        if result is None:
+            break
+        total_added += result[0]
+        total_updated += result[1]
+
+        if args.minutes <= 0:
+            break
+
+        elapsed = time.time() - start
+        print(f"  Gecen sure: {elapsed / 60:.1f} dk / {args.minutes} dk")
+        if elapsed >= args.minutes * 60:
+            break
+        time.sleep(5)
+
+    print(f"\nOZET: toplam yeni {total_added}, guncellenen {total_updated}")
+    print(f"Gecen sure: {(time.time() - start) / 60:.1f} dk")
     print("Sira: python train.py")
 
 
