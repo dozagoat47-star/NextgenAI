@@ -31,5 +31,5 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          model: groq/openai/gpt-oss-20b
+          model: groq/groq/compound
           use_github_token: true

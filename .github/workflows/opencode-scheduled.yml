@@ -8,7 +8,7 @@ on:
 jobs:
   opencode:
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 120
     permissions:
       id-token: write
       contents: write
@@ -27,15 +27,15 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          model: groq/openai/gpt-oss-20b
+          model: groq/groq/compound
           use_github_token: true
           prompt: |
-            Sen otonom bir QA muhendisisin. Bu oturumda yapacaklarin:
+            Sen otonom bir QA muhendisisin. Bu oturumda:
             1. Nextgen AI kod tabanini incele (Flask + numpy sinir agi).
-            2. Cok sayida Turkce mesajla chatbot'un /chat ve /predict endpointlerini test et.
+            2. Turkce mesajlarla chatbot'un /chat ve /predict endpointlerini test et.
             3. Tahmin, cevap secimi, tokenize, stemming hatalarini bul.
-            4. Buldugun hatalari duzelt ve kod kalitesini iyilestir.
-            5. Degisiklikleri kucuk net commit'ler halinde (Turkce mesajla) main dalina push et.
-            6. Is bittiginde yaptiklarini ozetle.
-            Tum token/istek limitine dikkat et: kucuk ve odakli adimlar at.
-            Kendi entegrasyon testlerini calistir; her commit'ten once kodun hala calistigini dogrula.
+            4. Buldugun hatalari duzelt.
+            5. Yukaridaki isleri adim adim yap; her mantikli agamada KUCUK bir commit at (Turkce mesajla). Commit atmayi sona birakma, erken commit yap.
+            6. Limit bilincinde calis: ayni oturumda bir isi bitirip commit edip digerine gec; rate limit gorursen bekleyip devam etme, mevcut isi bitir.
+            7. Calisma baslar baslamaz once en kritik onemli bulguyu duzelt ve commit et.
+            Ozet cikarmaya harcanan zaman sinirli; onceligin gercek commitler.
