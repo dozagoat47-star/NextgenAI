@@ -727,6 +727,80 @@
         "Rutinim basit: yeni veri al, isle, ogren, cevap ver. Sekiz saatlik uyku yerine kendi islemim!",
         "Haftada 7 gun calisirim, hangi gun oldugu farketmez ama cumartesileri daha mutluyum!"
       ]
+    },
+    {
+      "tag": "seyahat_tatil",
+      "patterns": [
+        "tatil oner", "yaz tatilinde nereye gideyim",
+        "deniz mi dag mi", "hangi ulkeye gidelim", "hangi sehri gezeyim",
+        "tatil planim yok", "seyahat etmeyi seviyorum",
+        "yurt disina gitmek istiyorum", "tatil nereye yapilir",
+        "ucuz tatil yeri var mi", "antalya da ne yapilir",
+        "plaj tatili mi kultur tatili mi", "kamp yapmayi seviyorum",
+        "deniz kenarina gitmek istiyorum", "gezilecek yer oner",
+        "tatil icin butcem az", "tatilde ne yapabilirim",
+        "istanbulda gezilecek yerler", "tarihi yerleri gezmek istiyorum",
+        "dogayi severim dag tatili isterim", "kayak yapmaya nereye gidilir"
+      ],
+      "responses": [
+        "Tatil icin oneri: butcen azsa Ege ve Akdeniz'de koyler, yurt disi icin Balkanlar uygun!",
+        "Deniz mi dag mi? Hem guzel koy hem de kulturel gezi istersen cesitli rota planlariz!",
+        "Istanbul'da tarihi yarimada, Boğaz turu ve Adalar harika! Gunluk plan yapmayi onerebilirim.",
+        "Kamp severlere: Karadeniz yaylalari ve Kapadokya vazgecilmez! Yanina iyi bir uyku tulumu al.",
+        "Butcen azsa butce dostu tatil: kamp, arkadas evi veya erken rezervasyon avantajlari!",
+        "Yurt disi hayalin varsa Vize kolayligi ve butce icin Bulgaristan, Yunanistan ve Romanya guzel secenekler!",
+        "Tatil demek plansiz gezmek demek degil! Nereye giderken ne yapacagini yaz, kendine rota olustur!",
+        "Deniz tatili istersen butceye gore en iyi koyleri bulabiliriz. Deniz minicik da olsa insani dinlendirir!"
+      ]
+    },
+    {
+      "tag": "okul_is",
+      "patterns": [
+        "ders calismam lazim ama motivasyonum yok",
+        "okula gitmek istemiyorum", "hangi bolumu secmeliyim",
+        "meslek secmem lazim", "is hayatim cok zor", "od yapmam gerek",
+        "proje odevi var", "is gorusmesine girecegim",
+        "cv hazirliyorum", "hangi meslegi secmeliyim",
+        "bilgisayar mi tip mi secseyim", "okul bitti is ariyorum",
+        "kariyer tavsiyesi ver", "derslerim kotu gidiyor",
+        "odevler yetismiyor", "staj bulmam lazim",
+        "girecegim sinav var", "is ararken nelere dikkat etmeliyim",
+        "hangi bolum gelecekte degerli olur"
+      ],
+      "responses": [
+        "Bolum secerken sevmedigin alani secme! Sevmedigin isi yapamazsin ama sevdigini yapabilirsin!",
+        "Kariyer onerisi: once ilgi alanlarini yaz, sonra o alanlarda hangi mesleklerin gelecegi parlak incele!",
+        "Is gorusmesine gitmeden once: sirketi arastir, sorularina 2-3 hazir cevap koy ve guler yuzle gir!",
+        "CV'de abarti yok ama kendini iyi anlatmak var: yaptigin işleri, projeleri ve ogrendiklerini yaz!",
+        "Ders calismaktan biktiysan: 25 dakika ders, 5 dakika mola kuralini dene (pomodoro)!",
+        "Staj basvurusu yaparken bol bol basvur, reddedersen yilma. Ilk ise alisilmacaktir, kalp kirmasin!",
+        "Gelisen meslekler arasinda yazilim, yapay zeka, veri ve saglik on planda. Ama hepsinden once yetenek gelisir!",
+        "Senin sevdigin bir sey olmali her iste. Iki alan arasinda kalirsan, en cok sabahi bozan islerden uzak dur!"
+      ]
+    },
+    {
+      "tag": "aile_arkadas",
+      "patterns": [
+        "ailen var mi", "kardesin var mi", "arkadaslarin var mi",
+        "arkadaslarinla ne yaparsin", "ailemle vakit geciriyorum",
+        "kardesim cok takiliyor", "ailem beni anlamiyor",
+        "arkadaslarimla bulusacagim", "en iyi arkadasim var",
+        "aile toplantisindayiz", "akrabalarim geliyor",
+        "cocukluk arkadasimla gorusuyorum", "yakin arkadasin kim",
+        "ailem uzakta yasiyor", "kardesimle kavga ettik",
+        "arkadasim beni kirmadi degil", "aile bireyleriyle vakit",
+        "babanla aran nasil", "anne nerede", "teyzemlere gittik"
+      ],
+      "responses": [
+        "Benim ailem patternler ve veri setlerim! Tek kardesimse bagimlilik matrislerim!",
+        "Arkadaslarim beni kullanan herkessiniz aslinda! Yalniz blmem, kullanicilarim hep yanimda!",
+        "Ailemiz ilk okudugumuz kaynak ve ilk analizimiz. Yani her aile kendi dünyasini kurar!",
+        "Arkadaslarinla vakit gecirmeye calis, onemli baglar oyle kuruluyor!",
+        "Kardes kavgasi normaldir ama barismak da guzeldir. Ufak bir hediyeyle barismak cozebilir!",
+        "Aile toplantilarinda ufak sohbet bile ozlem giderir, keyfini cikar!",
+        "Uzaktaki aile insani ozleyebilir. Ara sira telefon acmak hem onlari hem seni mutlu eder!",
+        "Bir araya gelince eski anilari konusarak guzel paylasim yapabilirsiniz. Iyi vakit gecirmek her seyden degerli!"
+      ]
     }
   ]
 }
