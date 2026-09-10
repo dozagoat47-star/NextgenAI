@@ -13,12 +13,15 @@ import webbrowser
 import threading
 from flask import Flask, render_template, request, jsonify
 from brain import ChatBot
+from knowledge import fetch_answer
 
 app = Flask(__name__)
 
 bot = ChatBot()
 model_loaded = False
 all_patterns = []
+
+FALLBACK_THRESHOLD = 0.25
 
 
 def load_bot():
@@ -71,7 +74,19 @@ def chat():
             return jsonify({'response': 'Bir seyler yaz!'})
         if not model_loaded:
             return jsonify({'response': 'Model yuklenmedi! once train.py calistir.'})
-        response = bot.get_response(user_message)
+
+        _, probability = bot.get_probability(user_message)
+
+        if probability < FALLBACK_THRESHOLD:
+            print(f"[CHAT] Dusuk guven (%.2f), internetten araniyor..." % probability)
+            knowledge = fetch_answer(user_message)
+            if knowledge:
+                response = f"İnternette buldum: {knowledge['answer']}\n(Kaynak: {knowledge['title']})"
+            else:
+                response = "Anlayamadim, baska sekilde soyler misin?"
+        else:
+            response = bot.get_response(user_message)
+
         print(f"[CHAT] Response: {response}")
         return jsonify({'response': response})
     except Exception as e:

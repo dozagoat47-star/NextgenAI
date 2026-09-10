@@ -345,6 +345,17 @@ class ChatBot:
 
         return losses
 
+    def get_probability(self, user_input):
+        """User input icin en guclu intent tahminini ve olasiligini dondurur."""
+        if self.model is None or not self.vocabulary:
+            return None, 0.0
+        words = self.tokenize(user_input)
+        bag = self.bag_of_words(words)
+        X = np.array([bag])
+        probabilities = self.model.predict_proba(X)[0]
+        best_index = int(np.argmax(probabilities))
+        return self.intent_tags[best_index], float(probabilities[best_index])
+
     def get_response(self, user_input):
         """Generate response for user input"""
         if self.model is None:

@@ -1,0 +1,42 @@
+name: Autogrow Knowledge
+
+on:
+  schedule:
+    - cron: '20 */4 * * *'
+  workflow_dispatch:
+
+jobs:
+  autogrow:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install requests numpy
+
+      - name: Grow knowledge from Wikipedia
+        run: python autogrow.py --count 5
+
+      - name: Train model
+        run: python train.py
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "dozagoat47-star"
+          git config user.email "dozagoat47-star@users.noreply.github.com"
+          if [ -n "$(git status --porcelain)" ]; then
+            git add intents.json
+            git commit -m "autogrow: Wikipedia'dan yeni bilgiler eklendi [skip ci]"
+            git push -q
+            echo "New knowledge committed and pushed."
+          else
+            echo "No changes - trained contents are already up to date."
+          fi
