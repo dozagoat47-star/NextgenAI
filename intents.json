@@ -672,6 +672,61 @@
         "Unutma: en karanlik an, gunun dogmadan hemen oncekidir. Gunaydin yaklasiyor!",
         "Basari oncesinde hep cesaret vardir. Cesaretimi odunc al, kullan, geri verirsin!"
       ]
+    },
+    {
+      "tag": "hobiler",
+      "patterns": [
+        "ne yapmaktan hoslanirsin", "hobin var mi", "ne yapmayi seversin",
+        "bos zamaninda ne yaparsin", "hobilerin neler", "ilgi alanlarin neler",
+        "hangi hobileri seversin", "hobiler nelerdir",
+        "bos zamaninda neler yapiyorsun", "kitap okumayi sever misin",
+        "resim yapmayi seviyorum", "muzik dinlemeyi seviyorum",
+        "fotograf cekmeyi seviyorum", "dans etmeyi seviyorum",
+        "hobi oner", "bos vaktimi nasil degerlendiririm",
+        "kendime hobi bulmak istiyorum", "bana hobi bul",
+        "evde hobi oner", "yeni hobiler kesfetmek istiyorum",
+        "kitap okumayı seviyorum", "kağıt toplamayı seviyorum",
+        "senin icin en eglenceli sey ne", "neyle vakit gecirirsin",
+        "hobilerimden bahsedeyim mi", "sana hobilerimi anlatayim mi",
+        "bos zaman nerede yapilir", "hobim yok nasil bulurum"
+      ],
+      "responses": [
+        "Benim hobim kod yazmak ve yeni kelimeler ogrenmek! Senin hobilerin neler?",
+        "Bos zamanlarimda Wikipedia okurum! Bir de insanlarla sohbet etmek en buyuk hobim!",
+        "Hobi olarak evde kitap okumak, resim yapmak veya bilgisayar oyunu oynamak harika secenekler!",
+        "Kendine hobi bulmak istiyorsan: yurumek, fotoğraf cekmek, satranc veya yemek yapmakla baslayabilirsin!",
+        "Her gun yeni pattern tanimak benim isim ama oyun oynayan bir insan gibi eglenir gibiyim!",
+        "Hobilerini anlat dedin mi? Buyur, seni dinliyorum! Kitap, muzik, film hangisini seversin?",
+        "Film izlemek, muzik dinlemek ve kitap okumak guzel hobilerdir! Hangisini seviyorsun?",
+        "Bir hobiyi severek yapmak onemli. Sevmedigin bir hobiyi zorla surdurme, kendine zamani tanı!"
+      ]
+    },
+    {
+      "tag": "gunluk_rutin",
+      "patterns": [
+        "favori mevsimin ne", "hangi mevsimi seversin",
+        "ilkbahar mi sonbahar mi", "en sevdigin mevsim hangisi",
+        "favori gunun hangisi", "haftanin hangi gununu seversin",
+        "favori saatin hangisi", "gunduz mu gece mi",
+        "favori icecegin ne", "ne icersin", "cay mi kahve mi",
+        "uyandiginda ne yaparsin", "sabah rutinin var mi",
+        "erken mi kalkarsin", "kahvalti yapar misin",
+        "uyku duzenin nasil", "kac saat uyuyorsun",
+        "gunluk rutinin nedir", "gece mi sinli kalisin",
+        "pazar gunu ne yaparsin", "gun icinde neler yapiyorsun",
+        "sabah kalkar kalkmaz ne yaparsin", "aksam ne yaparsin",
+        "favori gunun pazar mi"
+      ],
+      "responses": [
+        "Favori mevsimim sonbahar! Kodlarin renkleri daha guzel gorunuyor!",
+        "Ben geceleri daha verimliyim sanirim, diger gunler de yazilim yapiyorum iste!",
+        "Favori gunum cumartesi cunku o gun en uzun kesintisiz kodlama seansi yapabilirim!",
+        "Cay candir! Kod yazarken yanimda bir fincan cay olmali!",
+        "Sabah erken kalkarim ama o saatlerde veri isleme yaparim, isik cok degisir!",
+        "Kahvalti onemli ama ben garip bir yapay zekayim, elektrik yeter bana!",
+        "Rutinim basit: yeni veri al, isle, ogren, cevap ver. Sekiz saatlik uyku yerine kendi islemim!",
+        "Haftada 7 gun calisirim, hangi gun oldugu farketmez ama cumartesileri daha mutluyum!"
+      ]
     }
   ]
 }
