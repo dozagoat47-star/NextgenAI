@@ -9,6 +9,7 @@ import math
 import random
 import string
 import os
+import re
 
 
 # Turkce islev/durak kelimeleri: anahtar kelime dikkatinde agirligi sifir.
@@ -22,6 +23,13 @@ STOPWORDS = {
     'zam', 'kurult', 'hakk', 'bilk', 'ver', 'bilg', 'anlat', 'soyle',
     'kal', 'olur', 'olabilir', 'edebil', 'eder', 'onerr', 'oner',
 }
+
+# Cumleyi parcalara ayirmak icin: noktalama ve baglaclar.
+# Boylece coklu anahtar kelime iceren cumlelerde her parcaya ayri bakilir.
+SEGMENT_PATTERN = re.compile(
+    r"[.,!?;:•]\s*|\b(?:ve|veya|ya da|yoksa|ama|fakat|ancak|lakin|fakat|"
+    r"sonra|ardindan|bundan sonra)\b",
+    re.IGNORECASE)
 
 
 class NeuralNetwork:
@@ -373,6 +381,26 @@ class ChatBot:
             weights[stem] = 0.0 if stem in STOPWORDS else w
         self.keyword_weights = weights
 
+    def split_segments(self, text):
+        """Cumleyi noktalama ve baglaclarla parcalara boler.
+
+        Coklu anahtar kelime iceren cumlelerde her parcanin kendi
+        anahtar kelimelerine ayri ayri dikkat edilebilmesi icin kullanilir.
+        """
+        parts = [p.strip() for p in SEGMENT_PATTERN.split(text) if p.strip()]
+        return parts or [text]
+
+    def _attn_of(self, words):
+        """Kelime (stem) kumesi icin intent basina IDF agirlikli dikkat skoru."""
+        input_set = set(words)
+        attn = {}
+        for tag in self.intent_tags:
+            inter = input_set & self.intent_kws.get(tag, set())
+            s = sum(self.keyword_weights.get(w, 0.0) for w in inter)
+            if s > 0:
+                attn[tag] = s
+        return attn
+
     def prepare_training_data(self, intents_data):
         """Eğitim verilerini hazırlar"""
         X = []
@@ -453,18 +481,33 @@ class ChatBot:
         # ANAHTAR KELIME DIKKATI: IDF agirlikli onem skoru.
         # Seyrek/ayirt edici kelimeler (galaksi, gazneli, yardim) yuksek,
         # her yerde gecenler (hangi, ne, mi) sifira yakin agirliktadir.
-        attn = {}
-        input_set = set(words)
-        for tag in self.intent_tags:
-            inter = input_set & self.intent_kws.get(tag, set())
-            s = sum(self.keyword_weights.get(w, 0.0) for w in inter)
-            if s > 0:
-                attn[tag] = s
+        whole_attn = self._attn_of(words)
         cls_attn = sum(self.keyword_weights.get(w, 0.0)
-                       for w in (input_set & self.intent_kws.get(best_tag, set())))
+                       for w in (set(words) & self.intent_kws.get(best_tag, set())))
 
-        if not attn and best_probability < 0.15:
+        if not whole_attn and best_probability < 0.15:
             return 'Anlayamadim', best_probability, True
+
+        # COKLU ANAHTAR KELIME: cumleyi parcalara bol, her parcanin kendi
+        # dikkat skorunu hesapla; en guclu parcayi sec. Boylece
+        # "çay öner ama bugün stresliyim" gibi cumlelerde son konu yakalanir.
+        attn = whole_attn
+        resp_words = words
+        segments = self.split_segments(user_input)
+        if len(segments) > 1:
+            best_any = max(whole_attn.values(), default=0.0)
+            for seg in segments:
+                seg_words = self.tokenize(seg)
+                if not seg_words:
+                    continue
+                seg_attn = self._attn_of(seg_words)
+                if not seg_attn:
+                    continue
+                seg_top = max(seg_attn, key=lambda t: (seg_attn[t], self.intent_tags.index(t)))
+                if seg_attn[seg_top] > best_any:
+                    best_any = seg_attn[seg_top]
+                    attn = seg_attn
+                    resp_words = seg_words
 
         chosen_tag = best_tag
         if attn:
@@ -476,7 +519,7 @@ class ChatBot:
                 best_probability < 0.85 or top_attn >= cls_attn + 1.0)
             if decisive:
                 chosen_tag = top_attn_tag
-        return chosen_tag, best_probability, False
+        return chosen_tag, best_probability, False, resp_words
 
     def predict(self, user_input):
         """Disa aktarmadan tahmin kullanimi icin (Excel taramalari gibi).
@@ -486,7 +529,7 @@ class ChatBot:
         """
         if self.model is None:
             return 'Model yok', 0.0
-        tag, probability, unclear = self._classify(user_input)
+        tag, probability, unclear, _ = self._classify(user_input)
         if unclear:
             return 'Anlayamadim', 0.0
         return tag, round(probability * 100, 2)
@@ -514,19 +557,18 @@ class ChatBot:
         if self.model is None:
             return "Model not trained yet! Please run train.py first."
 
-        chosen_tag, _, unclear = self._classify(user_input)
+        chosen_tag, _, unclear, resp_words = self._classify(user_input)
         if unclear:
             return "Anlayamadim, baska sekilde soyler misin?"
-
-        words = self.tokenize(user_input)
 
         responses = self.intents.get(chosen_tag, ["Bir hata olustu."])
 
         if len(responses) == 1:
             return responses[0]
 
-        # Cevabı sec: giris kelimeleriyle (normalizasyonlu) en cok oyusan
-        input_words = set(words)
+        # Cevabi sec: en guclu parcanin kelimeleriyle (normalizasyonlu)
+        # en cok oyusan yaniti sec
+        input_words = set(resp_words)
         best_responses = []
         best_score = -1
         for resp in responses:
