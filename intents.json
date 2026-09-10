@@ -1263,6 +1263,534 @@
         "İskepati Köprüsü, Artvin'in Borçka ilçesinde konumlanmış bir kemer köprüdür.",
         "Hopa-Borçka karayolundaki Düzköy çıkışının 2 km kuzeydoğusunda konumlanmıştır."
       ]
+    },
+    {
+      "tag": "cemita",
+      "patterns": [
+        "cemita nedir",
+        "cemita hakkinda bilgi ver",
+        "cemita ne demek",
+        "cemita anlat",
+        "bana cemita hakkinda bilgi ver",
+        "cemita hakkinda konus"
+      ],
+      "responses": [
+        "Cemita ekmeği Cemita poblana olarak da adlandırılmaktadır.",
+        "Günümüzde New York, Los Angeles gibi büyük şehirlerdeki Meksika restoranlarında sıklıkla kullanılmakta ve tüketilmektedir.",
+        "Cemita tipik olarak üzeri susamla kaplı bir ekmektir."
+      ]
+    },
+    {
+      "tag": "denizyıldızı",
+      "patterns": [
+        "denizyıldızı nedir",
+        "denizyıldızı hakkinda bilgi ver",
+        "denizyıldızı ne demek",
+        "denizyıldızı anlat",
+        "bana denizyıldızı hakkinda bilgi ver",
+        "denizyıldızı hakkinda konus"
+      ],
+      "responses": [
+        "Dünya üzerinde, tropikal bölgelerden soğuk kutup denizi sularına kadar deniz tabanında 1.500 kadar denizyıldızı türü bulunur.",
+        "Denizyıldızı, hayvanlar âleminin derisi dikenliler şubesine bağlı Asteroidea sınıfından olan deniz omurgasızlarına verilen ortak addır.",
+        "Deniz kıyısından 6.000 m derinliğe kadar olan bölgede yaşarlar."
+      ]
+    },
+    {
+      "tag": "akciğer kanseri",
+      "patterns": [
+        "akciğer kanseri nedir",
+        "akciğer kanseri hakkinda bilgi ver",
+        "akciğer kanseri ne demek",
+        "akciğer kanseri anlat",
+        "bana akciğer kanseri hakkinda bilgi ver",
+        "akciğer kanseri hakkinda konus"
+      ],
+      "responses": [
+        "Biyopsi genelde bronkoskopi veya BT-yardımlı biyopsi ile yapılır.",
+        "Bu nedenler arasında; genetik faktörler, radon gazı, asbest ve hava kirliliği gibi faktörler sorumlu tutulmaktadır.",
+        "Bu kontrolsüz çoğalma, hücrelerin çevredeki dokuları sararak veya akciğer dışındaki organlara yayılmaları ile (metastaz) sonuçlanabilir."
+      ]
+    },
+    {
+      "tag": "deli mike",
+      "patterns": [
+        "deli mike nedir",
+        "deli mike hakkinda bilgi ver",
+        "deli mike ne demek",
+        "deli mike anlat",
+        "bana deli mike hakkinda bilgi ver",
+        "deli mike hakkinda konus"
+      ],
+      "responses": [
+        "Deli Mike ya da Deli Mayk, Türk Hava Yolları'nın TC-JDM sivil tescilli, beklenmedik birtakım teknik sorunlar yaşayan Airbus A340-300 uçağıdır.",
+        "Neredeyse 4 yıl boyunca burada depolanan uçak, Aralık 2022'de Mehrabad Havalimanı'na uçuruldu.",
+        "Daha sonra İran'ın Sivil Havacılık Organizasyonu, dört Airbus A340 uçağın satın alındığını doğruladı."
+      ]
+    },
+    {
+      "tag": "dressin' up",
+      "patterns": [
+        "dressin' up nedir",
+        "dressin' up hakkinda bilgi ver",
+        "dressin' up ne demek",
+        "dressin' up anlat",
+        "bana dressin' up hakkinda bilgi ver",
+        "dressin' up hakkinda konus"
+      ],
+      "responses": [
+        "\"Dressin' Up\", Teenage Dream: The Complete Confection albümünün yayımlanmasının ardından UK Singles Chart'ta 109 numaraya yerleşti.",
+        "Müzik eleştirmenlerden karışık eleştiriler alan şarkı, bazı eleştirmenler tarafından \"eğlenceli\" melodisi nedeniyle övülürken bazıları tarafından Perry'nin diğer şarkılarına çok benzediği için olumsuz eleştirdi.",
+        "Perry, Christopher \"Tricky\" Stewart, Monte Neuble ve Matt Thiessen tarafından yazılan şarkının yapımcılığını Stewart ve Kuk Harrell üstlendi."
+      ]
+    },
+    {
+      "tag": "evrim",
+      "patterns": [
+        "evrim nedir",
+        "evrim hakkinda bilgi ver",
+        "evrim ne demek",
+        "evrim anlat",
+        "bana evrim hakkinda bilgi ver",
+        "evrim hakkinda konus"
+      ],
+      "responses": [
+        "Evrimsel biyologlar, evrimin bir olgu olduğunu gösteren verileri belgelerler, nedenlerini açıklayan kuramları, test ederler ve geliştirirler.",
+        "Bazı tahminlere göre henüz tanımlanmamış 10 ila 30 milyon canlı türü vardır.",
+        "Bir milimetrenin binde birinden kısa bakterilerden, yerden yüksekliği 100 metreyi, kütlesi binlerce tonu bulan sekoya servi ağaçlarına kadar dünyadaki canlı türleri, cüsse, biçim ve yaşayış biçimi açısından çok büyük farklılıklar gösterirler."
+      ]
+    },
+    {
+      "tag": "galata kulesi",
+      "patterns": [
+        "galata kulesi nedir",
+        "galata kulesi hakkinda bilgi ver",
+        "galata kulesi ne demek",
+        "galata kulesi anlat",
+        "bana galata kulesi hakkinda bilgi ver",
+        "galata kulesi hakkinda konus"
+      ],
+      "responses": [
+        "2020'de yapılan çalışmalar sonrasında kule, müze ve sergi mekânı olarak düzenlendi.",
+        "Çatısının ucuna kadar olan yüksekliği 62,59 m olan Romanesk tarzdaki kâgir kulenin silindirik gövdesi taştandır.",
+        "Mehmed'in fermanıyla kuledeki tahribatlar durduruldu ve tahrip edilen kısımlar yeniden inşa edildi."
+      ]
+    },
+    {
+      "tag": "krusty yakalanıyor",
+      "patterns": [
+        "krusty yakalanıyor nedir",
+        "krusty yakalanıyor hakkinda bilgi ver",
+        "krusty yakalanıyor ne demek",
+        "krusty yakalanıyor anlat",
+        "bana krusty yakalanıyor hakkinda bilgi ver",
+        "krusty yakalanıyor hakkinda konus"
+      ],
+      "responses": [
+        "Jay Kogen ile Wallace Wolodarsky tarafından yazıldı ve Brad Bird tarafından yönetildi.",
+        "Bart ile Lisa, olayı araştırırlar ve bunun bir komplo olduğunu ortaya çıkarırlar.",
+        "\"Krusty Gets Busted\", Amerikan animasyon televizyon dizisi Simpsonlar'ın birinci sezonunun on ikinci bölümüdür ve 29 Nisan 1990 tarihine yayınlanmıştır."
+      ]
+    },
+    {
+      "tag": "sms prinz adalbert",
+      "patterns": [
+        "sms prinz adalbert nedir",
+        "sms prinz adalbert hakkinda bilgi ver",
+        "sms prinz adalbert ne demek",
+        "sms prinz adalbert anlat",
+        "bana sms prinz adalbert hakkinda bilgi ver",
+        "sms prinz adalbert hakkinda konus"
+      ],
+      "responses": [
+        "Prinz Adalbert'in inşasına 1900 yılında, Kiel'deki İmparatorluk Tersanesi'nde başlandı.",
+        "Sınıfının ilk gemisi olan Prinz Adalbert iken, ikinci gemisi ise kardeş gemi Friedrich Carl idi.",
+        "Prinz Adalbert, göreve başlayınca topçu eğitim gemisi olarak kullanılmaya başlandı ve bu görev, geminin hizmet süresi boyunca önemli bir süre zarfını teşkil etti."
+      ]
+    },
+    {
+      "tag": "sarayönü camii",
+      "patterns": [
+        "sarayönü camii nedir",
+        "sarayönü camii hakkinda bilgi ver",
+        "sarayönü camii ne demek",
+        "sarayönü camii anlat",
+        "bana sarayönü camii hakkinda bilgi ver",
+        "sarayönü camii hakkinda konus"
+      ],
+      "responses": [
+        "Tarihsel olarak Lefkoşa'nın idari merkezi niteliğindeki Sarayönü Meydanı'nda yer almış olan caminin meydanla bağlantısı 1960'larda kesildi.",
+        "2005 yılındaysa Türkiye'de iktidarda olan Adalet ve Kalkınma Partisi çevrelerinin caminin bu maksatla kullanımına itiraz etmesinin ardından yeni bir evlendirme dairesi yaptırılarak yapı tekrar camiye çevrildi.",
+        "1962'de yanına inşa edilen Saray Hotel'in açılmasıyla birlikte ibadete kapatılan cami, 1963 yılında sergi salonu olarak kullanıldı, 1964'ten itibaren ise evlendirme dairesi olarak kullanılmaya başlandı."
+      ]
+    },
+    {
+      "tag": "stamata revithi",
+      "patterns": [
+        "stamata revithi nedir",
+        "stamata revithi hakkinda bilgi ver",
+        "stamata revithi ne demek",
+        "stamata revithi anlat",
+        "bana stamata revithi hakkinda bilgi ver",
+        "stamata revithi hakkinda konus"
+      ],
+      "responses": [
+        "Çağdaş kaynaklara göre aynı maratonu koştuğu belirtilen \"Melpomene\" adında ikinci bir kadının ise Revithi ile aynı kişi olup olmadığı konusunda Olimpiyat tarihçileri arasında farklı görüşler bulunmaktadır.",
+        "Belgelerini, başarısını kabul edecekleri umuduyla Yunan Olimpiyat Komitesine sunma girişiminde bulunsa da bunu yapıp yapmadığı bilinmemektedir.",
+        "Stamata Revithi (Yunanca: Σταμάτα Ρεβίθη, 1866, Sire - 1896 sonrası), 1896 Yaz Olimpiyatları sırasında 40 kilometrelik maraton koşan Yunan kadındır."
+      ]
+    },
+    {
+      "tag": "süperstar '83",
+      "patterns": [
+        "süperstar '83 nedir",
+        "süperstar '83 hakkinda bilgi ver",
+        "süperstar '83 ne demek",
+        "süperstar '83 anlat",
+        "bana süperstar '83 hakkinda bilgi ver",
+        "süperstar '83 hakkinda konus"
+      ],
+      "responses": [
+        "Müzik eleştirmenleri, şarkıcının en iyi albümlerinden biri olarak gösterdikleri çalışmayı takdir etti ve Pekkan'ın bunalımlı geçirdiği birkaç yılın ardından tekrar aranjman şarkılardan oluşan bir albüm hazırlanmasını beğeniyle karşıladı.",
+        "Amerikalı şarkıcılar Amii Stewart ve Donna Summer ile İtalyan şarkıcılar Mia Martini ve Mina'nın şarkıları çalışmada yeni aranjmanlarıyla yer bulurlarken bu isimlerden bazıları da Pekkan'ın yorumculuğunu etkiledi.",
+        "19 Mart 1983'te Balet Plak tarafından yayımlandı."
+      ]
+    },
+    {
+      "tag": "1994 kış olimpiyatları'nda meksika",
+      "patterns": [
+        "1994 kış olimpiyatları'nda meksika nedir",
+        "1994 kış olimpiyatları'nda meksika hakkinda bilgi ver",
+        "1994 kış olimpiyatları'nda meksika ne demek",
+        "1994 kış olimpiyatları'nda meksika anlat",
+        "bana 1994 kış olimpiyatları'nda meksika hakkinda bilgi ver",
+        "1994 kış olimpiyatları'nda meksika hakkinda konus"
+      ],
+      "responses": [
+        "Meksika, Norveç'in Lillehammer şehrinde düzenlenen 1994 Kış Olimpiyatları'na, alp disiplininde bir sporcuyla katıldı.",
+        "İlk kez 1928 Kış Olimpiyatları'nda temsil edilen ülke, Kış Olimpiyatları tarihindeki beşinci katılımını gerçekleştirdi.",
+        "Erkekler iniş kategorisinde yarışan Hubertus von Hohenlohe, 1:53.37'lik derecesiyle yarışmayı 48."
+      ]
+    },
+    {
+      "tag": "2003 i̇stanbul saldırıları",
+      "patterns": [
+        "2003 i̇stanbul saldırıları nedir",
+        "2003 i̇stanbul saldırıları hakkinda bilgi ver",
+        "2003 i̇stanbul saldırıları ne demek",
+        "2003 i̇stanbul saldırıları anlat",
+        "bana 2003 i̇stanbul saldırıları hakkinda bilgi ver",
+        "2003 i̇stanbul saldırıları hakkinda konus"
+      ],
+      "responses": [
+        "Yargıtay'ın davada alınan kararları bazı sanıklar yönünden bozması sebebiyle yeniden yapılan yargılama sonrasında ise 16 sanık hakkında çeşitli kademelerde hapis cezalarına hükmedildi.",
+        "Başlatılan soruşturmalar sonucunda saldırıların el-Kaide'nin Türkiye yapılanması tarafından gerçekleştirdiği tespit edildi.",
+        "15 ve 20 Kasım 2003 tarihlerinde İstanbul'un dört noktasında, her iki günde de ikişer patlayıcı yüklü kamyonetin infilak ettirilmesiyle dört intihar saldırısı gerçekleştirildi."
+      ]
+    },
+    {
+      "tag": "agar.io",
+      "patterns": [
+        "agar.io nedir",
+        "agar.io hakkinda bilgi ver",
+        "agar.io ne demek",
+        "agar.io anlat",
+        "bana agar.io hakkinda bilgi ver",
+        "agar.io hakkinda konus"
+      ],
+      "responses": [
+        "Oyunun ismi, bakterileri kültürleme için kullanılan agar maddesinden gelmektedir.",
+        "Agar.io'nun ardından, benzer mekanik ve temaya sahip \".io oyunu\" olarak adlandırılan oyunlar geliştirilmeye başlandı.",
+        "Agar.io, çevrimiçi çok oyunculu bir strateji ve aksiyon oyunudur."
+      ]
+    },
+    {
+      "tag": "arsenal fc",
+      "patterns": [
+        "arsenal fc nedir",
+        "arsenal fc hakkinda bilgi ver",
+        "arsenal fc ne demek",
+        "arsenal fc anlat",
+        "bana arsenal fc hakkinda bilgi ver",
+        "arsenal fc hakkinda konus"
+      ],
+      "responses": [
+        "Arsenal, en uzun süre kesintisiz olarak en üst ligde yer alan kulüptür (105 yıldan fazla ve devam ediyor) ve 20.",
+        "Rekor kıran yedi FA Kupası kazandı ve üçüncü ve son şampiyonluğunu kazanan takımı, 2003 ve 2004 yılları arasında 49 maçlık yenilgisiz bir seriyle İngiliz liginde en uzun süre yenilmezlik rekorunu kırdı ve \"Yenilmezler\" lakabını aldı.",
+        "1998 ile 2017 yılları arasında Arsenal, İngiliz futbolunda rekor kıran on dokuz ardışık sezon boyunca UEFA Şampiyonlar Ligi'ne katılmaya hak kazandı."
+      ]
+    },
+    {
+      "tag": "batman başlıyor",
+      "patterns": [
+        "batman başlıyor nedir",
+        "batman başlıyor hakkinda bilgi ver",
+        "batman başlıyor ne demek",
+        "batman başlıyor anlat",
+        "bana batman başlıyor hakkinda bilgi ver",
+        "batman başlıyor hakkinda konus"
+      ],
+      "responses": [
+        "Batman Başlıyor (Özgün adı: Batman Begins), DC Comics'in kurgusal çizgi roman karakteri Batman'den uyarlanan, yönetmenliğini Christopher Nolan'ın yaptığı 2005 yapımı süper kahraman filmidir.",
+        "İlk olarak 31 Mayıs 2005'te Tokyo'da gösterilen yapım; 15 Haziran 2005'te Amerika Birleşik Devletleri ve Kanada'da, 17 Haziran'da ise Birleşik Krallık'ta gösterime girdi.",
+        "Batman film serisini yeniden başlatan bu filmde Bruce Wayne'in yarasa korkusu, ebeveynlerinin ölümü, Batman'e dönüşümü ve Ra's Al Ghul ile Korkuluk'un Gotham şehrini kaosa sürüklemesini engellemeye çalışması anlatılmaktadır."
+      ]
+    },
+    {
+      "tag": "call of duty 4: modern warfare",
+      "patterns": [
+        "call of duty 4: modern warfare nedir",
+        "call of duty 4: modern warfare hakkinda bilgi ver",
+        "call of duty 4: modern warfare ne demek",
+        "call of duty 4: modern warfare anlat",
+        "bana call of duty 4: modern warfare hakkinda bilgi ver",
+        "call of duty 4: modern warfare hakkinda konus"
+      ],
+      "responses": [
+        "Yapım aşaması iki yıl süren oyunda, Infinity Ward'ın geliştirdiği IW 3.0 adlı oyun motoru kullanıldı.",
+        "Oyunun hikâyesi kurgusal bir yakın gelecekte geçmektedir.",
+        "Oyun, çeşitli kuruluş ve yayınlar tarafından ödüller kazandı."
+      ]
+    },
+    {
+      "tag": "charles domery",
+      "patterns": [
+        "charles domery nedir",
+        "charles domery hakkinda bilgi ver",
+        "charles domery ne demek",
+        "charles domery anlat",
+        "bana charles domery hakkinda bilgi ver",
+        "charles domery hakkinda konus"
+      ],
+      "responses": [
+        "Birinci Koalisyon Savaşı sırasında Fransa'ya karşı Prusya Ordusu'nda hizmet verdiği sırada, Prusyalıların erzaklarının yetersiz olmasından ötürü yiyecek karşılığında Fransız Ordusu'na geçti.",
+        "Genel olarak sağlıklı olmasına rağmen, Fransız hizmetinde geçirdiği süre boyunca ciddi bir şekilde aç kaldı ve mevcut tüm yiyecekleri yedi.",
+        "Fransız gemisi Hoche'deki hizmeti sırasında, bir mürettebat üyesinin top atışı nedeniyle kopan bacağını yemeye çalışırken mürettebatın diğer üyeleri kopan bacağı ondan alıp denize atmıştı."
+      ]
+    },
+    {
+      "tag": "homer'ın felekten gecesi",
+      "patterns": [
+        "homer'ın felekten gecesi nedir",
+        "homer'ın felekten gecesi hakkinda bilgi ver",
+        "homer'ın felekten gecesi ne demek",
+        "homer'ın felekten gecesi anlat",
+        "bana homer'ın felekten gecesi hakkinda bilgi ver",
+        "homer'ın felekten gecesi hakkinda konus"
+      ],
+      "responses": [
+        "Bölüm, eleştirmenlerden olumlu yorumlar aldı ve yayınlandığı hafta Fox Broadcasting Company kanalında en çok izlenen ikinci program oldu.",
+        "\"Homer's Night Out\", Amerikan animasyon televizyon dizisi Simpsonlar'ın birinci sezonunun onuncu bölümüdür.",
+        "Bu bölüm, diğer üç Simpsonlar bölümüyle, 2004'te piyasaya sürülen The Simpsons Gone Wild DVD'sinde yer aldı."
+      ]
+    },
+    {
+      "tag": "pelikan",
+      "patterns": [
+        "pelikan nedir",
+        "pelikan hakkinda bilgi ver",
+        "pelikan ne demek",
+        "pelikan anlat",
+        "bana pelikan hakkinda bilgi ver",
+        "pelikan hakkinda konus"
+      ],
+      "responses": [
+        "Beyaz tüylü dört türü yerde yuva yaparken kahverengi ya da gri renkli diğer dört türü ise ağaçlarda yuvalanmayı tercih eder.",
+        "Üç türü korunma durumu açısından önem arz etmektedir.",
+        "Aynı takım içinde yer alan aynaklar, kaşıkçılar ve balıkçıllar ise uzak akrabalarıdır."
+      ]
+    },
+    {
+      "tag": "i̇zmit saat kulesi",
+      "patterns": [
+        "i̇zmit saat kulesi nedir",
+        "i̇zmit saat kulesi hakkinda bilgi ver",
+        "i̇zmit saat kulesi ne demek",
+        "i̇zmit saat kulesi anlat",
+        "bana i̇zmit saat kulesi hakkinda bilgi ver",
+        "i̇zmit saat kulesi hakkinda konus"
+      ],
+      "responses": [
+        "Abdülhamid'in tahta çıkışının 25.",
+        "1 Eylül 1900'de temeli atılan kulenin ertesi yıl aynı gün tamamlanması hedeflense de, süreç gecikti ve Eylül 1902'de henüz inşâsı tamamlanamayan kulenin açılışı gerçekleştirildi.",
+        "Yapının çatısı piramidal koni şeklindedir."
+      ]
+    },
+    {
+      "tag": "1964 brinks oteli bombalı saldırısı",
+      "patterns": [
+        "1964 brinks oteli bombalı saldırısı nedir",
+        "1964 brinks oteli bombalı saldırısı hakkinda bilgi ver",
+        "1964 brinks oteli bombalı saldırısı ne demek",
+        "1964 brinks oteli bombalı saldırısı anlat",
+        "bana 1964 brinks oteli bombalı saldırısı hakkinda bilgi ver",
+        "1964 brinks oteli bombalı saldırısı hakkinda konus"
+      ],
+      "responses": [
+        "Tartışmadan Johnson galip çıktı ve herhangi bir harekette bulunulmadı.",
+        "İki Vietkong casusunun, ABD Ordusu'na ev sahipliği yapan otelin altındaki bir arabaya koydukları bombanın patlaması sonucunda biri subay, biri ise astsubay olmak üzere iki Amerikalı öldü.",
+        "1964 Brinks Oteli bombalı saldırısı; Güney Vietnam'ın başkenti Saygon'daki Brinks Oteli'ne, Vietnam Savaşı sırasında, 24 Aralık 1964 akşamında Vietkong tarafından gerçekleştirilen bombalı saldırıdır."
+      ]
+    },
+    {
+      "tag": "2015 emirates cup",
+      "patterns": [
+        "2015 emirates cup nedir",
+        "2015 emirates cup hakkinda bilgi ver",
+        "2015 emirates cup ne demek",
+        "2015 emirates cup anlat",
+        "bana 2015 emirates cup hakkinda bilgi ver",
+        "2015 emirates cup hakkinda konus"
+      ],
+      "responses": [
+        "Ayrıca takımlara attıkları her gol başına fazladan bir puan daha verildi.",
+        "Villarreal ile Arsenal ve Wolfsburg ile Lyon takımları birbirleriyle maç yapmadılar.",
+        "2015 Emirates Cup, İngiliz futbol kulübü Arsenal'ın ev sahipliğinde, 25-26 Temmuz 2015 tarihlerinde Londra'daki Emirates Stadyumu'nda düzenlenen ve iki gün süren, sezon öncesi hazırlık turnuvası statüsündeki Emirates Cup'ın 8."
+      ]
+    },
+    {
+      "tag": "4 minutes",
+      "patterns": [
+        "4 minutes nedir",
+        "4 minutes hakkinda bilgi ver",
+        "4 minutes ne demek",
+        "4 minutes anlat",
+        "bana 4 minutes hakkinda bilgi ver",
+        "4 minutes hakkinda konus"
+      ],
+      "responses": [
+        "Madonna'ya göre şarkı, I Am Because We Are belgeselini hazırlamasında kendisine esin kaynağı oldu.",
+        "Şarkının video klibinde Madonna ve Timberlake şarkı söylüyorlar ve önüne çıkan her şeyi yutan siyah bir perdeden kaçıyorlar.",
+        "Şarkının performansları sırasında Timberlake ve Timbaland video ekranlarında belirdiler ve kendi bölümlerini söylediler."
+      ]
+    },
+    {
+      "tag": "henry moore",
+      "patterns": [
+        "henry moore nedir",
+        "henry moore hakkinda bilgi ver",
+        "henry moore ne demek",
+        "henry moore anlat",
+        "bana henry moore hakkinda bilgi ver",
+        "henry moore hakkinda konus"
+      ],
+      "responses": [
+        "Kullandığı şekiller genellikle insan figürünün soyutlamasıdır ve çalışmalarında özellikle anne ile çocuk ve yaslanmış figürler kullanmıştır.",
+        "Moore'un eserleri -1950'lerde aileleri resmeden heykeller yaptığı dönem hariç- sıklıkla kadın vücudunu işler.",
+        "Yaşamının sonlarına doğru büyük ölçekli siparişleri tamamlaması sayesinde oldukça zengin olmuştur."
+      ]
+    },
+    {
+      "tag": "kırda öğle yemeği",
+      "patterns": [
+        "kırda öğle yemeği nedir",
+        "kırda öğle yemeği hakkinda bilgi ver",
+        "kırda öğle yemeği ne demek",
+        "kırda öğle yemeği anlat",
+        "bana kırda öğle yemeği hakkinda bilgi ver",
+        "kırda öğle yemeği hakkinda konus"
+      ],
+      "responses": [
+        "Arka planda başka bir kadın ise suyun içinde yıkanmaktadır.",
+        "Manet, Kırda Öğle Yemeği ile 1863'teki Paris Salonu'na başvurdu.",
+        "Napolyon'un emriyle bir Reddedilenler Salonu açıldı ve tablo orada sergilendi."
+      ]
+    },
+    {
+      "tag": "nasreddin hoca",
+      "patterns": [
+        "nasreddin hoca nedir",
+        "nasreddin hoca hakkinda bilgi ver",
+        "nasreddin hoca ne demek",
+        "nasreddin hoca anlat",
+        "bana nasreddin hoca hakkinda bilgi ver",
+        "nasreddin hoca hakkinda konus"
+      ],
+      "responses": [
+        "Nasreddin Hoca fıkraları, sadece Anadolu'da değil, Orta Asya ve Rusya'daki özerk Türk Cumhuriyetlerinde de yaygın olarak anlatılmaktadır.",
+        "Bunların arasında 1775-1782 yılları arasında yazılan Nasreddin Hoca'nın Mansıbı, bilinen ilk tiyatro oyunu; 1939 yılında gösterime giren Nastradin Hoca i Hitar Petar da, bilinen ilk filmdir.",
+        "Özbekistan'ın tarihî Buhara şehrinde, Nasreddin Hoca'yı eşeğe binmiş hâlde tasvir eden bir heykel bulunmaktadır."
+      ]
+    },
+    {
+      "tag": "setophaga angelae",
+      "patterns": [
+        "setophaga angelae nedir",
+        "setophaga angelae hakkinda bilgi ver",
+        "setophaga angelae ne demek",
+        "setophaga angelae anlat",
+        "bana setophaga angelae hakkinda bilgi ver",
+        "setophaga angelae hakkinda konus"
+      ],
+      "responses": [
+        "Setophaga angelae, Setophaga cinsine bağlı, Karayiplerde yer alan Porto Riko adasına özgü endemik ve nadir görülen bir kuş türüdür.",
+        "Böcekçil olan kuş, yapraklar üzerindeki küçük böceklerle beslenir.",
+        "1968 yılında keşfedildi ve 1972 yılında tanımlandı."
+      ]
+    },
+    {
+      "tag": "simpson ve delilah",
+      "patterns": [
+        "simpson ve delilah nedir",
+        "simpson ve delilah hakkinda bilgi ver",
+        "simpson ve delilah ne demek",
+        "simpson ve delilah anlat",
+        "bana simpson ve delilah hakkinda bilgi ver",
+        "simpson ve delilah hakkinda konus"
+      ],
+      "responses": [
+        "Saçları uzayınca iş yerinde terfi eder ve Karl adında bir yardımcı tutar.",
+        "Bu bölümle aynı anda yayınlanan The Cosby Show daha fazla reyting aldı ancak \"Simpson and Delilah\", 29.9 milyon kişi tarafından seyredilerek dizinin en çok izlenen bölümleri arasında yer almayı başardı.",
+        "Bölümde, Homer çalıştığı Springfield Nükleer Enerji Santrali'nin sigorta şirketini kullanarak mucizevi saç çıkarma ilacı Dimoxinil'ı satın alır."
+      ]
+    },
+    {
+      "tag": "sonsuz maymun teoremi",
+      "patterns": [
+        "sonsuz maymun teoremi nedir",
+        "sonsuz maymun teoremi hakkinda bilgi ver",
+        "sonsuz maymun teoremi ne demek",
+        "sonsuz maymun teoremi anlat",
+        "bana sonsuz maymun teoremi hakkinda bilgi ver",
+        "sonsuz maymun teoremi hakkinda konus"
+      ],
+      "responses": [
+        "yüzyılda teoremi, istatistiksel mekaniğin gizli zaman cetvelini ortaya koymak amacıyla kullanmışlardır.",
+        "Sonsuz maymun teoremi, bir daktilonun tuşlarına sonsuz bir süre boyunca gelişigüzel basan bir maymunun belirli bir metni (örneğin William Shakespeare'in tüm yapıtlarını) neredeyse kesin olarak yazabileceğini ortaya koyan matematik teoremidir.",
+        "Bu bağlamda, \"neredeyse kesin\" söz öbeği matematiksel bir terimdir ve \"maymun\" da gerçek bir maymundan çok, rastgele harflerden oluşan bir diziyi sonsuza dek üreten soyut bir aygıtı ifade eder."
+      ]
+    },
+    {
+      "tag": "the one with ross's wedding",
+      "patterns": [
+        "the one with ross's wedding nedir",
+        "the one with ross's wedding hakkinda bilgi ver",
+        "the one with ross's wedding ne demek",
+        "the one with ross's wedding anlat",
+        "bana the one with ross's wedding hakkinda bilgi ver",
+        "the one with ross's wedding hakkinda konus"
+      ],
+      "responses": [
+        "'Ross'un Düğünü Olan'), Amerikan televizyon durum komedisi Friends'in (1994-2004), toplamdaki 96.",
+        "Kudrow, dizinin yayınlandığı gün bir erkek çocuğu dünyaya getirdi.",
+        "Bölüm, Mart 1998'de baş yapımcı Kevin S."
+      ]
+    },
+    {
+      "tag": "tammy abraham",
+      "patterns": [
+        "tammy abraham nedir",
+        "tammy abraham hakkinda bilgi ver",
+        "tammy abraham ne demek",
+        "tammy abraham anlat",
+        "bana tammy abraham hakkinda bilgi ver",
+        "tammy abraham hakkinda konus"
+      ],
+      "responses": [
+        "2021 yılında 40 milyon avroluk bir transfer bedeliyle İtalya'nın Roma kulübüne katılan Abraham, Serie A'daki ilk sezonunda bir İngiliz futbolcu için lig tarihindeki en yüksek rakam olan 17 gole ulaştı.",
+        "Ayrıca Polonya'da düzenlenen 2017 UEFA Avrupa 21 Yaş Altı Futbol Şampiyonası'nda oynadı.",
+        "Ardından Swansea City'de de bir sezon kiralık oynadı, ancak takımı sezonun sonunda Premier League'den küme düştü."
+      ]
     }
   ]
 }
