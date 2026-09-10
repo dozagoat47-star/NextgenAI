@@ -1232,6 +1232,37 @@
         "Nazilerin Sovyet savaş esirlerine karşı işledikleri suçlar kapsamında pek çok kişi burada öldürüldü.",
         "Sovyet savaş esirlerini toplamak için inşa edilen 381 numaralı Stalag iki şube halinde Tallinn ve Tapa'da kuruldu."
       ]
+    },
+    {
+      "tag": "man-ape",
+      "patterns": [
+        "man-ape nedir",
+        "man-ape hakkinda bilgi ver",
+        "man-ape ne demek",
+        "man-ape anlat",
+        "bana man-ape hakkinda bilgi ver",
+        "man-ape hakkinda konus"
+      ],
+      "responses": [
+        "Roy Thomas ve John Buscema tarafından yaratılan karakter ilk olarak The Avengers #62'de ortaya çıktı.",
+        "Man-Ape (M'Baku), Marvel Comics tarafından yayınlanan Amerikan çizgi romanlarında görünen bir Süper kötü adamdır.",
+        "Man-Ape, süper kahraman Kara Panter'in sık sık düşmanı olarak tasvir edilir."
+      ]
+    },
+    {
+      "tag": "i̇skepati köprüsü",
+      "patterns": [
+        "i̇skepati köprüsü nedir",
+        "i̇skepati köprüsü hakkinda bilgi ver",
+        "i̇skepati köprüsü ne demek",
+        "i̇skepati köprüsü anlat",
+        "bana i̇skepati köprüsü hakkinda bilgi ver",
+        "i̇skepati köprüsü hakkinda konus"
+      ],
+      "responses": [
+        "İskepati Köprüsü, Artvin'in Borçka ilçesinde konumlanmış bir kemer köprüdür.",
+        "Hopa-Borçka karayolundaki Düzköy çıkışının 2 km kuzeydoğusunda konumlanmıştır."
+      ]
     }
   ]
 }
