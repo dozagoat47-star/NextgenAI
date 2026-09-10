@@ -44,7 +44,7 @@ def load_bot():
         all_patterns = []
         for intent in data['intents']:
             for p in intent['patterns']:
-                all_patterns.append(p.lower())
+                all_patterns.append(bot.ascii_normalize(p.lower()))
 
 
 @app.after_request
@@ -102,6 +102,7 @@ def predict():
     try:
         data = request.get_json(force=True, silent=True)
         text = data.get('text', '').strip().lower() if data else ''
+        text = bot.ascii_normalize(text)
         if not text or len(text) < 2:
             return jsonify({'suggestions': []})
         suggestions = [p for p in all_patterns if text in p or p.startswith(text)]

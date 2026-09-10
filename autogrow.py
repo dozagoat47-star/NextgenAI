@@ -40,6 +40,18 @@ QUESTION_TEMPLATES = [
     "{topic} hakkinda soru sor",
 ]
 
+TURKISH_TO_ASCII = {
+    'ç': 'c', 'ğ': 'g', 'ı': 'i', 'ö': 'o', 'ş': 's', 'ü': 'u',
+    'â': 'a', 'î': 'i', 'û': 'u',
+    'Ç': 'c', 'Ğ': 'g', 'İ': 'i', 'I': 'i', 'Ö': 'o', 'Ş': 's', 'Ü': 'u',
+    '\u0307': '',
+}
+
+
+def tr_ascii(text):
+    """Etiket ve kaliplari ASCII Turkce ile tutarli hale getirir."""
+    return text.translate(str.maketrans(TURKISH_TO_ASCII))
+
 
 def api_get(params, retries=3):
     """Wikipedia action API istegi; 429/5xx durumunda bekle ve tekrar dene."""
@@ -154,7 +166,7 @@ def build_intent(title, extract):
     if len(sentences) < 2:
         return None
 
-    clean = title.lower().replace('_', ' ').strip()
+    clean = tr_ascii(title.lower().replace('_', ' ').strip())
     if len(clean.split()) > 6:
         return None
 

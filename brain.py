@@ -226,6 +226,20 @@ class ChatBot:
         self.intent_tags = []
         self.stem_cache = {}
 
+    def ascii_normalize(self, text):
+        """
+        Turkce ozel karakterleri ASCII karsiliklarina cevirir.
+        Boylece 'ogle' / 'öğle' / 'OĞLE' hepsi ayni kelimeye donusur.
+        """
+        turkish_to_ascii = {
+            'ç': 'c', 'ğ': 'g', 'ı': 'i', 'ö': 'o', 'ş': 's', 'ü': 'u',
+            'â': 'a', 'î': 'i', 'û': 'u', 'i': 'i', 'o': 'o', 'u': 'u',
+            'Ç': 'c', 'Ğ': 'g', 'İ': 'i', 'I': 'i', 'Ö': 'o', 'Ş': 's', 'Ü': 'u',
+            'Â': 'a', 'Î': 'i', 'Û': 'u',
+            '\u0307': '',  # Python'in 'İ'.lower() ciktisindaki kombinasyon noktasi
+        }
+        return text.translate(str.maketrans(turkish_to_ascii))
+
     def simple_stem(self, word):
         """Basit Türkçe kelime kökü bulma (stemming)"""
         if word in self.stem_cache:
@@ -250,6 +264,7 @@ class ChatBot:
         """Metni kelimelere ayırır ve temizler"""
         # noktalama işaretlerini kaldır
         text = text.lower()
+        text = self.ascii_normalize(text)
         for char in string.punctuation:
             text = text.replace(char, '')
         words = text.split()
