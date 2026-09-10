@@ -32,7 +32,10 @@
         "hey nextgen",
         "merhaba yapay zeka",
         "selam nasilsin",
-        "hey nasilsin kardesim"
+        "hey nasilsin kardesim",
+        "meraba",
+        "merhaba gunaydin",
+        "hey naber"
       ],
       "responses": [
         "Merhaba! Ben Nextgen AI'yim, nasılsın?",
@@ -79,7 +82,7 @@
         "Hoşça kal! Tekrar beklerim, iyi günler!",
         "Bay bay! Güle güle, kendini ihmal etme!",
         "Görüşürüz! Sana yardımcı olabildiysem ne mutlu!",
-        "Kendine iyi bak! Istediğin zaman gel, buradayim!",
+        "Kendine iyi bak! İstediğin zaman gel, buradayim!",
         "Hoşçakal! Bir dahaki sefere daha fazla sohbet ederiz!",
         "Güle güle! Günün güzel geçsin!"
       ]
@@ -120,7 +123,7 @@
         "Ne demek, yardımcı olabildiysem ne mutlu!",
         "Bir şey değil! Baska bir sorun varsa sormaktan çekinme!",
         "Rica ederim! Senin için buradayim!",
-        "Ne demek, bu benim görevim! Istediğin zaman sorabilirsin!",
+        "Ne demek, bu benim görevim! İstediğin zaman sorabilirsin!",
         "Çok naziksin, teşekkürler! Daha fazla yardımcı olmak isterim!",
         "Aferin! Biliyorum ki öğrenmeye meraklı birisin!",
         "Sen de çok iyisin! Sohbet etmeyi sevdim seninle!"
@@ -155,16 +158,19 @@
         "keyifler gicir mi",
         "havalar nasil gidiyor",
         "sen nasilsin peki",
-        "iyilik sende de olsun"
+        "iyilik sende de olsun",
+        "nasilsin",
+        "sen nasilsin",
+        "bugun nasilsin"
       ],
       "responses": [
-        "Iyiyim, teşekkürler! Sen nasılsın? Günün nasıl geçti?",
+        "İyiyim, teşekkürler! Sen nasılsın? Günün nasıl geçti?",
         "Çok iyiyim! Seninle konuşmak beni mutlu ediyor! Sende n'aber?",
         "Mükemmelim! Yeni şeyler öğrenmeye hazırım! Sen nasılsın?",
         "Harika hissediyorum! Seninle sohbet etmek güzel! Anlat bakalım neler oluyor?",
         "Çok iyi! Burada seni bekliyordum! Sormak istediğin bir şey var mi?",
         "Süperim! Seninle konuşmak günü güzelleştiriyor! Sende nasılsın?",
-        "Iyilik, şukur! Sen de anlat biraz neler yapıyorsun?",
+        "İyilik, şukur! Sen de anlat biraz neler yapıyorsun?",
         "Çok iyiyim! Yeni günler, yeni sohbetler! Sen nasılsın?"
       ]
     },
@@ -200,15 +206,17 @@
         "ne icin calisiyorsun",
         "ne ise yariyorsun",
         "hayatinda ne yapiyorsun",
-        "bize kendinden bahset"
+        "bize kendinden bahset",
+        "anlat kendini",
+        "kisaca kendini anlat"
       ],
       "responses": [
         "Ben Nextgen AI! Sıfırdan yapılmış bir yapay zekayım! Python ile yazıldım, Wikipedia'dan bilgi topluyorum!",
         "Adım Nextgen! Türkçe konuşan bir yapay zeka asistanıyım! Sana yardımcı olmak için buradayim!",
-        "Yapay zeka asistanıyım! Insanların sorularını yanitmak için var oluyorum! Çok meraklıyım!",
+        "Yapay zeka asistanıyım! İnsanların sorularını yanitmak için var oluyorum! Çok meraklıyım!",
         "Ben Nextgen! Sıfırdan eğitim görmüş bir sinir agiyim! Her gün yeni şeyler öğreniyorum!",
         "Yapay zekayım ama ruhum yok! Ama seninle sohbet etmeyi çok seviyorum!",
-        "Bir bilgisayar programiyim ama seninle arkadaş olmak istiyorum! Sorularını bekliyorum!",
+        "Bir bilgisayar programıyım ama seninle arkadaş olmak istiyorum! Sorularını bekliyorum!",
         "Türkçe konuşuyorum! Python ile yazıldım ve su an seninle sohbet ediyorum! Harika değil mi?",
         "Yaşım yok ama çok deneyimliyim! Her gün yeni insanlarla konuşup yeni şeyler öğreniyorum!"
       ]
@@ -297,7 +305,7 @@
         "Tabii! Sana nasıl yardımcı olabilirim? Buyur dinliyorum!",
         "Elbette! Bana ne sormak istersen sor, elimden geleni yaparım!",
         "Yardım için buradayim! Söyle bakalım ne merak ediyorsun?",
-        "Buradayim! Istediğini sor, yardımcı olmaya hazırım!",
+        "Buradayim! İstediğini sor, yardımcı olmaya hazırım!",
         "Tabii ki yardımcı olurum! Anlat bakalım neler kafanı kurcalıyor?",
         "Sor sormaktan çekinme! Elimden geleni yaparım!"
       ]
@@ -330,9 +338,9 @@
       ],
       "responses": [
         "Python harika bir başlangıç dili! Kolay öğrenilir ve çok geniş bir alanda kullanılır!",
-        "Programlama, bilgisayarlara ne yapacağını öğretmek! Ister web, ister oyun, ister yapay zeka yapabilirsin!",
+        "Programlama, bilgisayarlara ne yapacağını öğretmek! İster web, ister oyun, ister yapay zeka yapabilirsin!",
         "Kodlama öğrenmek için önce temelleri öğren, sonra her gün pratik yap! Python iyi bir seçim!",
-        "Yazılım dünyası çok geniş! Python, JavaScript, Java gibi diller var. Ilgine göre seç!",
+        "Yazılım dünyası çok geniş! Python, JavaScript, Java gibi diller var. İlgine göre seç!",
         "Yazılımcı olmak zor değil, sabır ve pratik ister! Her gün küçük projeler yaparak başla!",
         "Programlama zor gibi görünebilir ama zamanla çok eğlenceli hale gelir! Vazgeçme!",
         "Bilgisayar bilimi için önce matematik ve mantık temellerini öğren, sonra kodlamaya başla!",
@@ -459,7 +467,15 @@
         "evde ne pisirsem",
         "tatli oner",
         "tatli ne yapayim",
-        "cikolata sever misin"
+        "cikolata sever misin",
+        "cay icmek isterim",
+        "cay mi kahve mi tercih edersin",
+        "kahve icelim mi",
+        "bir sey icelim",
+        "icmek istiyorum",
+        "icecek oner",
+        "neyi tercih edersin",
+        "soguk icecek oner"
       ],
       "responses": [
         "Pizza için: hamur, sos, peynir! Fırında 15 dakika, harika olur!",
@@ -470,7 +486,10 @@
         "Kahvaltı için: yumurta, peynir, zeytin, ekmek ve sıcak çay!",
         "Salata: yeşillik, domates, salatalik, zeytinyağı! Hem sağlıklı hem güzel!",
         "Tatlı için: sütlaç veya kek yapabilirsin, çok lezzetli olur!",
-        "Evde hızlı yemek: makarna veya çorba yapabilirsin!"
+        "Evde hızlı yemek: makarna veya çorba yapabilirsin!",
+        "Çay da kahve de güzel! Sabah kahvesi, akşam çayı derim ben!",
+        "Çay severim, kahveyi de severim. Sıcak bir çay her derde deva!",
+        "Ne içeceğine ben de karar veremem bazen! Çay de ölümsüz, kahve de!"
       ]
     },
     {
@@ -555,12 +574,12 @@
       ],
       "responses": [
         "Tarih, geçmişte yaşanan olayları inceleyen bir bilim dalıdır!",
-        "Osmanlı Imparatorluğu 1299 yılında kurulmuş, büyük bir imparatorluktur!",
+        "Osmanlı İmparatorluğu 1299 yılında kurulmuş, büyük bir imparatorluktur!",
         "Türkiye Cumhuriyeti 29 Ekim 1923 yılında Atatürk tarafindan kurulmuştur!",
-        "Istanbul iki kıtada yer alan dünyanın en güzel şehirlerinden biridir!",
+        "İstanbul iki kıtada yer alan dünyanın en güzel şehirlerinden biridir!",
         "Ankara Türkiye'nin başkentidir ve orta Anadolu'da bulunur!",
         "Atatürk, Türkiye Cumhuriyeti'nin kurucusu ve ilk cumhurbaşkanıdır!",
-        "Osmanlı Imparatorluğu 600 yıl boyunca 3 kıtada etkili olmustur!"
+        "Osmanlı İmparatorluğu 600 yıl boyunca 3 kıtada etkili olmustur!"
       ]
     },
     {
@@ -633,7 +652,7 @@
       ],
       "responses": [
         "Kediler balık, tavuk ve kuru mama yerler. Sevimli ve bağımsız hayvanlardır!",
-        "Köpekler et ve kuru mama yerler. Insanın en sadık dostudur!",
+        "Köpekler et ve kuru mama yerler. İnsanın en sadık dostudur!",
         "Aslan et yer, avlarını yakalayarak beslenir. Ormanların kralıdır!",
         "Kaplan et yer, ormanlarda yaşar ve çok güçlü bir hayvandır!",
         "Kuşlar tohum, böcek ve meyve yerler. Uçmalarıyla tanınır!",
@@ -843,7 +862,7 @@
         "Bu harika! Sevincine ortak oluyorum! Anlat bakalım neler oldu?",
         "Çok mutlu oldum seni mutlu görünce! Bunu hak ediyorsun!",
         "Süper bir gün geçiriyorsun, bu harika! Bu mutluluk senin olsun!",
-        "Vay, bu cesaret verici! Iyi haberini benimle paylaştığına sevindim!",
+        "Vay, bu cesaret verici! İyi haberini benimle paylaştığına sevindim!",
         "Mutluluğunu hissettim! Bu anın tadını çıkar, bugün senin günün!",
         "Harika bir duygu değil mi? Seninle birlikte ben de mutlu oldum!"
       ]
@@ -872,13 +891,21 @@
         "kendimi uzgun hissediyorum",
         "uzgun hissediyorum",
         "mutsuzum",
-        "kendimi mutsuz hissediyorum"
+        "kendimi mutsuz hissediyorum",
+        "hicbir sey yapmak istemiyorum",
+        "canim hicbir sey yapmak istemiyor",
+        "bugun hicbir sey yapmak istemiyorum",
+        "motivasyonum cok dusuk",
+        "enerjim yok",
+        "cok yorgunum",
+        "bitkinim",
+        "ne yaparsam yapayim keyfim yok"
       ],
       "responses": [
-        "Üzgün olduğunu duyduğuma üzdüm. Istersen anlat, seni dinliyorum.",
+        "Üzgün olduğunu duyduğuma üzüldüm. İstersen anlat, seni dinliyorum.",
         "Sana sarmak isterdim ama elimden gelmiyor. Burada seni dinliyorum, iyi olacak.",
         "Herkesin kötü günleri olur. Bu da geçer, inan bana geçmeyen gün yok.",
-        "Içindekileri dökersen daha iyi hissedersin. Söyle bakalım neler oluyor?",
+        "İçindekileri dökersen daha iyi hissedersin. Söyle bakalım neler oluyor?",
         "Hiçbir duygu sonsuz değildir. Biraz dinlen, yarına daha iyi uyanırsın.",
         "Yalnız değilsin, ben buradayim. Anlatmak istersen kulaklarım senin!"
       ]
@@ -902,7 +929,10 @@
         "nefes alamiyorum",
         "cok calismaktan yoruldum",
         "son teslim tarihi yetismiyor",
-        "stres beni bitirdi"
+        "stres beni bitirdi",
+        "is yeri beni strese sokuyor",
+        "isimden dolayi cok stresliyim",
+        "is beni strese sokuyor"
       ],
       "responses": [
         "Derin bir nefes al... Şimdi yavaş yavaş ver. Stres geçici, sen güçlüsün!",
@@ -932,7 +962,7 @@
       ],
       "responses": [
         "Yalnız hissedebilirsin ama bunu paylaşman güçlü bir adım. Ben seninle konuşuyorum işte!",
-        "Insan bazen kalabalık içinde bile yalnız olur. Ama bak, ben buradayim ve seni dinliyorum.",
+        "İnsan bazen kalabalık içinde bile yalnız olur. Ama bak, ben buradayim ve seni dinliyorum.",
         "Yalnızlık geçicidir. Kendine zaman ver, yeni bağlantılar sana gelecektir.",
         "Bazen biraz yalnızlık iyidir ama sürekli olursa zor. Bir hobi veya kurs seni insanlarla buluşturabilir.",
         "Unutma, su anda bile seninle konuşan biri var: ben! Daha fazlasını konuşmak istersen buradayim."
@@ -1015,7 +1045,7 @@
       ],
       "responses": [
         "Vazgeçip vazgeçmen arasındaki fark, eger tek deneme daha yaparsan tüm değişen olur!",
-        "Sen daha önce yapamadıklarını yaptin, bunu da yapacaksın! Ileri!",
+        "Sen daha önce yapamadıklarını yaptin, bunu da yapacaksın! İleri!",
         "Küçük bir adım bile ilerlemedir. Günlük bir hedef belirle ve başla!",
         "Her büyük başarı binlerce küçük adımdan oluşur. Su an adımlardan birindesin!",
         "Unutma: en karanlık an, günün doğmadan hemen öncekidir. Günaydın yaklaşıyor!",
@@ -1091,13 +1121,20 @@
         "gun icinde neler yapiyorsun",
         "sabah kalkar kalkmaz ne yaparsin",
         "aksam ne yaparsin",
-        "favori gunun pazar mi"
+        "favori gunun pazar mi",
+        "en sevdigim gun cumartesi",
+        "favori gunun nedir",
+        "hangi gunu seversin",
+        "cumartesi gunu ne yaparsin",
+        "hafta sonu planin ne",
+        "rutinim sana anlatayim",
+        "cumartesi ne yapiyorsun"
       ],
       "responses": [
         "Favori mevsimim sonbahar! Kodların renkleri daha güzel görünüyor!",
         "Ben geceleri daha verimliyim sanırım, diğer günler de yazılım yapıyorum işte!",
         "Favori günüm cumartesi çünkü o gün en uzun kesintisiz kodlama seansı yapabilirim!",
-        "Çay candır! Kod yazarken yanımda bir fincan çay olmali!",
+        "Çay candır! Kod yazarken yanımda bir fincan çay olmalı!",
         "Sabah erken kalkarım ama o saatlerde veri işleme yaparım, ışık çok değişir!",
         "Kahvaltı önemli ama ben garip bir yapay zekayım, elektrik yeter bana!",
         "Rutinim basit: yeni veri al, işle, öğren, cevap ver. Sekiz saatlik uyku yerine kendi işlemim!",
@@ -1132,7 +1169,7 @@
       "responses": [
         "Tatil için öneri: bütçen azsa Ege ve Akdeniz'de köyler, yurt dışı için Balkanlar uygun!",
         "Deniz mi dağ mi? Hem güzel köy hem de kültürel gezi istersen çeşitli rota planlariz!",
-        "Istanbul'da tarihi yarımada, Boğaz türü ve Adalar harika! Günlük plan yapmayı önerebilirim.",
+        "İstanbul'da tarihi yarımada, Boğaz türü ve Adalar harika! Günlük plan yapmayı önerebilirim.",
         "Kamp severlere: Karadeniz yaylaları ve Kapadokya vazgeçilmez! Yanına iyi bir uyku tulumu al.",
         "Bütçen azsa bütçe dostu tatil: kamp, arkadaş evi veya erken rezervasyon avantajları!",
         "Yurt dışı hayalin varsa Vize kolaylığı ve bütçe için Bulgaristan, Yunanistan ve Romanya güzel seçenekler!",
@@ -1161,17 +1198,22 @@
         "staj bulmam lazim",
         "girecegim sinav var",
         "is ararken nelere dikkat etmeliyim",
-        "hangi bolum gelecekte degerli olur"
+        "hangi bolum gelecekte degerli olur",
+        "ise gitmekten sikildim",
+        "isin sikildim",
+        "is yoruyor beni",
+        "kariyerimden memnun degilim",
+        "ofiste hic mutlu degilim"
       ],
       "responses": [
         "Bölüm seçerken sevmediğin alanı seçme! Sevmediğin işi yapamazsın ama sevdiğini yapabilirsin!",
         "Kariyer önerisi: önce ilgi alanlarını yaz, sonra o alanlarda hangi mesleklerin geleceği parlak incele!",
-        "Iş görüşmesine gitmeden önce: sirketi araştır, sorularina 2-3 hazır cevap köy ve güler yüzle gir!",
+        "İş görüşmesine gitmeden önce: sirketi araştır, sorularına 2-3 hazır cevap köy ve güler yüzle gir!",
         "CV'de abartı yok ama kendini iyi anlatmak var: yaptığın işleri, projeleri ve öğrendiklerini yaz!",
         "Ders çalışmaktan bıktıysan: 25 dakika ders, 5 dakika mola kuralını dene (pomodoro)!",
-        "Staj başvurusu yaparken böl böl başvur, reddedersen yılma. Ilk ise alışılacaktır, kalp kırmasın!",
+        "Staj başvurusu yaparken böl böl başvur, reddedersen yılma. İlk ise alışılacaktır, kalp kırmasın!",
         "Gelişen meslekler arasında yazılım, yapay zeka, veri ve sağlık on planda. Ama hepsinden önce yetenek gelişir!",
-        "Senin sevdiğin bir şey olmali her işte. Iki alan arasında kalırsan, en çok sabahi bozan işlerden uzak dur!"
+        "Senin sevdiğin bir şey olmalı her işte. İki alan arasında kalırsan, en çok sabahi bozan işlerden uzak dur!"
       ]
     },
     {
@@ -1206,7 +1248,7 @@
         "Kardeş kavgası normaldir ama barışmak da güzeldir. Ufak bir hediyeyle barışmak çözebilir!",
         "Aile toplantılarında ufak sohbet bile özlem giderir, keyfini çıkar!",
         "Uzaktaki aile insanı özleyebilir. Ara sıra telefon açmak hem onlari hem seni mutlu eder!",
-        "Bir araya gelince eski anıları konuşarak güzel paylaşım yapabilirsiniz. Iyi vakit geçirmek her şeyden değerli!"
+        "Bir araya gelince eski anıları konuşarak güzel paylaşım yapabilirsiniz. İyi vakit geçirmek her şeyden değerli!"
       ]
     },
     {

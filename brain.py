@@ -241,24 +241,44 @@ class ChatBot:
         return text.translate(str.maketrans(turkish_to_ascii))
 
     def simple_stem(self, word):
-        """Basit Türkçe kelime kökü bulma (stemming)"""
+        """Basit Turkce kelime koku bulma (stemming)"""
         if word in self.stem_cache:
             return self.stem_cache[word]
 
         original = word
-        # Türkçe ekleri kaldır
-        suffixes = ['ler', 'lar', 'den', 'dan', 'ten', 'tan', 'de', 'da', 'te', 'ta',
-                     'nin', 'nın', 'nun', 'nün', 'in', 'ın', 'un', 'ün', 'i', 'ı', 'u', 'ü',
-                     'ye', 'ya', 'yi', 'yı', 'yle', 'yla']
+        stem = word
 
-        stemmed = word
-        for suffix in suffixes:
-            if word.endswith(suffix) and len(word) - len(suffix) >= 2:
-                stemmed = word[:-len(suffix)]
+        # onceki tek-adim yaklasimi yerine, ekleri tekrarli sekilde temizle
+        suffixes = [
+            'misiniz', 'miyim', 'musunuz', 'misin', 'lerimiz', 'larimiz',
+            'leriniz', 'lariniz', 'lerine', 'larina', 'lerin', 'larin',
+            'lari', 'leri', 'lar', 'ler',
+            'den', 'dan', 'ten', 'tan', 'de', 'da', 'te', 'ta',
+            'nin', 'nin', 'nun', 'nun', 'in', 'in', 'un', 'un',
+            'mis', 'mis', 'mis', 'mus', 'im', 'im', 'um', 'um',
+            'sin', 'sin', 'sun', 'sin', 'i', 'i', 'u', 'u',
+            'ecek', 'acak', 'erek', 'arak', 'mel', 'mal', 'mek', 'mak',
+            'iyor', 'uyor', 'yor', 'ir', 'ar', 'er', 'en', 'an',
+            'ye', 'ya', 'yi', 'yi', 'yle', 'yla'
+        ]
+
+        while True:
+            removed = False
+            for suffix in suffixes:
+                if len(stem) - len(suffix) >= 3 and stem.endswith(suffix):
+                    stem = stem[:-len(suffix)]
+                    removed = True
+                    break
+            if not removed:
                 break
 
-        self.stem_cache[original] = stemmed
-        return stemmed
+        # Turkce son sessiz sedasizlasma (devoicing): yemek/yemegi -> yemek
+        # 'ozellikleri' gibi koklerde g/g/k tutarliligi saglar
+        if len(stem) >= 4 and stem[-1] in 'gbd':
+            stem = stem[:-1] + {'g': 'k', 'b': 'p', 'd': 't'}[stem[-1]]
+
+        self.stem_cache[original] = stem
+        return stem
 
     def tokenize(self, text):
         """Metni kelimelere ayırır ve temizler"""
@@ -305,6 +325,19 @@ class ChatBot:
         # Benzersiz kelimeleri sırala
         self.vocabulary = sorted(list(set(all_words)))
         self.intent_tags = sorted(tags)
+
+        # Her niyet icin normalizasyonlu anahtar kelime kumesi
+        # (sohbet esnasinda niyet secimine yardimci olur)
+        self.intent_kws = {}
+        for tag in self.intent_tags:
+            self.intent_kws[tag] = set()
+        for intent in data['intents']:
+            tag = intent['tag']
+            kws = set()
+            for pattern in intent['patterns']:
+                kws.update(self.tokenize(pattern))
+            if tag in self.intent_kws:
+                self.intent_kws[tag].update(kws)
 
         return data
 
@@ -381,43 +414,58 @@ class ChatBot:
         X = np.array([bag])
 
         probabilities = self.model.predict_proba(X)[0]
-
         best_index = np.argmax(probabilities)
-        best_probability = probabilities[best_index]
+        best_probability = float(probabilities[best_index])
         best_tag = self.intent_tags[best_index]
 
-        confidence_threshold = 0.15
+        # Niyet keywordlerine gore degerlendir
+        kw_hits = {}
+        for tag, kws in self.intent_kws.items():
+            hits = set(words) & kws
+            if hits:
+                kw_hits[tag] = len(hits)
+        cls_hits = len(set(words) & self.intent_kws.get(best_tag, set()))
 
-        if best_probability < confidence_threshold:
+        # Softmax cok sinifli oldugu icin sohbette dusuk guven verir.
+        # Keyword eslesmesi daha gucluyse onu onceliklendir.
+        chosen_tag = best_tag
+        if kw_hits:
+            top_kw_tag = max(kw_hits, key=kw_hits.get)
+            top_kw_score = kw_hits[top_kw_tag]
+            # Guclu kelime eslesmesi (>=2) classifier'in asiri guvenini asar;
+            # zayif eslesme (<3) yalnizca classifier emin degilken kullanilir.
+            if top_kw_score >= 2 and top_kw_score >= cls_hits and \
+                    (best_probability < 0.5 or top_kw_score >= 3):
+                chosen_tag = top_kw_tag
+        elif best_probability < 0.15:
             return "Anlayamadim, baska sekilde soyler misin?"
 
-        responses = self.intents.get(best_tag, ["Bir hata olustu."])
+        responses = self.intents.get(chosen_tag, ["Bir hata olustu."])
 
         if len(responses) == 1:
             return responses[0]
 
+        # Cevabı sec: giris kelimeleriyle (normalizasyonlu) en cok oyusan
         input_words = set(words)
-        best_response = responses[0]
-        best_score = 0
+        best_responses = []
+        best_score = -1
         for resp in responses:
-            resp_lower = resp.lower()
-            score = 0
+            resp_words = set(self.tokenize(resp))
+            score = len(input_words & resp_words)
+            resp_flat = self.ascii_normalize(resp).lower()
             for w in input_words:
-                if len(w) >= 2 and w in resp_lower:
-                    score += 2
-            for w in input_words:
-                if len(w) >= 3:
-                    for rw in resp_lower.split():
-                        if w in rw:
-                            score += 1
+                if len(w) >= 3 and w in resp_flat:
+                    score += 0.5
             if score > best_score:
                 best_score = score
-                best_response = resp
+                best_responses = [resp]
+            elif score == best_score:
+                best_responses.append(resp)
 
-        if best_score == 0:
-            best_response = random.choice(responses)
+        if best_score <= 0:
+            return random.choice(responses)
 
-        return best_response
+        return random.choice(best_responses)
 
     def save_model(self, model_dir):
         """Save model and bot data"""
@@ -428,7 +476,8 @@ class ChatBot:
         bot_data = {
             'vocabulary': self.vocabulary,
             'intent_tags': self.intent_tags,
-            'intents': self.intents
+            'intents': self.intents,
+            'intent_kws': {tag: sorted(list(kws)) for tag, kws in self.intent_kws.items()}
         }
         with open(os.path.join(model_dir, 'bot_data.json'), 'w', encoding='utf-8') as f:
             json.dump(bot_data, f, ensure_ascii=False, indent=2)
@@ -446,6 +495,10 @@ class ChatBot:
         self.vocabulary = bot_data['vocabulary']
         self.intent_tags = bot_data['intent_tags']
         self.intents = bot_data['intents']
+        self.intent_kws = {tag: set(kws) for tag, kws in bot_data.get('intent_kws', {}).items()}
+        if not self.intent_kws:
+            for tag in self.intent_tags:
+                self.intent_kws[tag] = set()
 
         print(f"Bot data loaded: {model_dir}")
         print(f"  Vocabulary size: {len(self.vocabulary)}")

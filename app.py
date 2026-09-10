@@ -23,6 +23,18 @@ all_patterns = []
 
 FALLBACK_THRESHOLD = 0.25
 
+FACTUAL_MARKERS = ['nedir', 'ne demek', 'hakkinda', 'kimdir', 'kimlerdir', 'nerede',
+                   'ne zaman', 'nasil yapilir', 'kac yil', 'tarihi', 'ozetle', 'acikla',
+                   'kaynak', 'wikipedia', 'yapilir misin', 'verebilir misin']
+
+
+def is_factual_query(text):
+    t = bot.ascii_normalize(text.lower())
+    if any(m in t for m in FACTUAL_MARKERS):
+        return True
+    return t.count('?') > 0 and any(w in t for w in
+                                   [' ne ', ' kim ', ' nerede ', ' nasil ', ' kac ', ' hangi ', ' neden '])
+
 
 def load_bot():
     global bot, model_loaded, all_patterns
@@ -77,13 +89,13 @@ def chat():
 
         _, probability = bot.get_probability(user_message)
 
-        if probability < FALLBACK_THRESHOLD:
-            print(f"[CHAT] Dusuk guven (%.2f), internetten araniyor..." % probability)
+        if probability < FALLBACK_THRESHOLD and is_factual_query(user_message):
+            print(f"[CHAT] Bilgi sorusu, dusuk guven (%.2f), internetten araniyor..." % probability)
             knowledge = fetch_answer(user_message)
             if knowledge:
                 response = f"İnternette buldum: {knowledge['answer']}\n(Kaynak: {knowledge['title']})"
             else:
-                response = "Anlayamadim, baska sekilde soyler misin?"
+                response = bot.get_response(user_message)
         else:
             response = bot.get_response(user_message)
 
