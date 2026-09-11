@@ -37,9 +37,9 @@ jobs:
           git config user.name "dozagoat47-star"
           git config user.email "dozagoat47-star@users.noreply.github.com"
           if [ -n "$(git status --porcelain)" ]; then
-            git pull --rebase origin main
-            git add intents.json
+            git add -A
             git commit -m "autogrow: 60 dakikalik derin tarama ile yeni bilgiler eklendi [skip ci]"
+            git pull --rebase origin main
             git push -q
             echo "New knowledge committed and pushed."
           else
