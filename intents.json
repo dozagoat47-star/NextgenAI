@@ -13635,6 +13635,22 @@
         "Her bir truva asteroidi, Jüpiter'e göre gezegenin 60° önündeki L4 veya 60° ardındaki L5 olarak adlandırılan sabit Lagrange noktalarında ve kendi yörüngelerinde salınmaktadır.",
         "Cisimler, ortalama yarı büyük ekseni yaklaşık 5,2 Astronomik birim (AU) olan bu Lagrange noktalarının etrafındaki iki adet uzun ve kavisli bölgeye dağılmış durumda bulunur."
       ]
+    },
+    {
+      "tag": "gabon mutfagi",
+      "patterns": [
+        "gabon mutfagi nedir",
+        "gabon mutfagi hakkinda bilgi ver",
+        "gabon mutfagi ne demek",
+        "gabon mutfagi anlat",
+        "bana gabon mutfagi hakkinda bilgi ver",
+        "gabon mutfagi hakkinda konus"
+      ],
+      "responses": [
+        "Tavuk ve balık ile antilop, yaban domuzu ve maymun gibi yaban hayvanı eti mevcut olduğunda tüketilen et çeşitleridir.",
+        "Fransız mutfağından dikkate değer bir şekilde etkilenmiştir ve büyük şehirlerde Fransız mutfağına özgü çeşitli yemekler yaygındır.",
+        "Plantain, domates, mısır ve patlıcan da kullanılır."
+      ]
     }
   ]
 }
