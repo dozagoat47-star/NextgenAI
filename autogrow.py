@@ -27,7 +27,7 @@ if sys.stdout.encoding.lower() not in ('utf-8', 'utf8'):
 
 API_BASE = "https://tr.wikipedia.org/w/api.php"
 USER_AGENT = "NextgenAI/1.0 (educational chatbot; local test) requests/2.0"
-AUTOGROW_MAX_INTENTS = 500
+AUTOGROW_MAX_INTENTS = 800
 MAX_PATTERNS = 6
 MAX_RESPONSES = 3
 
@@ -228,6 +228,14 @@ def grow_once(source, count):
     if not new_intents:
         print("  Eklenebilecek yeni konu bulunamadi.")
         return (0, 0)
+
+    # siniri asmamak icin yalnizca kalan bosluk kadar yeni intent alinir
+    room = AUTOGROW_MAX_INTENTS - existing_count
+    if room <= 0:
+        return None
+    if len(new_intents) > room:
+        print(f"  Cap kaldi: {room}, {len(new_intents) - room} fazla aday ayiklandi.")
+        new_intents = new_intents[:room]
 
     print("\n  INTENTS DOSYASI GUNCELLENIYOR")
     merged, added, updated = merge_intents(INTENTS_FILE, new_intents)
