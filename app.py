@@ -14,11 +14,14 @@ import threading
 from flask import Flask, render_template, request, jsonify
 from brain import ChatBot
 from knowledge import fetch_answer
+from corpus import Corpus
 
 app = Flask(__name__)
 
 bot = ChatBot()
+corpus = Corpus()
 model_loaded = False
+corpus_loaded = False
 all_patterns = []
 
 FALLBACK_THRESHOLD = 0.25
@@ -37,7 +40,7 @@ def is_factual_query(text):
 
 
 def load_bot():
-    global bot, model_loaded, all_patterns
+    global bot, model_loaded, all_patterns, corpus, corpus_loaded
     script_dir = os.path.dirname(os.path.abspath(__file__))
     model_dir = os.path.join(script_dir, 'model')
     intents_file = os.path.join(script_dir, 'intents.json')
@@ -57,6 +60,11 @@ def load_bot():
         for intent in data['intents']:
             for p in intent['patterns']:
                 all_patterns.append(bot.ascii_normalize(p.lower()))
+
+    # RAG-lite: ilk acilista corpus yoksa mevcut intents'lardan tohumla
+    Corpus.seed_from_intents()
+    corpus.load()
+    corpus_loaded = True
 
 
 @app.after_request
@@ -92,12 +100,18 @@ def chat():
         if is_factual_query(user_message) and (
                 probability < FALLBACK_THRESHOLD
                 or (probability < 0.7 and bot.keyword_strength(user_message) < 1.5)):
-            print(f"[CHAT] Bilgi sorusu, dusuk guven (%.2f), internetten araniyor..." % probability)
-            knowledge = fetch_answer(user_message)
-            if knowledge:
-                response = f"İnternette buldum: {knowledge['answer']}\n(Kaynak: {knowledge['title']})"
+            print(f"[CHAT] Bilgi sorusu, dusuk guven (%.2f), once corpus'a bakiliyor..." % probability)
+            chunk = corpus.search(user_message)
+            if chunk and chunk['score'] >= corpus.min_score:
+                print(f"[CHAT] Corpus eslesmesi (%.2f): {chunk['title']}" % chunk['score'])
+                response = (f"Kütüphanemden buldum: {Corpus.snippet(chunk['text'])}\n"
+                            f"(Konu: {chunk['title']})")
             else:
-                response = bot.get_response(user_message)
+                knowledge = fetch_answer(user_message)
+                if knowledge:
+                    response = f"İnternette buldum: {knowledge['answer']}\n(Kaynak: {knowledge['title']})"
+                else:
+                    response = bot.get_response(user_message)
         else:
             response = bot.get_response(user_message)
 
@@ -130,6 +144,8 @@ def predict():
 def status():
     return jsonify({
         'model_loaded': model_loaded,
+        'corpus_loaded': corpus_loaded,
+        'corpus_chunks': len(corpus.chunks) if corpus_loaded else 0,
         'vocabulary_size': len(bot.vocabulary) if model_loaded else 0,
         'intent_count': len(bot.intent_tags) if model_loaded else 0
     })

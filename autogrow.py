@@ -21,6 +21,7 @@ import random
 import requests
 
 from scrape_intents import split_sentences, merge_intents, INTENTS_FILE
+from corpus import Corpus
 
 if sys.stdout.encoding.lower() not in ('utf-8', 'utf8'):
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
@@ -217,11 +218,18 @@ def grow_once(source, count):
         return (0, 0)
 
     new_intents = []
+    corpus_chunks = []
     for title, extract in extracts.items():
         intent = build_intent(title, extract)
         if intent:
             print(f"  [YENI] {intent['tag']} ({len(intent['responses'])} response)")
             new_intents.append(intent)
+            corpus_chunks.append({
+                'id': tr_ascii(title.strip().lower().replace(' ', '_')),
+                'title': title,
+                'text': extract,
+                'source': 'autogrow',
+            })
         else:
             print(f"  [SKIP] {title} (ozet cok kisa/yetersiz)")
 
@@ -236,12 +244,17 @@ def grow_once(source, count):
     if len(new_intents) > room:
         print(f"  Cap kaldi: {room}, {len(new_intents) - room} fazla aday ayiklandi.")
         new_intents = new_intents[:room]
+        corpus_chunks = corpus_chunks[:room]
 
     print("\n  INTENTS DOSYASI GUNCELLENIYOR")
     merged, added, updated = merge_intents(INTENTS_FILE, new_intents)
 
     with open(INTENTS_FILE, 'w', encoding='utf-8') as f:
         json.dump(merged, f, ensure_ascii=False, indent=2)
+
+    # Toplanan ham bilgi RAG-lite corpus'unda biriksin (sinir yok: bilgi hic
+    # kaybolmasin). Ayni id'li kayit taze metinle guncellenir.
+    Corpus.append_many(corpus_chunks)
 
     print(f"  Bu tur: yeni {added}, guncellenen {updated} | toplam {len(merged['intents'])} intent")
     return (added, updated)
@@ -269,14 +282,22 @@ def main():
         candidates = [t.strip() for t in args.topics.split(',') if t.strip()]
         extracts = fetch_batch_extracts([t for t in candidates if is_quality_title(t)])
         new_intents = []
+        corpus_chunks = []
         for title, extract in extracts.items():
             intent = build_intent(title, extract)
             if intent:
                 new_intents.append(intent)
+                corpus_chunks.append({
+                    'id': tr_ascii(title.strip().lower().replace(' ', '_')),
+                    'title': title,
+                    'text': extract,
+                    'source': 'autogrow',
+                })
         if new_intents:
             merged, added, updated = merge_intents(INTENTS_FILE, new_intents)
             with open(INTENTS_FILE, 'w', encoding='utf-8') as f:
                 json.dump(merged, f, ensure_ascii=False, indent=2)
+            Corpus.append_many(corpus_chunks)
             print(f"Yeni konular: {added}, Guncellenen: {updated}")
             print(f"Toplam intent sayisi: {len(merged['intents'])}")
             print("Sira: python train.py")
