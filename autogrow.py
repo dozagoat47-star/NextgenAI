@@ -188,15 +188,19 @@ def grow_once(source, count):
     """
     Tek bir buyume turu calistirir.
 
+    Intent cap dolmus olsa bile RAG-lite corpus'u buyumeye devam eder:
+    NN eğitim verisi (intents) sinirli kalir, corpus ise sinirsiz birikir.
+
     Returns:
-        (added, updated) veya None (cap'a ulasildi, duz dur)
+        (added, updated) ; intent eklenemezse (0, 0) ; hic veri yoksa (0, 0)
     """
     with open(INTENTS_FILE, 'r', encoding='utf-8') as f:
         existing_count = len(json.load(f)['intents'])
 
-    if existing_count >= AUTOGROW_MAX_INTENTS:
-        print(f"[DUR] Zaten {existing_count} intent var, cap {AUTOGROW_MAX_INTENTS}. Ekleme yapilamaz.")
-        return None
+    cap_reached = existing_count >= AUTOGROW_MAX_INTENTS
+    if cap_reached:
+        print(f"[BILGI] Intent cap {AUTOGROW_MAX_INTENTS} doldu ({existing_count}). "
+              f"RAG-lite corpus buyumeye devam ediyor.")
 
     if source == 'featured':
         candidates = fetch_category_titles(
@@ -220,18 +224,32 @@ def grow_once(source, count):
     new_intents = []
     corpus_chunks = []
     for title, extract in extracts.items():
-        intent = build_intent(title, extract)
-        if intent:
-            print(f"  [YENI] {intent['tag']} ({len(intent['responses'])} response)")
-            new_intents.append(intent)
+        if not cap_reached:
+            intent = build_intent(title, extract)
+            if intent:
+                print(f"  [YENI] {intent['tag']} ({len(intent['responses'])} response)")
+                new_intents.append(intent)
+            else:
+                print(f"  [SKIP] {title} (ozet cok kisa/yetersiz)")
+
+        # Corpus icin yeterli uzunluktaki TUM ozetler degerlidir:
+        # retriever kisa metinleri de kullanabilir.
+        if len(extract) >= 40:
             corpus_chunks.append({
                 'id': tr_ascii(title.strip().lower().replace(' ', '_')),
                 'title': title,
                 'text': extract,
                 'source': 'autogrow',
             })
+
+    if cap_reached:
+        Corpus.append_many(corpus_chunks)
+        if corpus_chunks:
+            print(f"  [CORPUS] {len(corpus_chunks)} konu corpus'a eklendi/guncellendi "
+                  f"(intentler {existing_count} olarak sabit).")
         else:
-            print(f"  [SKIP] {title} (ozet cok kisa/yetersiz)")
+            print("  Eklenebilecek yeni konu bulunamadi.")
+        return (0, 0)
 
     if not new_intents:
         print("  Eklenebilecek yeni konu bulunamadi.")
