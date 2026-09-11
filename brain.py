@@ -303,14 +303,27 @@ class ChatBot:
         return stem
 
     def tokenize(self, text):
-        """Metni kelimelere ayırır ve temizler"""
+        """Metni kelimelere ayırır ve temizler.
+
+        Tekil kelimelerin yaninda "yapay zeka", "kara delik" gibi anlamli
+        2'li kelime gruplarini (bigram) da tek birim olarak dondurur.
+        Her iki parcasi durak kelime olan gruplar elenir: "hakkinda bilgi"
+        konu tasimaz, "yapay zeka" konu tasir.
+        """
         # noktalama işaretlerini kaldır
         text = text.lower()
         text = self.ascii_normalize(text)
         for char in string.punctuation:
             text = text.replace(char, '')
         words = text.split()
-        return [self.simple_stem(w) for w in words]
+        stems = [self.simple_stem(w) for w in words]
+        result = list(stems)
+        for i in range(len(stems) - 1):
+            a, b = stems[i], stems[i + 1]
+            if a and b and a not in STOPWORDS and b not in STOPWORDS:
+                if len(a) >= 4 and len(b) >= 4:
+                    result.append(a + '_' + b)
+        return result
 
     def bag_of_words(self, words):
         """Bag of words vektörü oluşturur"""
