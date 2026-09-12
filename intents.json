@@ -13667,6 +13667,33 @@
         "Fransız mutfağından dikkate değer bir şekilde etkilenmiştir ve büyük şehirlerde Fransız mutfağına özgü çeşitli yemekler yaygındır.",
         "Plantain, domates, mısır ve patlıcan da kullanılır."
       ]
+    },
+    {
+      "tag": "feedback_tepki",
+      "patterns": [
+        "yalan soyleme",
+        "yalan soyluyorsun",
+        "yalan atma",
+        "dogru soyle",
+        "dogru mu soyluyorsun",
+        "sacmalama",
+        "sacmaliyorsun",
+        "yanlis biliyorsun",
+        "yanlis cevap veriyorsun",
+        "yanlis sey soyluyorsun",
+        "beni kandirma",
+        "benimle dalga gecme",
+        "ciddi ol",
+        "durst ol",
+        "bos konusma",
+        "soylediklerine inanmiyorum",
+        "gercegi soyle"
+      ],
+      "responses": [
+        "Özür dilerim, verdiğim bilgi yanlış veya eksik olabilir. Doğrusunu öğrenmem için beni yönlendirebilirsin.",
+        "Haklısın, bazen hata yapabiliyorum. Senin düzeltmenle daha iyi öğrenirim, devam edelim mi?",
+        "Yanlış anladıysam özür dilerim. Ne demek istediğini bana açıklar mısın?"
+      ]
     }
   ]
 }

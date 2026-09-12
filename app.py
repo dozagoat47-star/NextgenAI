@@ -27,6 +27,39 @@ all_patterns = []
 DEFAULT_UNKNOWN = ("Bu konuda henüz yeterli bilgiye sahip değilim, "
                    "farklı bir şekilde sormak ister misin?")
 
+FEEDBACK_TEMPLATE = ("Özür dilerim, verdiğim bilgi yanlış veya eksik olabilir. "
+                     "Doğrusunu öğrenmem için beni yönlendirebilirsin.")
+
+ADVICE_TEMPLATE = ("Ben bir yapay zekayım; kişisel ve sağlıkla ilgili kararlarını "
+                   "senin yerine veremem. Konuyla ilgili bir uzmana ya da güvendiğin "
+                   "birine danışmanı öneririm.")
+
+# Kullanıcı modelin tepkisini beğenmediğinde (eleştiri/geri bildirim) arama veya
+# corpus'a gitmeden DOĞRUDAN özür yanıtı verilir.
+FEEDBACK_PHRASES = [
+    'yalan soyl', 'yalan at', 'dogru soyl', 'sacmal', 'yanlis biliy',
+    'yanlis cevap', 'kandirm', 'dalga gec', 'ciddi ol', 'durst ol',
+    'bos konus', 'gerceg soyl', 'inanm',
+]
+
+# Kisisel/karar sorulari: 'sence ... yapmali miyim' tarzi kişisel girdiler
+# ansiklopedik tanimlara kaymasin; limit-bilen bir yanit donsun. Yalnizca
+# gercek anlamda kisisel ise (factual olmayan) uygulanir.
+ADVICE_MARKERS = ['sence', 'yapayim mi', 'benim icin', 'adima karar ver']
+
+
+def is_feedback_phrase(text):
+    t = bot.ascii_normalize(text.lower())
+    return any(p in t for p in FEEDBACK_PHRASES)
+
+
+def is_advice_question(text):
+    t = bot.ascii_normalize(text.lower())
+    if not any(m in t for m in ADVICE_MARKERS):
+        return False
+    # 'sence paris hangi ulkede' gibi gercek bilgi sorusu engellenmesin
+    return not is_factual_query(text)
+
 FACTUAL_MARKERS = ['nedir', 'ne demek', 'hakkinda', 'kimdir', 'kimlerdir', 'nerede',
                    'ne zaman', 'nasil yapilir', 'kac yil', 'tarihi', 'ozetle', 'acikla',
                    'kaynak', 'wikipedia', 'yapilir misin', 'verebilir misin',
@@ -126,8 +159,14 @@ def chat():
         if not model_loaded:
             return jsonify({'response': 'Model yuklenmedi! once train.py calistir.'})
 
-        if bot.can_answer(user_message) and not bot.has_unknown_subject(user_message):
+        if is_feedback_phrase(user_message):
+            print("[CHAT] Feedback algilandi, dogrudan yanit veriliyor.")
+            response = FEEDBACK_TEMPLATE
+        elif bot.can_answer(user_message) and not bot.has_unknown_subject(user_message):
             response = bot.get_response(user_message)
+        elif is_advice_question(user_message):
+            print("[CHAT] Kisisel/karar sorusu, tavsiye siniri yaniti.")
+            response = ADVICE_TEMPLATE
         else:
             print(f"[CHAT] Dataset'e guvenilmedi (guven/ornek filteri), fallback deneniyor: {user_message}")
             response = fallback_answer(user_message)
