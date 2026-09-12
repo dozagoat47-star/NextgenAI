@@ -742,7 +742,13 @@
         "diyet yapmali miyim",
         "su icmek neden onemlidir",
         "stres nasil gecirilir",
-        "saglikli kalmak icin ne yapmaliyim"
+        "saglikli kalmak icin ne yapmaliyim",
+        "nasil kilo verilir",
+        "kilo nasil verilir",
+        "kilo vermek istiyorum",
+        "kilo nasil verebilirim",
+        "kilo verme yontemleri nelerdir",
+        "zayiflamak istiyorum"
       ],
       "responses": [
         "Sağlıklı beslenme ve düzenli spor sağlığın temelidir!",
@@ -751,7 +757,9 @@
         "Düzgün beslenme, yeterli uyku ve egzersiz sağlıklı yaşamın sırrıdır!",
         "Vitaminler vücudun doğru çalışması için gerekli önemli besinlerdir!",
         "Su içmek çok önemli! Gününde en az 2 litre su içmeye çalış!",
-        "Stres için: yürüyüş yap, derin nefes al, sevdiklerinle vakit geçir!"
+        "Stres için: yürüyüş yap, derin nefes al, sevdiklerinle vakit geçir!",
+        "Kilo vermek icin dengeli beslenme, porsiyon kontrolu ve duzenli egzersiz en guvenli yoldur! Hizli ve sagliksiz diyetlerden kacin, saglik uzmani ile adim adim ilerle!",
+        "Kalici kilo kontrolu icin sekerli ve islenmis gidalari azalt, yemeklerine sebze ve protein ekle, haftada birkac gun yuruyus yap!"
       ]
     },
     {
@@ -1088,7 +1096,13 @@
         "hobilerimden bahsedeyim mi",
         "sana hobilerimi anlatayim mi",
         "bos zaman nerede yapilir",
-        "hobim yok nasil bulurum"
+        "hobim yok nasil bulurum",
+        "kitap okumak neden onemli",
+        "kitap okumanin faydalari nelerdir",
+        "neden kitap okumaliyiz",
+        "kitap okumanin onemi nedir",
+        "kitap okumak bana ne kazandirir",
+        "okumak insana ne kazandirir"
       ],
       "responses": [
         "Benim hobim kod yazmak ve yeni kelimeler öğrenmek! Senin hobilerin neler?",
@@ -1098,7 +1112,9 @@
         "Her gün yeni pattern tanımak benim işim ama oyun oynayan bir insan gibi eğlenir gibiyim!",
         "Hobilerini anlat dedin mi? Buyur, seni dinliyorum! Kitap, müzik, film hangisini seversin?",
         "Film izlemek, müzik dinlemek ve kitap okumak güzel hobilerdir! Hangisini seviyorsun?",
-        "Bir hobiyi severek yapmak önemli. Sevmediğin bir hobiyi zorla sürdürme, kendine zamani tanı!"
+        "Bir hobiyi severek yapmak önemli. Sevmediğin bir hobiyi zorla sürdürme, kendine zamani tanı!",
+        "Kitap okumak kelime dagarcigini genisletir, odaklanmayi artirir, empati ve hayal gucunu gelistirir!",
+        "Kitap okumak hafizayi gucuendirir, dili zenginlestirir ve hayata daha genis bir acidan bakmayi saglar!"
       ]
     },
     {
