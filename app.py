@@ -59,6 +59,15 @@ SENSITIVE_TOPICS = [
 ]
 
 
+# Uretime GIRMEYECEK tagler: sabit tek-cümlelik sohbet/kibarlik yanitlari
+# ve fikra (espri) — bunlar oldugu gibi verilir; bilgi yanitlari ise
+# generator'dan gecerek kopyala-yapistirmadan kurtulur.
+GENERATIVE_EXEMPT = {
+    'karsilama', 'kendini_tanit', 'tesekkur', 'veda', 'durum',
+    'yardim', 'mutluluk', 'uzuntu', 'espri',
+}
+
+
 def is_feedback_phrase(text):
     t = bot.ascii_normalize(text.lower())
     return any(p in t for p in FEEDBACK_PHRASES)
@@ -222,12 +231,16 @@ def chat():
         elif is_repeat_request(user_message) and _last_tag == 'espri':
             print("[CHAT] Konusuz devam istegi, son niyet espri -> yeni fikra.")
             response = random.choice(bot.intents.get('espri', ["Aklıma komik bir şey gelmedi şimdi!"]))
+        elif is_advice_question(user_message):
+            # Hassas konu (saglik/diyet/hukuk) + kisisel yonlendirme istegi:
+            # dataset cevaplarini bile asar, sinir-bilen yanit verir.
+            print("[CHAT] Kisisel/karar sorusu, tavsiye siniri yaniti.")
+            response = ADVICE_TEMPLATE
         elif bot.can_answer(user_message) and not bot.has_unknown_subject(user_message):
             response = bot.get_response(user_message)
             _last_tag = bot._classify(user_message)[0]
-        elif is_advice_question(user_message):
-            print("[CHAT] Kisisel/karar sorusu, tavsiye siniri yaniti.")
-            response = ADVICE_TEMPLATE
+            if _last_tag not in GENERATIVE_EXEMPT:
+                response = generator.generate_response(response)
         else:
             print(f"[CHAT] Dataset'e guvenilmedi (guven/ornek filteri), fallback deneniyor: {user_message}")
             response = fallback_answer(user_message)

@@ -7,12 +7,13 @@ retrieval ciktisini alip kendi cumlelerini kuran metin uretici.
 Yaklasim:
   - Bilgi yuklu cekirdekler (ozel isimler, sayilar, tarihler, baslik
     kelimeleri) 'anchor' olarak SABITLENIR; gercekler bozulmaz.
-  - Kalan yapi (dolgu kelimeler, baglaclar, ek duzenleyiciler) yerel
+- Kalan yapi (dolgu kelimeler, baglaclar, ek duzenleyiciler) yerel
     (retrieved metin) ve genel (corpus + intents) kelime gecis
     olasiliklarindan (bigram Markov + unigram geri donus, duzeltilmis
-    pürüzsuzlestirme) uretilir.
-  - Cok kisa metin ya da asiri bilgi yogun paragraflar dogrudan verilir
-    (cikti kalitesi bilgiden once gelmez).
+    pürüzsüzlestirme) uretilir.
+  - 3'ten uzun olan HER bilgi cumlesi uretimden gecirilir; yalnizca mikro
+    yanitlar (3 kelime ve alti) ve tablo-yogun (sayi anchor) paragraflar
+    guvenli gecis yapar (cikti kalitesi bilgiden once gelmez).
 
 Uretilen cumle retrieved metnin aynisi DEGILDIR; cekirdek faktler korunarak
 yeni dizilimler olusturulur.
@@ -288,7 +289,9 @@ class TextGenerator:
             text = re.sub(r'\s+', ' ', (raw_text or '')).strip()
             if not text:
                 return ''
-            if len(text) < 85:
+            # Kelime sayisi <= 3 olan mikro yanitlar ('rica ederim', 'evet')
+            # yerinde durur; 3'ten uzun HER bilgi cumlesi uretimden gecer.
+            if len(self._clean_words(text)) <= 3:
                 return self._crop(text)
 
             sents = self._split_sentences(text)
