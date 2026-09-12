@@ -26,6 +26,9 @@ STOPWORDS = {
     # Bunlarin yuksek IDF'si yanlis intent secimini guclendirir.
     'nere', 'neres', 'hank', 'hangis', 'kim', 'kimt', 'ney', 'nered',
     'kimi', 'kimin', 'neyi', 'nic', 'ned', 'neye', 'nerde', 'nerdey',
+    # yardimci/edilgen fiil kokleri: konu tasimaz, OOV gibi davranmasin,
+    # yapilir->yapil, edilir->edil gibi.
+    'edil', 'yapil', 'yapilir',
 }
 
 # Cumleyi parcalara ayirmak icin: noktalama ve baglaclar.
@@ -278,7 +281,7 @@ class ChatBot:
         suffixes = [
             'misiniz', 'miyim', 'musunuz', 'misin', 'lerimiz', 'larimiz',
             'leriniz', 'lariniz', 'lerine', 'larina', 'lerin', 'larin',
-            'lari', 'leri', 'lar', 'ler',
+            'lari', 'leri', 'lere', 'lara', 'lar', 'ler',
             'den', 'dan', 'ten', 'tan', 'de', 'da', 'te', 'ta',
             'nin', 'nin', 'nun', 'nun', 'in', 'in', 'un', 'un',
             'mis', 'mis', 'mis', 'mus', 'im', 'im', 'um', 'um',

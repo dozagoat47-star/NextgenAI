@@ -15,6 +15,7 @@ kullanilir (gercek zamanli RAG). Internete gitmeden once buradan bakilir.
 import os
 import json
 import math
+import re
 import datetime
 
 from brain import ChatBot, STOPWORDS
@@ -131,7 +132,11 @@ class Corpus:
             score = sum(qvec.get(w, 0.0) * dw for w, dw in v.items())
             title = self.chunks[i].get('title', '')
             tslug = self._slug(title)
-            if tslug in qnorm:
+            # Baslik bonusu YALNIZCA gercek kelimeyse: 'h' slug'i "hangi"nin
+            # icine substring olarak karismasin; tam kelime/soyutlanmis cogul
+            # gibi kelime sinirinda eşleşmeli.
+            if tslug and (tslug in qtoks or
+                          re.search(r'(?<![a-z0-9])' + re.escape(tslug) + r'(?![a-z0-9])', qnorm)):
                 score += 0.30
             if score > 0.0:
                 entry = self.chunks[i]
