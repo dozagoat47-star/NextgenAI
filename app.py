@@ -10,6 +10,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 import os
 import json
 import random
+import re
 import webbrowser
 import threading
 from flask import Flask, render_template, request, jsonify
@@ -66,6 +67,54 @@ GENERATIVE_EXEMPT = {
     'karsilama', 'kendini_tanit', 'tesekkur', 'veda', 'durum',
     'yardim', 'mutluluk', 'uzuntu', 'espri',
 }
+
+
+# SAYILANABILIR LISTE ISLEMLERI: "3 film oner", "2 tane dizi soyle" gibi
+# sorularda sorgudaki sayi yakalanir ve ilgili intent'in yanit havuzundan o
+# kadar FARKLI oge bir listede birlestirilir ("1. X 2. Y 3. Z ...").
+COUNT_WORDS = {'bir': 1, 'iki': 2, 'uc': 3, 'dort': 4, 'bes': 5,
+               'alti': 6, 'yedi': 7, 'sekiz': 8, 'dokuz': 9, 'on': 10}
+LISTABLE_NOUNS = ['film', 'dizi', 'kitap', 'sarki', 'muzik', 'oyun', 'sehir']
+COUNT_TAGS = {'film', 'sarki', 'oyun'}
+
+
+def extract_count(text):
+    """Sorgudaki sayiyi (rakam veya Turkce okunus) dondurur; yoksa None."""
+    t = bot.ascii_normalize(text.lower())
+    nums = re.findall(r'\b\d{1,2}\b', t)
+    if nums:
+        n = int(nums[0])
+        if 1 <= n <= 10:
+            return n
+    if re.search(r'\bbir ?kac\b', t):
+        return 3
+    for w in re.findall(r'[a-z0-9]+', t):
+        if w in COUNT_WORDS:
+            return COUNT_WORDS[w]
+    return None
+
+
+def build_counted_list(count, items):
+    """Intent yanit havuzundan o kadar FARKLI ogeyi "1. X ..." listesine dizer.
+    Her oge uretim katmanindan gecirilir (baslik anchor olarak korunur)."""
+    seen, uniq = set(), []
+    for it in items:
+        title = it.split('!')[0].split(',')[0]
+        key = re.sub(r'[^a-z0-9]+', '', bot.ascii_normalize(title.lower()))
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        uniq.append(it)
+    if len(uniq) < 2:
+        return None
+    random.shuffle(uniq)
+    chosen = uniq[:count]
+    out = []
+    for i, it in enumerate(chosen, 1):
+        text = generator.generate_response(it).strip()[:140]
+        text = text.rstrip('!.,; ').strip()
+        out.append(f"{i}. {text}.")
+    return ' '.join(out)
 
 
 def is_feedback_phrase(text):
@@ -237,9 +286,19 @@ def chat():
             print("[CHAT] Kisisel/karar sorusu, tavsiye siniri yaniti.")
             response = ADVICE_TEMPLATE
         elif bot.can_answer(user_message) and not bot.has_unknown_subject(user_message):
+            _tag = bot._classify(user_message)[0]
             response = bot.get_response(user_message)
-            _last_tag = bot._classify(user_message)[0]
-            if _last_tag not in GENERATIVE_EXEMPT:
+            _last_tag = _tag
+            count = extract_count(user_message)
+            if (count and count >= 2 and _tag in COUNT_TAGS
+                    and _tag in bot.intents):
+                listed = build_counted_list(count, bot.intents.get(_tag, []))
+                if listed:
+                    print(f"[CHAT] Sayili liste istegi ({count}), '{_tag}' havuzundan derlendi.")
+                    response = listed
+                elif _tag not in GENERATIVE_EXEMPT:
+                    response = generator.generate_response(response)
+            elif _tag not in GENERATIVE_EXEMPT:
                 response = generator.generate_response(response)
         else:
             print(f"[CHAT] Dataset'e guvenilmedi (guven/ornek filteri), fallback deneniyor: {user_message}")

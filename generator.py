@@ -57,12 +57,17 @@ GLUE_FALLBACK = ['olarak', 'ise', 'gibi', 'açısından', 'başlığında',
 class TextGenerator:
     """Bigram gecis olasilik matrisi uzerinden anchor-sabit yeni cumle uretici."""
 
-    def __init__(self, seed=None):
+    def __init__(self, seed=None, temperature=1.15, top_k=6):
         self.rng = random.Random(seed)
         self.trans = defaultdict(lambda: defaultdict(float))   # head -> {next: cnt}
         self.unigram = defaultdict(float)
         self.starters = defaultdict(float)                     # cumle basi kelimeler
         self.built = False
+        # Cesitlilik ayarlari: temperature>1 dagilimi yay (hep en olasi yolu
+        # secip orijinali birebir dokmeyi onler), top_k en guclu birkaç adayi
+        # cekerek kopyala-yapistir hissini kirar.
+        self.temperature = temperature
+        self.top_k = top_k
 
     # ------------------------------------------------------------- YAPI KURMA
     def _clean_words(self, text):
@@ -199,16 +204,34 @@ class TextGenerator:
         return [p.strip() for p in parts if p.strip()]
 
     # ------------------------------------------------------------ URETICILER
+    def _pick(self, items, weights):
+        """Sicaklik-duzeltmeli + top-k agirlikli ornekleme."""
+        items = list(items)
+        weights = [max(float(w), 1e-9) for w in weights]
+        if self.top_k and len(items) > self.top_k:
+            idx = sorted(range(len(weights)), key=lambda i: weights[i],
+                         reverse=True)[:self.top_k]
+            items = [items[i] for i in idx]
+            weights = [weights[i] for i in idx]
+        if self.temperature and abs(self.temperature - 1.0) > 1e-9:
+            weights = [w ** (1.0 / self.temperature) for w in weights]
+        total = sum(weights)
+        if total <= 0:
+            return self.rng.choice(items) if items else None
+        r = self.rng.random() * total
+        acc = 0.0
+        for w, wt in zip(items, weights):
+            acc += wt
+            if acc >= r:
+                return w
+        return items[-1]
+
     def _sample_connector(self):
         # Olasilikla genel korpus basi-tokenlerinden, yoksa guvendikleri listeden
         if self.starters and self.rng.random() < 0.5:
-            total = sum(self.starters.values())
-            r = self.rng.random() * total
-            acc = 0.0
-            for w, c in self.starters.items():
-                acc += c
-                if acc >= r:
-                    return ascii_normalize(w).capitalize()
+            return ascii_normalize(
+                self._pick(self.starters.keys(), self.starters.values())
+            ).capitalize()
         return self.rng.choice(DISC_CONNECTORS)
 
     def _sample_after(self, prev_norm, local, lgram):
@@ -225,15 +248,7 @@ class TextGenerator:
                     cand[w] = cand.get(w, 0.0) + 1.0
             if not cand:
                 return None
-        items, weights = zip(*cand.items())
-        total = sum(weights)
-        r = self.rng.random() * total
-        acc = 0.0
-        for w, wt in zip(items, weights):
-            acc += wt
-            if acc >= r:
-                return w
-        return items[-1] if items else None
+        return self._pick(cand.keys(), cand.values())
 
     def _synonym_neighbor(self, word, local, lgram):
         """Ayirt edici olmayan bir sozcugu, benzer baglamdaki bir komsuyla degistirir
