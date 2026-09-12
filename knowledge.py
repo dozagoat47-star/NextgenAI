@@ -124,6 +124,7 @@ def fetch_answer(question):
         return {
             'title': real_title,
             'answer': answer,
+            'raw': extract,
             'url': f"https://tr.wikipedia.org/wiki/{title.replace(' ', '_')}"
         }
     return None

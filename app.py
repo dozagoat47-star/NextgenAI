@@ -14,13 +14,15 @@ import webbrowser
 import threading
 from flask import Flask, render_template, request, jsonify
 from brain import ChatBot
-from knowledge import fetch_answer, short_answer
+from knowledge import fetch_answer
 from corpus import Corpus
+from generator import TextGenerator
 
 app = Flask(__name__)
 
 bot = ChatBot()
 corpus = Corpus()
+generator = TextGenerator()
 model_loaded = False
 corpus_loaded = False
 all_patterns = []
@@ -117,11 +119,15 @@ def is_factual_query(text):
 
 
 def fallback_answer(message):
-    """Dataset cevabina guvenilmezse: corpus -> internet (sessizce ogrenerek) -> bilmiyorum."""
+    """Dataset cevabina guvenilmezse: corpus -> internet (sessizce ogrenerek) -> bilmiyorum.
+
+    Retrieval ciktisi dogrudan basilmaz; TextGenerator uretim katmanindan
+    gecerek anchor-sabit yeni cumle olarak verilir.
+    """
     chunk = corpus.search(message)
     if chunk and chunk['score'] >= corpus.min_score:
         print(f"[CHAT] Corpus eslesmesi (%.2f): {chunk['title']}" % chunk['score'])
-        return short_answer(chunk['text'])
+        return generator.generate_response(chunk['text'], title=chunk.get('title', ''))
 
     if is_factual_query(message):
         knowledge = fetch_answer(message)
@@ -139,7 +145,8 @@ def fallback_answer(message):
                 print("[CHAT] Internet bilgisi corpus'a kaydedildi: " + knowledge['title'])
             except Exception as e:
                 print(f"[CHAT] Corpus kaydinda hata: {e}")
-            return short_answer(knowledge['answer'])
+            raw = knowledge.get('raw') or knowledge['answer']
+            return generator.generate_response(raw, title=knowledge.get('title', ''))
 
     return DEFAULT_UNKNOWN
 
@@ -170,6 +177,10 @@ def load_bot():
     Corpus.seed_from_intents()
     corpus.load()
     corpus_loaded = True
+
+    # Generative katman: genel gecis modelini corpus + intents uzerinden kur
+    generator.build_from_files(os.path.join(script_dir, 'corpus.jsonl'),
+                               os.path.join(script_dir, 'intents.json'))
 
 
 @app.after_request
