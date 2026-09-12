@@ -102,6 +102,20 @@ class Corpus:
         if not qtoks:
             return None
 
+        # 1) KALIP KISA YOLU: ogrenilmis parcalarda soru kalibi kayitlidir.
+        #    Sorunun anlamli kelimelerinin TAMAMI o kalip icinde geciyorsa
+        #    uzun metin kosinusunun sinyali seyreltip kaybetmesi onlenir
+        #    ("akropol nerede" -> 400 karaklik Akropolis metnine ragmen tutar).
+        for c in self.chunks:
+            pat = c.get('patterns', '')
+            if not pat:
+                continue
+            pat_norm = self.tokenizer.ascii_normalize(pat.lower())
+            if all(w in pat_norm for w in qtoks):
+                return {'title': c.get('title', ''),
+                        'text': c.get('text', ''),
+                        'score': 0.5}
+
         qnorm = self.tokenizer.ascii_normalize(query.lower())
         qcounts = {}
         for w in qtoks:
@@ -206,6 +220,7 @@ class Corpus:
                 'id': cid,
                 'title': ch.get('title', ''),
                 'text': ch.get('text', ''),
+                'patterns': ch.get('patterns', ''),
                 'source': ch.get('source', 'autogrow'),
                 'added_at': datetime.datetime.utcnow().isoformat(),
             }
@@ -215,3 +230,13 @@ class Corpus:
                 f.write(json.dumps(rec, ensure_ascii=False) + '\n')
         print(f"[CORPUS] corpus.jsonl guncellendi: {len(records)} parca.")
         return len(records)
+
+    def refresh(self):
+        """append_many sonrasi bellekteki indexi gunceller.
+
+        Sunucu calisirken ogrenilen parcalar bir sonraki soruya aninda
+        kutuphaneden cevap verebilsin diye dosya yeniden yuklenir.
+        """
+        if self.loaded and os.path.exists(self.path):
+            self.load()
+        return self.loaded

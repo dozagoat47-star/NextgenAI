@@ -24,11 +24,14 @@ model_loaded = False
 corpus_loaded = False
 all_patterns = []
 
-FALLBACK_THRESHOLD = 0.25
+DEFAULT_UNKNOWN = ("Bu konuda henüz yeterli bilgiye sahip değilim, "
+                   "farklı bir şekilde sormak ister misin?")
 
 FACTUAL_MARKERS = ['nedir', 'ne demek', 'hakkinda', 'kimdir', 'kimlerdir', 'nerede',
                    'ne zaman', 'nasil yapilir', 'kac yil', 'tarihi', 'ozetle', 'acikla',
-                   'kaynak', 'wikipedia', 'yapilir misin', 'verebilir misin']
+                   'kaynak', 'wikipedia', 'yapilir misin', 'verebilir misin',
+                   'ulkede', 'ulkesinde', 'ulkesi', 'sehirde', 'neresinde', 'ilcesi',
+                   'nerede', 'bolgesinde', 'kim kurdu', 'kim yazdi', 'kim buldu']
 
 
 def is_factual_query(text):
@@ -37,6 +40,36 @@ def is_factual_query(text):
         return True
     return t.count('?') > 0 and any(w in t for w in
                                    [' ne ', ' kim ', ' nerede ', ' nasil ', ' kac ', ' hangi ', ' neden '])
+
+
+def fallback_answer(message):
+    """Dataset cevabina guvenilmezse: corpus -> internet (ogrenerek) -> bilmiyorum."""
+    chunk = corpus.search(message)
+    if chunk and chunk['score'] >= corpus.min_score:
+        print(f"[CHAT] Corpus eslesmesi (%.2f): {chunk['title']}" % chunk['score'])
+        return (f"Kütüphanemden buldum: {Corpus.snippet(chunk['text'])}\n"
+                f"(Konu: {chunk['title']})")
+
+    if is_factual_query(message):
+        knowledge = fetch_answer(message)
+        if knowledge:
+            # Ogrenme: internetten gelen bilgi corpus'a yazilir; bir dahaki
+            # soruya kutuphane aninda cevap verir (yeniden egitim gerekmez).
+            try:
+                slug = bot.ascii_normalize(knowledge['title'].strip().lower()).replace(' ', '_')
+                Corpus.append_many([{'id': slug,
+                                     'title': knowledge['title'],
+                                     'text': knowledge['answer'],
+                                     'patterns': message,
+                                     'source': 'learned'}])
+                corpus.refresh()
+                print("[CHAT] Internet bilgisi corpus'a kaydedildi: " + knowledge['title'])
+            except Exception as e:
+                print(f"[CHAT] Corpus kaydinda hata: {e}")
+            return (f"Bu konuyu araştırıp hafızama ekliyorum! "
+                    f"{knowledge['answer']}\n(Kaynak: {knowledge['title']})")
+
+    return DEFAULT_UNKNOWN
 
 
 def load_bot():
@@ -95,25 +128,11 @@ def chat():
         if not model_loaded:
             return jsonify({'response': 'Model yuklenmedi! once train.py calistir.'})
 
-        _, probability = bot.get_probability(user_message)
-
-        if is_factual_query(user_message) and (
-                probability < FALLBACK_THRESHOLD
-                or (probability < 0.7 and bot.keyword_strength(user_message) < 1.5)):
-            print(f"[CHAT] Bilgi sorusu, dusuk guven (%.2f), once corpus'a bakiliyor..." % probability)
-            chunk = corpus.search(user_message)
-            if chunk and chunk['score'] >= corpus.min_score:
-                print(f"[CHAT] Corpus eslesmesi (%.2f): {chunk['title']}" % chunk['score'])
-                response = (f"Kütüphanemden buldum: {Corpus.snippet(chunk['text'])}\n"
-                            f"(Konu: {chunk['title']})")
-            else:
-                knowledge = fetch_answer(user_message)
-                if knowledge:
-                    response = f"İnternette buldum: {knowledge['answer']}\n(Kaynak: {knowledge['title']})"
-                else:
-                    response = bot.get_response(user_message)
-        else:
+        if bot.can_answer(user_message) and not bot.has_unknown_subject(user_message):
             response = bot.get_response(user_message)
+        else:
+            print(f"[CHAT] Dataset'e guvenilmedi (guven/ornek filteri), fallback deneniyor: {user_message}")
+            response = fallback_answer(user_message)
 
         print(f"[CHAT] Response: {response}")
         return jsonify({'response': response})

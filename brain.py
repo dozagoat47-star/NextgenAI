@@ -22,6 +22,10 @@ STOPWORDS = {
     # soru/template parcalari: konu tasimazlar, IDF onlari yanlis guclendirmesin
     'zam', 'kurult', 'hakk', 'bilk', 'ver', 'bilg', 'anlat', 'soyle',
     'kal', 'olur', 'olabilir', 'edebil', 'eder', 'onerr', 'oner',
+    # koklenmis soru/kilavuz kelimeler: nerede->nere, hangi->hank gibi.
+    # Bunlarin yuksek IDF'si yanlis intent secimini guclendirir.
+    'nere', 'neres', 'hank', 'hangis', 'kim', 'kimt', 'ney', 'nered',
+    'kimi', 'kimin', 'neyi', 'nic', 'ned', 'neye', 'nerde', 'nerdey',
 }
 
 # Cumleyi parcalara ayirmak icin: noktalama ve baglaclar.
@@ -499,7 +503,7 @@ class ChatBot:
                        for w in (set(words) & self.intent_kws.get(best_tag, set())))
 
         if not whole_attn and best_probability < 0.15:
-            return 'Anlayamadim', best_probability, True
+            return 'Anlayamadim', best_probability, True, words
 
         # COKLU ANAHTAR KELIME: cumleyi parcalara bol, her parcanin kendi
         # dikkat skorunu hesapla; en guclu parcayi sec. Boylece
@@ -564,6 +568,70 @@ class ChatBot:
             if s > best:
                 best = s
         return best
+
+    def can_answer(self, user_input):
+        """Veri kumesinden cevap vermeye guvenilir mi?
+
+        Kural 1 (Katı Eşik): Softmax olasiligi dusukse secilen intent e
+        guvenilmez; ancak guclu IDF eslesmesi (>=1.5) siniflandiriciyi
+        asabilir (mevcut davranis).
+        Kural 2 (Kelime Ortulusme): Sorunun anlamli kelimelerinden (stop-word
+        haric) HICBIRI secilen intent kalibinda gecmiyorsa, secim tahmindir;
+        donusturulmez.
+
+        Returns:
+            bool: True = dataset cevabini kullan, False = corpus/fallback.
+        """
+        tag, probability, unclear, _ = self._classify(user_input)
+        if unclear:
+            return False
+
+        strength = self.keyword_strength(user_input)
+        if strength < 0.5:
+            # Soru hicbir intent ile anlamli kelime paylasmiyor: secim guvenilmez.
+            return False
+
+        if probability < 0.30 and strength < 1.5:
+            return False
+
+        # Kural 2b: Soru icinde modelin HICBIR intentinde gecmeyen bilgilendirici
+        # bir kelime varsa (ozel isim/terim gibi: paris, akropol) ve secim zayif
+        # bir eslesmeye dayaniyorsa dataset cevabi suphelidir -> fallback.
+        if self.has_unknown_subject(user_input) and strength < 1.5:
+            return False
+
+        query_kws = {w for w in self.tokenize(user_input) if w not in STOPWORDS}
+        if not query_kws:
+            return probability >= 0.30 or strength >= 1.5
+        overlap = query_kws & self.intent_kws.get(tag, set())
+        if not overlap and strength < 1.5:
+            # Secilen intent sorunun HICBIR anahtar kelimesini icermiyor.
+            return False
+
+        return True
+
+    def has_unknown_subject(self, user_input):
+        """Soruda modelin hicbir intent kalibinda gecmeyen bilgilendirici bir kelime
+        var mi?
+
+        Ozel isim ve terimler (paris, akropol, kardiyoloji) intent kaliblarinda
+        olmadigi icin agirlik 0 olur; bunlar varken NN secimi tahmin olabilir,
+        corpus/internet fallbak tercih edilir. Stopword kokleri zaten agirlik 0
+        tutuldugundan otomatik elenir.
+        """
+        for w in self.tokenize(user_input):
+            if len(w) < 4:
+                continue
+            if w in STOPWORDS:
+                continue
+            if '_' in w:
+                # iki parcasi bilinen bigram yanlis alarm vermesin
+                a, b = w.rsplit('_', 1)
+                if self.keyword_weights.get(a, 0.0) > 0.0 or self.keyword_weights.get(b, 0.0) > 0.0:
+                    continue
+            if self.keyword_weights.get(w, 0.0) == 0.0:
+                return True
+        return False
 
     def get_response(self, user_input):
         """Generate response for user input"""

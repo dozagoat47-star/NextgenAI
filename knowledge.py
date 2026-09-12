@@ -15,7 +15,11 @@ STOPWORDS = {
     'bir', 'mi', 'mu', 'degil', 'acikla', 'detay', 'icer', 'ban', 'beraber',
     'soruyorum', 'merak', 'ediyorum', 'istedim', 'ilet', 'amonle',
     'acayip', 'coo', 'sey', 'hani', 'her', 'seyn', 'bagir', 'mr', 'ly',
-    'any', 'velo', 'cam', 'asiri', 'var'
+    'any', 'velo', 'cam', 'asiri', 'var',
+    # soru kilavuz kelimeler: bunlar kalirsa Wikipedia aramasi saçmalar
+    'hangi', 'ulkede', 'ulkesinde', 'ulkede', 'ulkelerde', 'sehirde',
+    'neresinde', 'ilcesi', 'neye', 'kime', 'neresi', 'neres', 'nerede',
+    'kac', 'ne zaman', 'ne kadardir', 'udur', 'dir', 'nufus', 'komsu',
 }
 
 API_BASE = "https://tr.wikipedia.org/w/api.php"
