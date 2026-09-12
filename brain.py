@@ -19,6 +19,9 @@ STOPWORDS = {
     'sen', 'ben', 'bana', 'sana', 'bu', 'su', 'neyi', 'hangisi',
     'ne', 'hangi', 'kac', 'nasil', 'neden', 'nicin', 'bir', 'da', 'de',
     'ya', 'ki', 'miydi', 'midir', 'neydi', 'var', 'yok',
+    # baglac/dolgu kelimeleri: konu tasimaz; 'bana baska bir mizah yap'
+    # gibi uzun isteklerde eylem niyeti tanim/ansiklopedi intent'ine kaymasin.
+    'baska', 'tane', 'daha',
     # soru/template parcalari: konu tasimazlar, IDF onlari yanlis guclendirmesin
     'zam', 'kurult', 'hakk', 'bilk', 'ver', 'bilg', 'anlat', 'soyle',
     'kal', 'olur', 'olabilir', 'edebil', 'eder', 'onerr', 'oner',

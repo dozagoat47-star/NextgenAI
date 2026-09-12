@@ -270,7 +270,14 @@
         "mizah anlat",
         "mizah soyle",
         "bana mizah anlat",
-        "bir mizah anlat"
+        "bir mizah anlat",
+        "baska bir mizah yap",
+        "baska bir espri yap",
+        "bir mizah daha yap",
+        "mizah anlatir misin",
+        "espri anlatir misin",
+        "baska bir fikra anlat",
+        "bir tane daha espri yap"
       ],
       "responses": [
         "Programci neden doğayı sever? Çünkü orada çok az bug vardır!",

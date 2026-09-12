@@ -9,6 +9,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 import os
 import json
+import random
 import webbrowser
 import threading
 from flask import Flask, render_template, request, jsonify
@@ -23,6 +24,7 @@ corpus = Corpus()
 model_loaded = False
 corpus_loaded = False
 all_patterns = []
+_last_tag = None  # baglam: son yanitin intent'i ('espri' devam istekleri icin)
 
 DEFAULT_UNKNOWN = ("Bu konuda henüz yeterli bilgiye sahip değilim, "
                    "farklı bir şekilde sormak ister misin?")
@@ -58,6 +60,34 @@ SENSITIVE_TOPICS = [
 def is_feedback_phrase(text):
     t = bot.ascii_normalize(text.lower())
     return any(p in t for p in FEEDBACK_PHRASES)
+
+
+# EYLEM KILIDI: eylem fiili ('yap/anlat/soyle') + mizah kelimesi birlikteyse
+# sorgu kesinlikle fıkra/şaka niyetine kilitlenir; 'mizah tanimi' gibi tanim
+# intent'lerine veya ansiklopedi fallback'ine düşmez.
+JOKE_VERBS = ['yap', 'anlat', 'soyle', 'uydur', 'yaz']
+HUMOR_STEMS = ['mizah', 'espri', 'fikra', 'saka']
+
+
+def is_joke_request(text):
+    stems = set(bot.tokenize(text))
+    if not (stems & set(JOKE_VERBS)):
+        return False
+    return bool(stems & set(HUMOR_STEMS))
+
+
+# DOLGU-ONLİ TERCIHTEN YOK: 'bir daha yap', 'baska bir tane daha soyle'
+# gibi konusuz devam istekleri. Son yanit fikraydiysa yeni fikra doner.
+REPEAT_CUES = {'daha', 'tane', 'baska', 'bir'}
+
+
+def is_repeat_request(text):
+    stems = set(bot.tokenize(text))
+    if not (stems & REPEAT_CUES):
+        return False
+    # Bilgilendirici (konu tasiyan) tek kelime olmamali: tamami dolu/stopword.
+    return all(w in bot.keyword_weights and bot.keyword_weights[w] == 0.0
+               for w in stems if '_' not in w)
 
 
 def is_advice_question(text):
@@ -157,6 +187,7 @@ def home():
 
 @app.route('/chat', methods=['GET', 'POST', 'OPTIONS'])
 def chat():
+    global _last_tag
     if request.method == 'OPTIONS':
         return '', 204
     try:
@@ -173,14 +204,23 @@ def chat():
         if is_feedback_phrase(user_message):
             print("[CHAT] Feedback algilandi, dogrudan yanit veriliyor.")
             response = FEEDBACK_TEMPLATE
+        elif is_joke_request(user_message):
+            print("[CHAT] Mizah/eylem istegi, espri niyetine kilitleniyor.")
+            response = random.choice(bot.intents.get('espri', ["Aklıma komik bir şey gelmedi şimdi!"]))
+            _last_tag = 'espri'
+        elif is_repeat_request(user_message) and _last_tag == 'espri':
+            print("[CHAT] Konusuz devam istegi, son niyet espri -> yeni fikra.")
+            response = random.choice(bot.intents.get('espri', ["Aklıma komik bir şey gelmedi şimdi!"]))
         elif bot.can_answer(user_message) and not bot.has_unknown_subject(user_message):
             response = bot.get_response(user_message)
+            _last_tag = bot._classify(user_message)[0]
         elif is_advice_question(user_message):
             print("[CHAT] Kisisel/karar sorusu, tavsiye siniri yaniti.")
             response = ADVICE_TEMPLATE
         else:
             print(f"[CHAT] Dataset'e guvenilmedi (guven/ornek filteri), fallback deneniyor: {user_message}")
             response = fallback_answer(user_message)
+            _last_tag = None
 
         print(f"[CHAT] Response: {response}")
         return jsonify({'response': response})
