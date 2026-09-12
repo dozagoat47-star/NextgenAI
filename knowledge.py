@@ -69,6 +69,36 @@ def fetch_summary(title):
     return None, title
 
 
+def short_answer(text, limit=150, scan=120):
+    """Uzun makale/paragraf metnini kisa, soruya odakli bir cumleye indirger.
+
+    Ilk tam cumle (nokta/!/?) sinirina kadar kirpar; limitin onune gecen
+    geri kalan '...' ile kapatilir. Telaffuz detaylari (parantez/kose parantez
+    icindeki 'telaffuz' bloklari) temizlenir.
+    """
+    text = re.sub(r'\s+', ' ', (text or '')).strip()
+    text = re.sub(r'\s*\(\s*[^)]*telaffuz[^)]*\)', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\s*\[\s*[^\]]*telaffuz[^\]]*\]', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\s{2,}', ' ', text).strip()
+
+    # Limit icinde tam cumle yoksa bir kac kelime daha git; boylece
+    # "Paris, ... nufusu ile Fransa'nin baskentidir" gibi anlamli tam
+    # cumleler yarim kesilmez.
+    m = re.search(r'[.!?]', text[:limit])
+    if m:
+        return re.sub(r'\s{2,}', ' ', text[:m.end()]).strip()
+
+    m2 = re.search(r'[.!?]', text[limit:limit + scan])
+    if m2 and m2.start() >= 4:
+        full = re.sub(r'\s{2,}', ' ', text[:limit + m2.end()]).strip()
+        if len(full) <= limit + scan:
+            return full
+
+    if len(text) <= limit:
+        return text.strip()
+    return text[:limit].rstrip() + '...'
+
+
 def fetch_answer(question):
     """
     Kullanici sorusuna Wikipedia'dan kisa bir cevap uretir.
@@ -86,13 +116,10 @@ def fetch_answer(question):
         if not extract:
             continue
 
-        sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', extract)][:3]
-        answer = ' '.join(sentences)
-        if len(answer) < 60:
+        answer = short_answer(extract)
+        if len(answer) < 40:
+            # Cok zayif/kisa aciklama varsa sonraki basligi dene
             continue
-
-        if len(answer) > 400:
-            answer = answer[:397] + '...'
 
         return {
             'title': real_title,

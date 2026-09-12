@@ -13,7 +13,7 @@ import webbrowser
 import threading
 from flask import Flask, render_template, request, jsonify
 from brain import ChatBot
-from knowledge import fetch_answer
+from knowledge import fetch_answer, short_answer
 from corpus import Corpus
 
 app = Flask(__name__)
@@ -43,12 +43,11 @@ def is_factual_query(text):
 
 
 def fallback_answer(message):
-    """Dataset cevabina guvenilmezse: corpus -> internet (ogrenerek) -> bilmiyorum."""
+    """Dataset cevabina guvenilmezse: corpus -> internet (sessizce ogrenerek) -> bilmiyorum."""
     chunk = corpus.search(message)
     if chunk and chunk['score'] >= corpus.min_score:
         print(f"[CHAT] Corpus eslesmesi (%.2f): {chunk['title']}" % chunk['score'])
-        return (f"Kütüphanemden buldum: {Corpus.snippet(chunk['text'])}\n"
-                f"(Konu: {chunk['title']})")
+        return short_answer(chunk['text'])
 
     if is_factual_query(message):
         knowledge = fetch_answer(message)
@@ -66,8 +65,7 @@ def fallback_answer(message):
                 print("[CHAT] Internet bilgisi corpus'a kaydedildi: " + knowledge['title'])
             except Exception as e:
                 print(f"[CHAT] Corpus kaydinda hata: {e}")
-            return (f"Bu konuyu araştırıp hafızama ekliyorum! "
-                    f"{knowledge['answer']}\n(Kaynak: {knowledge['title']})")
+            return short_answer(knowledge['answer'])
 
     return DEFAULT_UNKNOWN
 
