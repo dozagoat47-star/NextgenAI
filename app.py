@@ -39,6 +39,30 @@ ADVICE_TEMPLATE = ("Ben bir yapay zekayım; kişisel ve sağlıkla ilgili kararl
                    "senin yerine veremem. Konuyla ilgili bir uzmana ya da güvendiğin "
                    "birine danışmanı öneririm.")
 
+# Yetersizlik/yetkinlik eleştirisi ("sen hiçbir şey bilmiyorsun", "çok
+# yetersizsin") duygu olarak üzüntü/sarılma şeklinde yorumlanmamalı; model
+# kendini bilgi açısından savunup öneri ister.
+SYSTEM_FEEDBACK_TEMPLATE = ("Gelişmekte olan bir yapay zekayım, henüz her konuda "
+                            "yeterli bilgim olmayabilir. Önerilerini iletebilirsin.")
+
+INADEQUACY_PHRASES = [
+    'hicbir sey bilmiyor', 'hicbirsey bilmiyor', 'bir sey bilmiyor', 'birsey bilmiyor',
+    'hicbir sey bilemiyor', 'hicbirsey bilemiyor', 'bilmiyorsun', 'yetersizsin',
+    'yetersizsiniz', 'ise yaramaz', 'ise yaramiyor', 'beceriksiz', 'cok kotu biliyorsun',
+    'salaksin', 'akilli degilsin', 'beyinsiz', 'boylesini bile bilmiyorsun',
+]
+
+# Kimlik ve güven soruları veritabanı aramasına düşüp "bilgi yok" dememeli;
+# sabit, dürüst bir yanıt bağlanır ("sen kimsin", "sana güvenebilir miyim").
+TRUST_TEMPLATE = ("Ben yerel çalışan bir yapay zekayım. Bilgileri veritabanımdan "
+                  "kurgularım, kritik konularda teyit etmeni öneririm.")
+
+TRUST_PHRASES = [
+    'guvenebilir miyim', 'guvenebilir miyiz', 'guvenilir misin', 'guvenebilir misin',
+    'guvenir misin', 'sana guven', 'sen kimsin', 'kimsin', 'kim oldugunu soyle',
+    'kendini tanit', 'kendini anlat',
+]
+
 # Kullanıcı modelin tepkisini beğenmediğinde (eleştiri/geri bildirim) arama veya
 # corpus'a gitmeden DOĞRUDAN özür yanıtı verilir.
 FEEDBACK_PHRASES = [
@@ -120,6 +144,16 @@ def build_counted_list(count, items):
 def is_feedback_phrase(text):
     t = bot.ascii_normalize(text.lower())
     return any(p in t for p in FEEDBACK_PHRASES)
+
+
+def is_inadequacy_feedback(text):
+    t = bot.ascii_normalize(text.lower())
+    return any(p in t for p in INADEQUACY_PHRASES)
+
+
+def is_trust_question(text):
+    t = bot.ascii_normalize(text.lower())
+    return any(p in t for p in TRUST_PHRASES)
 
 
 # EYLEM KILIDI: eylem fiili ('yap/anlat/soyle') + mizah kelimesi birlikteyse
@@ -270,13 +304,22 @@ def chat():
         if not model_loaded:
             return jsonify({'response': 'Model yuklenmedi! once train.py calistir.'})
 
-        if is_feedback_phrase(user_message):
-            print("[CHAT] Feedback algilandi, dogrudan yanit veriliyor.")
-            response = FEEDBACK_TEMPLATE
+        if is_feedback_phrase(user_message) or is_inadequacy_feedback(user_message):
+            if is_inadequacy_feedback(user_message):
+                print("[CHAT] Yetersizlik elestirisi, sistem yaniti veriliyor.")
+                response = SYSTEM_FEEDBACK_TEMPLATE
+            else:
+                print("[CHAT] Feedback algilandi, dogrudan yanit veriliyor.")
+                response = FEEDBACK_TEMPLATE
         elif is_joke_request(user_message):
             print("[CHAT] Mizah/eylem istegi, espri niyetine kilitleniyor.")
             response = random.choice(bot.intents.get('espri', ["Aklıma komik bir şey gelmedi şimdi!"]))
             _last_tag = 'espri'
+        elif is_trust_question(user_message):
+            # Kimlik/güven sorusu: veritabanı araması veya "bilgi yok" degil,
+            # sabit ve dürüst bir tanıtım yanıtı.
+            print("[CHAT] Kimlik/guven sorusu, sabit yanit veriliyor.")
+            response = TRUST_TEMPLATE
         elif is_repeat_request(user_message) and _last_tag == 'espri':
             print("[CHAT] Konusuz devam istegi, son niyet espri -> yeni fikra.")
             response = random.choice(bot.intents.get('espri', ["Aklıma komik bir şey gelmedi şimdi!"]))

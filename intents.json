@@ -13721,6 +13721,198 @@
         "Mizah, insanları güldüren, eğlendiren söz, yazı veya davranış bütünüdür; espri, fıkra ve şakayla yakından ilgilidir.",
         "Mizah, yaşama ve olaylara esprili, gülünç bir açıdan bakma sanatıdır; hiciv ve ironi türleri de kapsar."
       ]
+    },
+    {
+      "tag": "dunya nufusu",
+      "patterns": [
+        "dunya nufusu nedir",
+        "dunya nufusu hakkinda bilgi ver",
+        "dunya nufusu ne demek",
+        "dunya nufusu anlat",
+        "bana dunya nufusu hakkinda bilgi ver",
+        "dunya nufusu hakkinda konus"
+      ],
+      "responses": [
+        "En yüksek küresel nüfus artış oranları, yılda %1,8'in üzerinde artışlarla 1955 ile 1975 yılları arasında gerçekleşti ve 1965–1970 arasında %2,1 ile zirve yaptı.",
+        "yüzyılın sonuna kadar ise 10–12 milyar arasında olacağını tahmin etmektedir.",
+        "Dünyadaki insan nüfusu hâlâ artmaktadır, ancak değişen doğurganlık ve ölüm oranları nedeniyle uzun vadeli gidişatı hakkında önemli bir belirsizlik de bulunmaktadır."
+      ]
+    },
+    {
+      "tag": "fransiz devrimi",
+      "patterns": [
+        "fransiz devrimi nedir",
+        "fransiz devrimi hakkinda bilgi ver",
+        "fransiz devrimi ne demek",
+        "fransiz devrimi anlat",
+        "bana fransiz devrimi hakkinda bilgi ver",
+        "fransiz devrimi hakkinda konus"
+      ],
+      "responses": [
+        "Fransız İhtilali veya Fransız Devrimi (1789-1799), Fransa'daki mutlak monarşinin devrilip yerine cumhuriyetin kurulması ve Katolik Kilisesi'nin ciddi reformlara gitmeye zorlanmasıdır.",
+        "Soylular statülerini koruma hevesindeyken, burjuvalar da ekonomik olarak güçlenmelerine rağmen toplumsal haklarda söz sahibi olamamaktan şikâyetçidirler.",
+        "Toprak sahipleri ve soylular ayrıcalıklarını korumaya çalışmakta; bu sebeple burjuvaların soylu tabakasına geçmesini engelleyecek barikatlar yükseltilmektedir."
+      ]
+    },
+    {
+      "tag": "hacli seferleri",
+      "patterns": [
+        "hacli seferleri nedir",
+        "hacli seferleri hakkinda bilgi ver",
+        "hacli seferleri ne demek",
+        "hacli seferleri anlat",
+        "bana hacli seferleri hakkinda bilgi ver",
+        "hacli seferleri hakkinda konus"
+      ],
+      "responses": [
+        "Bundan sonra başka büyük askerî seferler düzenlenmedi.",
+        "Haçlı Seferleri, Orta Çağ'da Papalık Devleti tarafından başlatılan, desteklenen ve bazen de yönetilen bir dizi dinî savaştı.",
+        "yüzyılın sonlarında başladı ve Varna Haçlı Seferi'ni de içeriyordu."
+      ]
+    },
+    {
+      "tag": "megakent",
+      "patterns": [
+        "megakent nedir",
+        "megakent hakkinda bilgi ver",
+        "megakent ne demek",
+        "megakent anlat",
+        "bana megakent hakkinda bilgi ver",
+        "megakent hakkinda konus"
+      ],
+      "responses": [
+        "2015 itibarıyla dünyada 36 megakent bulunmaktadır.",
+        "Megakent veya mega şehir, genellikle toplam nüfusu 10 milyonu aşan bir şehir veya Metropoliten alandır.",
+        "Tokyo, dünyanın en büyük metropolitan alan olup Şanghay ise dünyanın en büyük şehridir."
+      ]
+    },
+    {
+      "tag": "osmanli imparatorlugu",
+      "patterns": [
+        "osmanli imparatorlugu nedir",
+        "osmanli imparatorlugu hakkinda bilgi ver",
+        "osmanli imparatorlugu ne demek",
+        "osmanli imparatorlugu anlat",
+        "bana osmanli imparatorlugu hakkinda bilgi ver",
+        "osmanli imparatorlugu hakkinda konus"
+      ],
+      "responses": [
+        "Abdülhamid döneminin ardından 1908'de Jön Türkler tarafından meşrutiyet yeniden ilan edilmiştir.",
+        "Selim ve Kanuni Sultan Süleyman dönemlerinde Osmanlı İmparatorluğu küresel güç hâline geldi.",
+        "Selim, Büyük Mısır Seferi sırasında Ridâniye Muharebesi'nde Memlûk Devleti'ni yıkıp \"İslam Halifesi\" unvanını üstlendi ve hanedanın mevcut ünvanlarına bir yenisini daha ekledi."
+      ]
+    },
+    {
+      "tag": "roma imparatorlugu",
+      "patterns": [
+        "roma imparatorlugu nedir",
+        "roma imparatorlugu hakkinda bilgi ver",
+        "roma imparatorlugu ne demek",
+        "roma imparatorlugu anlat",
+        "bana roma imparatorlugu hakkinda bilgi ver",
+        "roma imparatorlugu hakkinda konus"
+      ],
+      "responses": [
+        "yüzyıl boyunca imparatorluk batı ve doğu olmak üzere ikiye ayrıldı.",
+        "Klasik dönemde Roma İmparatorluğu; Akdeniz'i ve Avrupa'nın, Batı Asya'nın ve Kuzey Afrika'nın büyük bir bölümünü kontrol ediyordu.",
+        "Bu deyişte imperium sözcüğü bir bölge, vilayet anlamında kullanılmaktadır."
+      ]
+    },
+    {
+      "tag": "sanayi devrimi",
+      "patterns": [
+        "sanayi devrimi nedir",
+        "sanayi devrimi hakkinda bilgi ver",
+        "sanayi devrimi ne demek",
+        "sanayi devrimi anlat",
+        "bana sanayi devrimi hakkinda bilgi ver",
+        "sanayi devrimi hakkinda konus"
+      ],
+      "responses": [
+        "Girişimcilik kültürü de İngiltere'de sanayileşmenin başlamasına katkıda bulundu ve 1800'den sonra Belçika, Amerika Birleşik Devletleri ve Fransa'da da benzer gelişmeler görüldü.",
+        "Sanayi Devrimi yalnızca ekonomik ve teknolojik alanlarda değil, kültürel yaşamda da önemli dönüşümlere neden oldu.",
+        "Bazı ekonomistler, Sanayi Devrimi'nin en önemli etkisinin Batı dünyası'ndaki genel nüfusun yaşam standardının tarihte ilk kez istikrarlı biçimde artmaya başlaması olduğunu savunurken, diğerleri anlamlı bir iyileşmenin 19."
+      ]
+    },
+    {
+      "tag": "istanbul",
+      "patterns": [
+        "istanbul nedir",
+        "istanbul hakkinda bilgi ver",
+        "istanbul ne demek",
+        "istanbul anlat",
+        "bana istanbul hakkinda bilgi ver",
+        "istanbul hakkinda konus"
+      ],
+      "responses": [
+        "Karadeniz ile Marmara Denizi'ni bağlayan ve Asya ile Avrupa'yı ayıran İstanbul Boğazı'na ev sahipliği yapması nedeniyle, İstanbul'un jeopolitik önemi oldukça yüksektir.",
+        "Tarihte ilk olarak üç tarafı Marmara Denizi, Boğaziçi ve Haliç'in sardığı bir yarımada üzerinde kurulan İstanbul'un batıdaki sınırını İstanbul Surları oluşturmaktaydı.",
+        "Son yıllarda ortaya çıkarılan arkeolojik bulgularla, insanlık tarihine ilişkin önemli bilgiler elde edilmiştir."
+      ]
+    },
+    {
+      "tag": "cografi kesifler",
+      "patterns": [
+        "cografi kesifler nedir",
+        "cografi kesifler hakkinda bilgi ver",
+        "cografi kesifler ne demek",
+        "cografi kesifler anlat",
+        "bana cografi kesifler hakkinda bilgi ver",
+        "cografi kesifler hakkinda konus"
+      ],
+      "responses": [
+        "yüzyılın ilk yarısından 17.",
+        "Avrupa'yla Asya arasındaki en büyük kara ticareti ağı olan İpek Yolu'nun, Osmanlı İmparatorluğu tarafından vergilendirilmesi ve Avrupalıların talep ettiği ürünün denetlenerek verilmesi, Avrupalı yönetimleri rahatsız ediyordu.",
+        "İlk olarak Portekizli kaptanlar tarafından, 1419 ile 1427 arasında Atlas Okyanusu'ndaki Madeira ve Azor takımadaları keşfedildi."
+      ]
+    },
+    {
+      "tag": "turk kurtulus savasi",
+      "patterns": [
+        "turk kurtulus savasi nedir",
+        "turk kurtulus savasi hakkinda bilgi ver",
+        "turk kurtulus savasi ne demek",
+        "turk kurtulus savasi anlat",
+        "bana turk kurtulus savasi hakkinda bilgi ver",
+        "turk kurtulus savasi hakkinda konus"
+      ],
+      "responses": [
+        "Geri çekilen Yunan birlikleri takip edildi ve Türk ordusu 9 Eylül 1922'de İzmir'e girdi.",
+        "Bu mücadelenin Batı Cephesi Yunan millî belleğine \"Küçük Asya Felaketi\" adıyla kazınmıştır.",
+        "Yunanlar Ankara'ya 50 kilometre kadar yaklaşsalar da Sakarya Muharebesi onlar için başarısızlıkla sonuçlandı."
+      ]
+    },
+    {
+      "tag": "ankara",
+      "patterns": [
+        "ankara nedir",
+        "ankara hakkinda bilgi ver",
+        "ankara ne demek",
+        "ankara anlat",
+        "bana ankara hakkinda bilgi ver",
+        "ankara hakkinda konus"
+      ],
+      "responses": [
+        "İlin adını taşıyan tavşanı, keçisi, atı ve kedisi dünya çapında bilinir; armudu, çiğdemi; yerel yemeklerden Ankara tavası ile Kızılcahamam ve Beypazarı maden suyu ise ülke çapında tanınır.",
+        "Coğrafi olarak Türkiye'nin merkezine yakın bir konumda bulunur ve İç Anadolu Bölgesi'nde yer alır.",
+        "Türkiye'nin en çok sayıda üniversiteye sahip ikinci ili olan Ankara'da ayrıca, üniversite mezunu oranı ülke ortalamasının iki katıdır."
+      ]
+    },
+    {
+      "tag": "tokyo",
+      "patterns": [
+        "tokyo nedir",
+        "tokyo hakkinda bilgi ver",
+        "tokyo ne demek",
+        "tokyo anlat",
+        "bana tokyo hakkinda bilgi ver",
+        "tokyo hakkinda konus"
+      ],
+      "responses": [
+        "Aslen Edo olarak bilinen Tokyo, 1603 yılında Tokugawa şogunluğunun merkezi haline geldiğinde siyasi önem kazandı ve 18.",
+        "Tokyo'daki özel semtler arasında, Ulusal Meclis Binası ve Tokyo İmparatorluk Sarayı'nın bulunduğu Chiyoda; şehrin idari merkezi olan Shinjuku; ve ticaret ve iş dünyasının merkezi olan Shibuya yer almaktadır.",
+        "Meiji Restorasyonu'ndan (1868) sonra, Kyoto'daki imparatorluk başkenti Edo'ya taşındı ve şehrin adı Tokyo (kelimenin tam anlamıyla 'Doğu Başkenti') olarak değiştirildi."
+      ]
     }
   ]
 }
