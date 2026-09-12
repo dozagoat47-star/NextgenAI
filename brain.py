@@ -27,8 +27,8 @@ STOPWORDS = {
     'nere', 'neres', 'hank', 'hangis', 'kim', 'kimt', 'ney', 'nered',
     'kimi', 'kimin', 'neyi', 'nic', 'ned', 'neye', 'nerde', 'nerdey',
     # yardimci/edilgen fiil kokleri: konu tasimaz, OOV gibi davranmasin,
-    # yapilir->yapil, edilir->edil gibi.
-    'edil', 'yapil', 'yapilir',
+    # yapilir->yapil, edilir->edil, yapmali->yap, miyim->miy gibi.
+    'edil', 'yapil', 'yapilir', 'yap', 'miy',
 }
 
 # Cumleyi parcalara ayirmak icin: noktalama ve baglaclar.
@@ -651,8 +651,10 @@ class ChatBot:
             return responses[0]
 
         # Cevabi sec: en guclu parcanin kelimeleriyle (normalizasyonlu)
-        # en cok oyusan yaniti sec
-        input_words = set(resp_words)
+        # en cok oyusan yaniti sec. Stop-word'ler ('yap','miy' gibi) skoru
+        # sulandirmasin; yoksa 'stres icin yuruYUS YAP' 'Kilo... diyet' ile
+        # esit puana ulasir ve rastgele secim yanlis yanit verir.
+        input_words = {w for w in resp_words if w not in STOPWORDS and len(w) >= 3}
         best_responses = []
         best_score = -1
         for resp in responses:
