@@ -29,6 +29,10 @@ STOPWORDS = {
     # yardimci/edilgen fiil kokleri: konu tasimaz, OOV gibi davranmasin,
     # yapilir->yapil, edilir->edil, yapmali->yap, miyim->miy gibi.
     'edil', 'yapil', 'yapilir', 'yap', 'miy',
+    # gorus/modal belirtecleri: tek basina konu tasimaz, corpus kisa-yolunu
+    # yanlis tetikleyip ansiklopedi cevabi cekmesin ('sence yapmali miyim'
+    # -> PSG makalesi gibi).
+    'sence', 'bence',
 }
 
 # Cumleyi parcalara ayirmak icin: noktalama ve baglaclar.

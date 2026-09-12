@@ -112,7 +112,11 @@ class Corpus:
             if not pat:
                 continue
             pat_norm = self.tokenizer.ascii_normalize(pat.lower())
-            if all(w in pat_norm for w in qtoks):
+            # Tek kelimelik eslesme yalnizca ayirt edici (en az 6 harf) bir
+            # kelimeyle olsun; 'sence' gibi genel kelimeyle kisa-yol
+            # tetiklenip ilgisiz cevap cekmesin.
+            distinct = len(qtoks) >= 2 or max(len(w) for w in qtoks) >= 6
+            if distinct and all(w in pat_norm for w in qtoks):
                 return {'title': c.get('title', ''),
                         'text': c.get('text', ''),
                         'score': 0.5}

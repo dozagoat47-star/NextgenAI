@@ -42,10 +42,17 @@ FEEDBACK_PHRASES = [
     'bos konus', 'gerceg soyl', 'inanm',
 ]
 
-# Kisisel/karar sorulari: 'sence ... yapmali miyim' tarzi kişisel girdiler
-# ansiklopedik tanimlara kaymasin; limit-bilen bir yanit donsun. Yalnizca
-# gercek anlamda kisisel ise (factual olmayan) uygulanir.
-ADVICE_MARKERS = ['sence', 'yapayim mi', 'benim icin', 'adima karar ver']
+# Kisisel/karar soruları yalnizca HASSAS konu (saglik, tip, diyet, hapis/hukuk)
+# icercekse sinir-bilen yanit alsin. 'sence' tek basina yeterli degil; telefon
+# tavsiyesi gibi genel sorular normal arama ile yanıtlanabilir.
+ADVICE_VERBS = ['sence', 'yapayim mi', 'benim icin', 'adima karar ver']
+
+SENSITIVE_TOPICS = [
+    'saglik', 'hasta', 'hastal', 'doktor', 'tedavi', 'ilac', 'ameliyat',
+    'teshis', 'diyet', 'kilo', 'kalp', 'tansiyon', 'seker', 'depresyon',
+    'anksiyete', 'kaygi', 'kanser', 'sigara', 'alkol', 'hamile', 'gebelik',
+    'hapis', 'ceza', 'hukuk', 'avukat', 'dava', 'mahkeme', 'suclu',
+]
 
 
 def is_feedback_phrase(text):
@@ -55,13 +62,17 @@ def is_feedback_phrase(text):
 
 def is_advice_question(text):
     t = bot.ascii_normalize(text.lower())
-    if not any(m in t for m in ADVICE_MARKERS):
+    if not any(v in t for v in ADVICE_VERBS):
         return False
     # 'sence paris hangi ulkede' gibi gercek bilgi sorusu engellenmesin
-    return not is_factual_query(text)
+    if is_factual_query(text):
+        return False
+    # yalnizca hassas konu kelimesi varsa sinir-bilen yanit
+    return any(s in t for s in SENSITIVE_TOPICS)
 
 FACTUAL_MARKERS = ['nedir', 'ne demek', 'hakkinda', 'kimdir', 'kimlerdir', 'nerede',
                    'ne zaman', 'nasil yapilir', 'kac yil', 'tarihi', 'ozetle', 'acikla',
+                   'tanimi', 'tanim', 'anlami',
                    'kaynak', 'wikipedia', 'yapilir misin', 'verebilir misin',
                    'ulkede', 'ulkesinde', 'ulkesi', 'sehirde', 'neresinde', 'ilcesi',
                    'nerede', 'bolgesinde', 'kim kurdu', 'kim yazdi', 'kim buldu']

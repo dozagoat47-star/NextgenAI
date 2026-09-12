@@ -265,7 +265,12 @@
         "komik ol",
         "espri yap bana",
         "dondur kafami",
-        "eglenceli cevap ver"
+        "eglenceli cevap ver",
+        "mizah yap",
+        "mizah anlat",
+        "mizah soyle",
+        "bana mizah anlat",
+        "bir mizah anlat"
       ],
       "responses": [
         "Programci neden doğayı sever? Çünkü orada çok az bug vardır!",
@@ -13693,6 +13698,21 @@
         "Özür dilerim, verdiğim bilgi yanlış veya eksik olabilir. Doğrusunu öğrenmem için beni yönlendirebilirsin.",
         "Haklısın, bazen hata yapabiliyorum. Senin düzeltmenle daha iyi öğrenirim, devam edelim mi?",
         "Yanlış anladıysam özür dilerim. Ne demek istediğini bana açıklar mısın?"
+      ]
+    },
+    {
+      "tag": "kavram_tanimi",
+      "patterns": [
+        "mizah nedir",
+        "mizah ne demek",
+        "mizah tanimi",
+        "mizah nedir aciklar misin",
+        "mizah hakkinda bilgi ver",
+        "mizah turleri nelerdir"
+      ],
+      "responses": [
+        "Mizah, insanları güldüren, eğlendiren söz, yazı veya davranış bütünüdür; espri, fıkra ve şakayla yakından ilgilidir.",
+        "Mizah, yaşama ve olaylara esprili, gülünç bir açıdan bakma sanatıdır; hiciv ve ironi türleri de kapsar."
       ]
     }
   ]
