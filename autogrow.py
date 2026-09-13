@@ -18,10 +18,12 @@ import json
 import time
 import argparse
 import random
+import re
 import requests
 
 from scrape_intents import split_sentences, merge_intents, INTENTS_FILE
 from corpus import Corpus
+from clean_intents import ascii_normalize, strip_foreign_scripts, is_harmful_tag
 
 if sys.stdout.encoding.lower() not in ('utf-8', 'utf8'):
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
@@ -168,14 +170,29 @@ def build_intent(title, extract):
     if len(sentences) < 2:
         return None
 
-    clean = tr_ascii(title.lower().replace('_', ' ').strip())
+    clean = ascii_normalize(title.lower().replace('_', ' ').strip())
     if len(clean.split()) > 6:
+        return None
+    if is_harmful_tag(clean):
+        print(f"  [SKIP] {title} (guvenlik/icerik filtresi)")
         return None
 
     patterns = [t.format(topic=clean) for t in QUESTION_TEMPLATES[:MAX_PATTERNS]]
 
-    random.shuffle(sentences)
-    responses = sentences[:MAX_RESPONSES]
+    # Yanit havuzu hijyeni: Latin disi yazim bloklari + kesik ozetler elenir.
+    responses = []
+    for s in sentences:
+        s = strip_foreign_scripts(s)
+        s = re.sub(r'\s{2,}', ' ', s).strip()
+        if not s or len(s.split()) < 3:
+            continue
+        if re.search(r'\(\s*d\.?\s*$|\(\s*$', s):
+            continue
+        responses.append(s)
+        if len(responses) >= MAX_RESPONSES:
+            break
+    if len(responses) < 2:
+        return None
 
     return {
         'tag': clean,
@@ -235,10 +252,12 @@ def grow_once(source, count):
         # Corpus icin yeterli uzunluktaki TUM ozetler degerlidir:
         # retriever kisa metinleri de kullanabilir.
         if len(extract) >= 40:
+            clean_extract = strip_foreign_scripts(extract)
+            clean_extract = re.sub(r'\s{2,}', ' ', clean_extract).strip()
             corpus_chunks.append({
-                'id': tr_ascii(title.strip().lower().replace(' ', '_')),
-                'title': title,
-                'text': extract,
+                'id': ascii_normalize(title.strip().lower().replace(' ', '_')).replace(' ', '_'),
+                'title': ascii_normalize(title.strip()),
+                'text': clean_extract,
                 'source': 'autogrow',
             })
 
@@ -306,9 +325,9 @@ def main():
             if intent:
                 new_intents.append(intent)
                 corpus_chunks.append({
-                    'id': tr_ascii(title.strip().lower().replace(' ', '_')),
-                    'title': title,
-                    'text': extract,
+                    'id': ascii_normalize(title.strip().lower().replace(' ', '_')).replace(' ', '_'),
+                    'title': ascii_normalize(title.strip()),
+                    'text': strip_foreign_scripts(extract),
                     'source': 'autogrow',
                 })
         if new_intents:

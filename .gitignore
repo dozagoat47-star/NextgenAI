@@ -10,3 +10,4 @@ scraped_intents.json
 *.xlsm
 train_out.txt
 train_err.txt
+corpus_embedding*

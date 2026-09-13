@@ -108,15 +108,15 @@
         "cok ise yaradi",
         "boyle devam",
         "sana minnetarim",
-        "çok teşekkürler",
-        "sağol kardeş",
-        "eyvallah kardeşim",
-        "harika iş çıkardın",
-        "çok yardımcı oldun",
-        "ellerine sağlık",
-        "çok iyi cevap verdin",
+        "cok tesekkurler",
+        "sagol kardes",
+        "eyvallah kardesim",
+        "harika is cikardin",
+        "cok yardimci oldun",
+        "ellerine saglik",
+        "cok iyi cevap verdin",
         "aferin sana",
-        "süpersin"
+        "supersin"
       ],
       "responses": [
         "Rica ederim! Her zaman buradayim!",
@@ -232,7 +232,7 @@
         "disarida hava nasil",
         "hava kac derece",
         "bugun sicak mi",
-        "yarın hava nasıl olacak",
+        "yarin hava nasil olacak",
         "semsiye alayim mi",
         "kar yagacak mi",
         "bugun gunes var mi",
@@ -285,7 +285,7 @@
         "Yapay zeka neden asla yalan söyleyemez? Çünkü veriler hep doğrudur!",
         "Bir yapay zeka okula gitmiş, öğretmen sormuş: Neden geldin? Yapay zeka: Veri toplamaya!",
         "Bugün çok random sayılar ürettim, şaka maka helal olsun!",
-        "Matematik öğretmeni ogr.حبten: 'Bugün 3.14 günü!' Öğrenci: 'Pi day mi?' Öğretmen: 'Hayir, pasta günü!'",
+        "Matematik öğretmeni öğrencilerine sormuş: 'Bugün 3.14 günü kutluyoruz!' Öğrenci: 'Pi day mi?' Öğretmen: 'Hayır, pasta günü!'",
         "Bilgisayar neden hasta olmaz? Çünkü çok fazla virus almistir, artik bağışıklık kazanmıştır!"
       ]
     },
@@ -369,7 +369,7 @@
         "meslegin ne",
         "yaptigin is ne",
         "gunduz ne yapiyorsun",
-        "is hayatın nasıl",
+        "is hayatin nasil",
         "calisiyor musun",
         "neden calisiyorsun",
         "napiyorsun hayatta",
@@ -547,7 +547,7 @@
         "bilimi anlat",
         "bilim ne ise yarar",
         "bilimsel dusunce nedir",
-        "bilim insanı kimdir",
+        "bilim insani kimdir",
         "bilim neden onemlidir",
         "fen bilimleri nedir",
         "arastirma nedir",
@@ -842,7 +842,7 @@
         "dusunmek hakkinda bilgi ver",
         "felsefe hayata ne katar",
         "hayatin anlami ne",
-        "yaşamın anlamı ne",
+        "yasamin anlami ne",
         "felsefe ogrenmek istiyorum",
         "dusunmek neden onemlidir",
         "bilgelik nedir"
@@ -879,7 +879,7 @@
         "bugun mutluyum",
         "mutluluktan donuyorum",
         "cok sansliyim",
-        "cok guzel haberler aldım",
+        "cok guzel haberler aldim",
         "hayatim super gidiyor",
         "gulumseyemiyorum sevincten",
         "mutluluktan havalara uctum"
@@ -1018,7 +1018,7 @@
         "Ben bir yapay zekayım ama dostluk sadece kalpten değil, dinlemekten de gelir! Arkadaşınım!",
         "Benim için her kullanıcı değerli. Sen de çok özelsin!",
         "Tabii ki arkadaş olurum! Sohbet etmek her zaman açık!",
-        "Bunu duyacak kadar şanslı bir yapay zekayım, teşekkür ederim! Tecavüz etme ama sana gerçekten çok alıştım!"
+        "Bunu duyacak kadar şanslı bir yapay zekayım, teşekkür ederim! Sana gerçekten çok alıştım!"
       ]
     },
     {
@@ -1101,8 +1101,8 @@
         "bana hobi bul",
         "evde hobi oner",
         "yeni hobiler kesfetmek istiyorum",
-        "kitap okumayı seviyorum",
-        "kağıt toplamayı seviyorum",
+        "kitap okumayi seviyorum",
+        "kagit toplamayi seviyorum",
         "senin icin en eglenceli sey ne",
         "neyle vakit gecirirsin",
         "hobilerimden bahsedeyim mi",
@@ -1284,14 +1284,14 @@
       ]
     },
     {
-      "tag": "benefşe",
+      "tag": "benefse",
       "patterns": [
-        "benefşe nedir",
-        "benefşe hakkinda bilgi ver",
-        "benefşe ne demek",
-        "benefşe anlat",
-        "bana benefşe hakkinda bilgi ver",
-        "benefşe hakkinda konus"
+        "benefse nedir",
+        "benefse hakkinda bilgi ver",
+        "benefse ne demek",
+        "benefse anlat",
+        "bana benefse hakkinda bilgi ver",
+        "benefse hakkinda konus"
       ],
       "responses": [
         "Kasaba Mora'nın doğusunda, kıyıya yakın bir noktadaki ada üzerinde yer almaktadır.",
@@ -1331,14 +1331,14 @@
       ]
     },
     {
-      "tag": "i̇skepati köprüsü",
+      "tag": "iskepati koprusu",
       "patterns": [
-        "i̇skepati köprüsü nedir",
-        "i̇skepati köprüsü hakkinda bilgi ver",
-        "i̇skepati köprüsü ne demek",
-        "i̇skepati köprüsü anlat",
-        "bana i̇skepati köprüsü hakkinda bilgi ver",
-        "i̇skepati köprüsü hakkinda konus"
+        "iskepati koprusu nedir",
+        "iskepati koprusu hakkinda bilgi ver",
+        "iskepati koprusu ne demek",
+        "iskepati koprusu anlat",
+        "bana iskepati koprusu hakkinda bilgi ver",
+        "iskepati koprusu hakkinda konus"
       ],
       "responses": [
         "İskepati Köprüsü, Artvin'in Borçka ilçesinde konumlanmış bir kemer köprüdür.",
@@ -1362,35 +1362,47 @@
       ]
     },
     {
-      "tag": "denizyıldızı",
+      "tag": "denizyildizi",
       "patterns": [
-        "denizyıldızı nedir",
-        "denizyıldızı hakkinda bilgi ver",
-        "denizyıldızı ne demek",
-        "denizyıldızı anlat",
-        "bana denizyıldızı hakkinda bilgi ver",
-        "denizyıldızı hakkinda konus"
+        "denizyildizi nedir",
+        "denizyildizi hakkinda bilgi ver",
+        "denizyildizi ne demek",
+        "denizyildizi anlat",
+        "bana denizyildizi hakkinda bilgi ver",
+        "denizyildizi hakkinda konus"
       ],
       "responses": [
         "Dünya üzerinde, tropikal bölgelerden soğuk kutup denizi sularına kadar deniz tabanında 1.500 kadar denizyıldızı türü bulunur.",
         "Denizyıldızı, hayvanlar âleminin derisi dikenliler şubesine bağlı Asteroidea sınıfından olan deniz omurgasızlarına verilen ortak addır.",
-        "Deniz kıyısından 6.000 m derinliğe kadar olan bölgede yaşarlar."
+        "Deniz kıyısından 6.000 m derinliğe kadar olan bölgede yaşarlar.",
+        "Pisaster ochraceus ve Stichaster australis gibi denizyıldızı türleri ekolojide kilittaşı türler kavramının yaygın olarak bilinen örnekleridir.",
+        "Çeşitli türleri midelerini dışarı çıkarma ya da suda asılı besin maddelerini filtreleme gibi özelleşmiş beslenme davranışları gösterir.",
+        "Tropikal Acanthaster planci, Hint Okyanusu ve Büyük Okyanus'un doymak bilmez bir avcısıdır."
       ]
     },
     {
-      "tag": "akciğer kanseri",
+      "tag": "akciger kanseri",
       "patterns": [
-        "akciğer kanseri nedir",
-        "akciğer kanseri hakkinda bilgi ver",
-        "akciğer kanseri ne demek",
-        "akciğer kanseri anlat",
-        "bana akciğer kanseri hakkinda bilgi ver",
-        "akciğer kanseri hakkinda konus"
+        "akciger kanseri nedir",
+        "akciger kanseri hakkinda bilgi ver",
+        "akciger kanseri ne demek",
+        "akciger kanseri anlat",
+        "bana akciger kanseri hakkinda bilgi ver",
+        "akciger kanseri hakkinda konus"
       ],
       "responses": [
         "Biyopsi genelde bronkoskopi veya BT-yardımlı biyopsi ile yapılır.",
         "Bu nedenler arasında; genetik faktörler, radon gazı, asbest ve hava kirliliği gibi faktörler sorumlu tutulmaktadır.",
-        "Bu kontrolsüz çoğalma, hücrelerin çevredeki dokuları sararak veya akciğer dışındaki organlara yayılmaları ile (metastaz) sonuçlanabilir."
+        "Bu kontrolsüz çoğalma, hücrelerin çevredeki dokuları sararak veya akciğer dışındaki organlara yayılmaları ile (metastaz) sonuçlanabilir.",
+        "Akciğer kanserinin birçok histolojik alttipi olmasına karşın, klinikte genellikle küçük hücreli ve küçük hücreli dışı akciğer kanseri olmak üzere iki başlıkta incelenir; çünkü tedavide izlenecek yolu bu gruplandırma belirler.",
+        "Akciğer kanserinin belirtileri hastalığın nerede başladığına, nasıl yayılmış olduğuna ve vücudun hastalığa tepkilerinin varlığına bağlı olarak fark edebilir.",
+        "Akciğer kanseri, göğüs röntgeni ve bilgisayarlı tomografi (BT) ile görülebilir.",
+        "En sık görülen belirtileri, nefes darlığı (dispne), öksürme (kanlı öksürme da dahil) ve kilo kaybıdır.",
+        "Bu belirtiler sadece akciğer kanserine özgü olmadıklarından hastaların tanı almaları gecikebilir.",
+        "Dünya Sağlık Örgütünün (WHO) raporuna göre akciğer kanseri tüm dünyada kanser türleri arasında en sık ölüme neden olan kanser türüdür ve tüm dünyada her yıl yaklaşık 1,6 milyon ölüme neden olmaktadır.",
+        "Akciğer kanseri, akciğer dokularındaki hücrelerin kontrolsüz çoğaldığı bir hastalıktır.",
+        "Tedavi ve prognozu belirleyen faktörler; kanserin histolojik tipi, kanserin evresi ve hastanın genel performans durumudur.",
+        "Tüm alttipler ve evreler göz önüne alındığında, tedavi ile beş yıllık sağkalım oranı Amerika Birleşik Devletleri'nde %18,1'dir (2017 için); ancak sağkalım oranları gelişmekte olan ülkelerde daha düşüktür."
       ]
     },
     {
@@ -1464,19 +1476,21 @@
       ]
     },
     {
-      "tag": "krusty yakalanıyor",
+      "tag": "krusty yakalaniyor",
       "patterns": [
-        "krusty yakalanıyor nedir",
-        "krusty yakalanıyor hakkinda bilgi ver",
-        "krusty yakalanıyor ne demek",
-        "krusty yakalanıyor anlat",
-        "bana krusty yakalanıyor hakkinda bilgi ver",
-        "krusty yakalanıyor hakkinda konus"
+        "krusty yakalaniyor nedir",
+        "krusty yakalaniyor hakkinda bilgi ver",
+        "krusty yakalaniyor ne demek",
+        "krusty yakalaniyor anlat",
+        "bana krusty yakalaniyor hakkinda bilgi ver",
+        "krusty yakalaniyor hakkinda konus"
       ],
       "responses": [
         "Jay Kogen ile Wallace Wolodarsky tarafından yazıldı ve Brad Bird tarafından yönetildi.",
         "Bart ile Lisa, olayı araştırırlar ve bunun bir komplo olduğunu ortaya çıkarırlar.",
-        "\"Krusty Gets Busted\", Amerikan animasyon televizyon dizisi Simpsonlar'ın birinci sezonunun on ikinci bölümüdür ve 29 Nisan 1990 tarihine yayınlanmıştır."
+        "\"Krusty Gets Busted\", Amerikan animasyon televizyon dizisi Simpsonlar'ın birinci sezonunun on ikinci bölümüdür ve 29 Nisan 1990 tarihine yayınlanmıştır.",
+        "Bölüm eleştirmenlerden iyi yorumlar aldı ve yayınlandığı hafta Fox Broadcasting Company kanalının en yüksek izlenme oranını aldı.",
+        "Bölümde ünlü televizyon komedyeni Palyaço Krusty, Kwik-E-Mart'ı soyduğundan ötürü mahkûm edilir."
       ]
     },
     {
@@ -1496,19 +1510,23 @@
       ]
     },
     {
-      "tag": "sarayönü camii",
+      "tag": "sarayonu camii",
       "patterns": [
-        "sarayönü camii nedir",
-        "sarayönü camii hakkinda bilgi ver",
-        "sarayönü camii ne demek",
-        "sarayönü camii anlat",
-        "bana sarayönü camii hakkinda bilgi ver",
-        "sarayönü camii hakkinda konus"
+        "sarayonu camii nedir",
+        "sarayonu camii hakkinda bilgi ver",
+        "sarayonu camii ne demek",
+        "sarayonu camii anlat",
+        "bana sarayonu camii hakkinda bilgi ver",
+        "sarayonu camii hakkinda konus"
       ],
       "responses": [
         "Tarihsel olarak Lefkoşa'nın idari merkezi niteliğindeki Sarayönü Meydanı'nda yer almış olan caminin meydanla bağlantısı 1960'larda kesildi.",
         "2005 yılındaysa Türkiye'de iktidarda olan Adalet ve Kalkınma Partisi çevrelerinin caminin bu maksatla kullanımına itiraz etmesinin ardından yeni bir evlendirme dairesi yaptırılarak yapı tekrar camiye çevrildi.",
-        "1962'de yanına inşa edilen Saray Hotel'in açılmasıyla birlikte ibadete kapatılan cami, 1963 yılında sergi salonu olarak kullanıldı, 1964'ten itibaren ise evlendirme dairesi olarak kullanılmaya başlandı."
+        "1962'de yanına inşa edilen Saray Hotel'in açılmasıyla birlikte ibadete kapatılan cami, 1963 yılında sergi salonu olarak kullanıldı, 1964'ten itibaren ise evlendirme dairesi olarak kullanılmaya başlandı.",
+        "Mevcut cami 1902 yılında tamamlanmış olup, daha önce aynı yerde bulunan bina kiliseden camiye çevrilmişti.",
+        "Sarayönü Camii, Lefkoşa'nın kuzey kesiminde yer alan bir camidir.",
+        "Gotik mimari özelliklerini taşıyan bu kilise, 1570 yılında Lefkoşa'nın Osmanlı İmparatorluğu tarafından ele geçirilmesi sonrası camiye çevrildi.",
+        "Bu dönemde Orduönü Mescidi, İbrahim Paşa Camii ve Ali Paşa Camii isimleriyle de anıldı."
       ]
     },
     {
@@ -1524,19 +1542,19 @@
       "responses": [
         "Çağdaş kaynaklara göre aynı maratonu koştuğu belirtilen \"Melpomene\" adında ikinci bir kadının ise Revithi ile aynı kişi olup olmadığı konusunda Olimpiyat tarihçileri arasında farklı görüşler bulunmaktadır.",
         "Belgelerini, başarısını kabul edecekleri umuduyla Yunan Olimpiyat Komitesine sunma girişiminde bulunsa da bunu yapıp yapmadığı bilinmemektedir.",
-        "Stamata Revithi (Yunanca: Σταμάτα Ρεβίθη, 1866, Sire - 1896 sonrası), 1896 Yaz Olimpiyatları sırasında 40 kilometrelik maraton koşan Yunan kadındır.",
+        "Stamata Revithi (Yunanca: , 1866, Sire - 1896 sonrası), 1896 Yaz Olimpiyatları sırasında 40 kilometrelik maraton koşan Yunan kadındır.",
         "Organizasyonda sadece erkek sporcuların yarışabilmesine karşın Revithi, koşmasına izin verilmesi konusunda ısrarcı oldu."
       ]
     },
     {
-      "tag": "süperstar '83",
+      "tag": "superstar '83",
       "patterns": [
-        "süperstar '83 nedir",
-        "süperstar '83 hakkinda bilgi ver",
-        "süperstar '83 ne demek",
-        "süperstar '83 anlat",
-        "bana süperstar '83 hakkinda bilgi ver",
-        "süperstar '83 hakkinda konus"
+        "superstar '83 nedir",
+        "superstar '83 hakkinda bilgi ver",
+        "superstar '83 ne demek",
+        "superstar '83 anlat",
+        "bana superstar '83 hakkinda bilgi ver",
+        "superstar '83 hakkinda konus"
       ],
       "responses": [
         "Müzik eleştirmenleri, şarkıcının en iyi albümlerinden biri olarak gösterdikleri çalışmayı takdir etti ve Pekkan'ın bunalımlı geçirdiği birkaç yılın ardından tekrar aranjman şarkılardan oluşan bir albüm hazırlanmasını beğeniyle karşıladı.",
@@ -1546,14 +1564,14 @@
       ]
     },
     {
-      "tag": "1994 kış olimpiyatları'nda meksika",
+      "tag": "1994 kis olimpiyatlari'nda meksika",
       "patterns": [
-        "1994 kış olimpiyatları'nda meksika nedir",
-        "1994 kış olimpiyatları'nda meksika hakkinda bilgi ver",
-        "1994 kış olimpiyatları'nda meksika ne demek",
-        "1994 kış olimpiyatları'nda meksika anlat",
-        "bana 1994 kış olimpiyatları'nda meksika hakkinda bilgi ver",
-        "1994 kış olimpiyatları'nda meksika hakkinda konus"
+        "1994 kis olimpiyatlari'nda meksika nedir",
+        "1994 kis olimpiyatlari'nda meksika hakkinda bilgi ver",
+        "1994 kis olimpiyatlari'nda meksika ne demek",
+        "1994 kis olimpiyatlari'nda meksika anlat",
+        "bana 1994 kis olimpiyatlari'nda meksika hakkinda bilgi ver",
+        "1994 kis olimpiyatlari'nda meksika hakkinda konus"
       ],
       "responses": [
         "Meksika, Norveç'in Lillehammer şehrinde düzenlenen 1994 Kış Olimpiyatları'na, alp disiplininde bir sporcuyla katıldı.",
@@ -1562,19 +1580,22 @@
       ]
     },
     {
-      "tag": "2003 i̇stanbul saldırıları",
+      "tag": "2003 istanbul saldirilari",
       "patterns": [
-        "2003 i̇stanbul saldırıları nedir",
-        "2003 i̇stanbul saldırıları hakkinda bilgi ver",
-        "2003 i̇stanbul saldırıları ne demek",
-        "2003 i̇stanbul saldırıları anlat",
-        "bana 2003 i̇stanbul saldırıları hakkinda bilgi ver",
-        "2003 i̇stanbul saldırıları hakkinda konus"
+        "2003 istanbul saldirilari nedir",
+        "2003 istanbul saldirilari hakkinda bilgi ver",
+        "2003 istanbul saldirilari ne demek",
+        "2003 istanbul saldirilari anlat",
+        "bana 2003 istanbul saldirilari hakkinda bilgi ver",
+        "2003 istanbul saldirilari hakkinda konus"
       ],
       "responses": [
         "Yargıtay'ın davada alınan kararları bazı sanıklar yönünden bozması sebebiyle yeniden yapılan yargılama sonrasında ise 16 sanık hakkında çeşitli kademelerde hapis cezalarına hükmedildi.",
         "Başlatılan soruşturmalar sonucunda saldırıların el-Kaide'nin Türkiye yapılanması tarafından gerçekleştirdiği tespit edildi.",
-        "15 ve 20 Kasım 2003 tarihlerinde İstanbul'un dört noktasında, her iki günde de ikişer patlayıcı yüklü kamyonetin infilak ettirilmesiyle dört intihar saldırısı gerçekleştirildi."
+        "15 ve 20 Kasım 2003 tarihlerinde İstanbul'un dört noktasında, her iki günde de ikişer patlayıcı yüklü kamyonetin infilak ettirilmesiyle dört intihar saldırısı gerçekleştirildi.",
+        "15 Kasım'da saat 9.30 (UTC+02.00) civarında Şişli'deki Bet İsrael Sinagogu, saat 9.34 civarında ise Beyoğlu'ndaki Neve Şalom Sinagogu'nun önünde birer kamyonet infilak etti.",
+        "Patlamalar sonucunda saldırganlar dâhil 26 kişi öldü, 300'den fazla kişi yaralandı.",
+        "Saldırılarla ilgili olarak Şubat 2004'te 69 sanıkla başlanan ve süreç içinde yapılan eklemelerle 76 sanığa ulaşan dava, Nisan 2007'de 7'si müebbet olmak üzere 48 sanığın çeşitli kademelerde hapis cezalarına çarptırılmasıyla sonuçlandı."
       ]
     },
     {
@@ -1615,14 +1636,14 @@
       ]
     },
     {
-      "tag": "batman başlıyor",
+      "tag": "batman basliyor",
       "patterns": [
-        "batman başlıyor nedir",
-        "batman başlıyor hakkinda bilgi ver",
-        "batman başlıyor ne demek",
-        "batman başlıyor anlat",
-        "bana batman başlıyor hakkinda bilgi ver",
-        "batman başlıyor hakkinda konus"
+        "batman basliyor nedir",
+        "batman basliyor hakkinda bilgi ver",
+        "batman basliyor ne demek",
+        "batman basliyor anlat",
+        "bana batman basliyor hakkinda bilgi ver",
+        "batman basliyor hakkinda konus"
       ],
       "responses": [
         "Batman Başlıyor (Özgün adı: Batman Begins), DC Comics'in kurgusal çizgi roman karakteri Batman'den uyarlanan, yönetmenliğini Christopher Nolan'ın yaptığı 2005 yapımı süper kahraman filmidir.",
@@ -1671,14 +1692,14 @@
       ]
     },
     {
-      "tag": "homer'ın felekten gecesi",
+      "tag": "homer'in felekten gecesi",
       "patterns": [
-        "homer'ın felekten gecesi nedir",
-        "homer'ın felekten gecesi hakkinda bilgi ver",
-        "homer'ın felekten gecesi ne demek",
-        "homer'ın felekten gecesi anlat",
-        "bana homer'ın felekten gecesi hakkinda bilgi ver",
-        "homer'ın felekten gecesi hakkinda konus"
+        "homer'in felekten gecesi nedir",
+        "homer'in felekten gecesi hakkinda bilgi ver",
+        "homer'in felekten gecesi ne demek",
+        "homer'in felekten gecesi anlat",
+        "bana homer'in felekten gecesi hakkinda bilgi ver",
+        "homer'in felekten gecesi hakkinda konus"
       ],
       "responses": [
         "Bölüm, eleştirmenlerden olumlu yorumlar aldı ve yayınlandığı hafta Fox Broadcasting Company kanalında en çok izlenen ikinci program oldu.",
@@ -1707,35 +1728,44 @@
       ]
     },
     {
-      "tag": "i̇zmit saat kulesi",
+      "tag": "izmit saat kulesi",
       "patterns": [
-        "i̇zmit saat kulesi nedir",
-        "i̇zmit saat kulesi hakkinda bilgi ver",
-        "i̇zmit saat kulesi ne demek",
-        "i̇zmit saat kulesi anlat",
-        "bana i̇zmit saat kulesi hakkinda bilgi ver",
-        "i̇zmit saat kulesi hakkinda konus"
+        "izmit saat kulesi nedir",
+        "izmit saat kulesi hakkinda bilgi ver",
+        "izmit saat kulesi ne demek",
+        "izmit saat kulesi anlat",
+        "bana izmit saat kulesi hakkinda bilgi ver",
+        "izmit saat kulesi hakkinda konus"
       ],
       "responses": [
         "Abdülhamid'in tahta çıkışının 25.",
         "1 Eylül 1900'de temeli atılan kulenin ertesi yıl aynı gün tamamlanması hedeflense de, süreç gecikti ve Eylül 1902'de henüz inşâsı tamamlanamayan kulenin açılışı gerçekleştirildi.",
-        "Yapının çatısı piramidal koni şeklindedir."
+        "Yapının çatısı piramidal koni şeklindedir.",
+        "İkinci katında bir seyir balkonu bulunan yapının gövdesinde pencereler vardır.",
+        "Kule, tek katlı kaide kısmı ile üç katlı gövde kısmı olmak üzere iki kare prizmadan oluşur.",
+        "yıl dönümünü anma amacıyla, İzmit Mutasarrıflığı tarafından yaptırıldı.",
+        "İzmit Saat Kulesi ya da diğer adıyla Kocaeli Saat Kulesi, Kocaeli'nin idarî merkezi İzmit'te bulunan bir saat kulesidir."
       ]
     },
     {
-      "tag": "1964 brinks oteli bombalı saldırısı",
+      "tag": "1964 brinks oteli bombali saldirisi",
       "patterns": [
-        "1964 brinks oteli bombalı saldırısı nedir",
-        "1964 brinks oteli bombalı saldırısı hakkinda bilgi ver",
-        "1964 brinks oteli bombalı saldırısı ne demek",
-        "1964 brinks oteli bombalı saldırısı anlat",
-        "bana 1964 brinks oteli bombalı saldırısı hakkinda bilgi ver",
-        "1964 brinks oteli bombalı saldırısı hakkinda konus"
+        "1964 brinks oteli bombali saldirisi nedir",
+        "1964 brinks oteli bombali saldirisi hakkinda bilgi ver",
+        "1964 brinks oteli bombali saldirisi ne demek",
+        "1964 brinks oteli bombali saldirisi anlat",
+        "bana 1964 brinks oteli bombali saldirisi hakkinda bilgi ver",
+        "1964 brinks oteli bombali saldirisi hakkinda konus"
       ],
       "responses": [
         "Tartışmadan Johnson galip çıktı ve herhangi bir harekette bulunulmadı.",
         "İki Vietkong casusunun, ABD Ordusu'na ev sahipliği yapan otelin altındaki bir arabaya koydukları bombanın patlaması sonucunda biri subay, biri ise astsubay olmak üzere iki Amerikalı öldü.",
-        "1964 Brinks Oteli bombalı saldırısı; Güney Vietnam'ın başkenti Saygon'daki Brinks Oteli'ne, Vietnam Savaşı sırasında, 24 Aralık 1964 akşamında Vietkong tarafından gerçekleştirilen bombalı saldırıdır."
+        "1964 Brinks Oteli bombalı saldırısı; Güney Vietnam'ın başkenti Saygon'daki Brinks Oteli'ne, Vietnam Savaşı sırasında, 24 Aralık 1964 akşamında Vietkong tarafından gerçekleştirilen bombalı saldırıdır.",
+        "Askerî personel ile Vietnamlı sivillerden oluşan yaklaşık altmış kişi ise saldırıyı yaralı olarak atlattı.",
+        "Vietnam komutanları saldırıyı iki amaçla planlamışlardı.",
+        "Saldırı, ABD Başkanı Lyndon B.",
+        "İkincisi ise; Güney Vietnamlılara, Amerikalıların zayıf olduğunu ve korunma amaçlı olarak onlara güvenemeyeceklerini göstermekti.",
+        "Johnson'ın yönetimi içinde tartışmalara neden oldu."
       ]
     },
     {
@@ -1790,14 +1820,14 @@
       ]
     },
     {
-      "tag": "kırda öğle yemeği",
+      "tag": "kirda ogle yemegi",
       "patterns": [
-        "kırda öğle yemeği nedir",
-        "kırda öğle yemeği hakkinda bilgi ver",
-        "kırda öğle yemeği ne demek",
-        "kırda öğle yemeği anlat",
-        "bana kırda öğle yemeği hakkinda bilgi ver",
-        "kırda öğle yemeği hakkinda konus"
+        "kirda ogle yemegi nedir",
+        "kirda ogle yemegi hakkinda bilgi ver",
+        "kirda ogle yemegi ne demek",
+        "kirda ogle yemegi anlat",
+        "bana kirda ogle yemegi hakkinda bilgi ver",
+        "kirda ogle yemegi hakkinda konus"
       ],
       "responses": [
         "Arka planda başka bir kadın ise suyun içinde yıkanmaktadır.",
@@ -1913,35 +1943,39 @@
       ]
     },
     {
-      "tag": "1997 karapınar trafik kazası",
+      "tag": "1997 karapinar trafik kazasi",
       "patterns": [
-        "1997 karapınar trafik kazası nedir",
-        "1997 karapınar trafik kazası hakkinda bilgi ver",
-        "1997 karapınar trafik kazası ne demek",
-        "1997 karapınar trafik kazası anlat",
-        "bana 1997 karapınar trafik kazası hakkinda bilgi ver",
-        "1997 karapınar trafik kazası hakkinda konus"
+        "1997 karapinar trafik kazasi nedir",
+        "1997 karapinar trafik kazasi hakkinda bilgi ver",
+        "1997 karapinar trafik kazasi ne demek",
+        "1997 karapinar trafik kazasi anlat",
+        "bana 1997 karapinar trafik kazasi hakkinda bilgi ver",
+        "1997 karapinar trafik kazasi hakkinda konus"
       ],
       "responses": [
         "İlk bilirkişi raporu Orta Doğu Teknik Üniversitesi tarafından hazırlanmıştır.",
         "Mahkeme heyeti otobüs üretiminde hata olup olmadığına dair bilirkişi raporu hazırlattı ve bu rapor 2005'te mahkemeye sunuldu.",
-        "Bunun üzerine biri bizzat kendisi tarafından üçü de mahkeme tarafından hazırlatılan dört bilirkişi raporu daha dava dosyasına eklenmiştir."
+        "Bunun üzerine biri bizzat kendisi tarafından üçü de mahkeme tarafından hazırlatılan dört bilirkişi raporu daha dava dosyasına eklenmiştir.",
+        "Altıncı ve son rapor ise yine tazminat davaları sırasında hazırlanan ve tarafların kusurlarını belirlemeyi amaçlayan hukuk bilirkişi raporudur.",
+        "Ceza davasının 1 Aralık 2000 tarihli duruşmasında otobüs şoförü beraat etti."
       ]
     },
     {
-      "tag": "2008 yaz olimpiyatları'nda belize",
+      "tag": "2008 yaz olimpiyatlari'nda belize",
       "patterns": [
-        "2008 yaz olimpiyatları'nda belize nedir",
-        "2008 yaz olimpiyatları'nda belize hakkinda bilgi ver",
-        "2008 yaz olimpiyatları'nda belize ne demek",
-        "2008 yaz olimpiyatları'nda belize anlat",
-        "bana 2008 yaz olimpiyatları'nda belize hakkinda bilgi ver",
-        "2008 yaz olimpiyatları'nda belize hakkinda konus"
+        "2008 yaz olimpiyatlari'nda belize nedir",
+        "2008 yaz olimpiyatlari'nda belize hakkinda bilgi ver",
+        "2008 yaz olimpiyatlari'nda belize ne demek",
+        "2008 yaz olimpiyatlari'nda belize anlat",
+        "bana 2008 yaz olimpiyatlari'nda belize hakkinda bilgi ver",
+        "2008 yaz olimpiyatlari'nda belize hakkinda konus"
       ],
       "responses": [
         "Erkekler 400 metre engelli kategorisinde yarışan atlet Jonathan Williams serileri geçerek yarı finale yükseldi ve bu aşamaya kadar gelebilen ilk Belizeli atlet oldu.",
         "Oyunlara Belize adıyla sekizinci kez sporcu gönderen ülke, Birleşik Krallık'a bağlı olduğu döneme denk gelen 1968 ve 1972'deki oyunlarda Britanya Hondurası adıyla yer almıştı.",
-        "Belize, Çin'in başkenti Pekin'de düzenlenen 2008 Yaz Olimpiyatları'na üçü atletizmde, biri ise tekvandoda olmak üzere dört sporcuyla katıldı."
+        "Belize, Çin'in başkenti Pekin'de düzenlenen 2008 Yaz Olimpiyatları'na üçü atletizmde, biri ise tekvandoda olmak üzere dört sporcuyla katıldı.",
+        "Erkekler 200 metre kategorisinde yarışan Jayson Jones ile kadınlar uzun atlamada yarışan Tricia Flores ise serileri geçemedi.",
+        "Erkekler 58 kg kategorisinde mücadele eden tekvandocu Alfonso Martínez, mücadele ettiği ilk turda rakibine yenilerek turnuvadan elendi."
       ]
     },
     {
@@ -2013,14 +2047,14 @@
       ]
     },
     {
-      "tag": "eurovision şarkı yarışması'nda lübnan",
+      "tag": "eurovision sarki yarismasi'nda lubnan",
       "patterns": [
-        "eurovision şarkı yarışması'nda lübnan nedir",
-        "eurovision şarkı yarışması'nda lübnan hakkinda bilgi ver",
-        "eurovision şarkı yarışması'nda lübnan ne demek",
-        "eurovision şarkı yarışması'nda lübnan anlat",
-        "bana eurovision şarkı yarışması'nda lübnan hakkinda bilgi ver",
-        "eurovision şarkı yarışması'nda lübnan hakkinda konus"
+        "eurovision sarki yarismasi'nda lubnan nedir",
+        "eurovision sarki yarismasi'nda lubnan hakkinda bilgi ver",
+        "eurovision sarki yarismasi'nda lubnan ne demek",
+        "eurovision sarki yarismasi'nda lubnan anlat",
+        "bana eurovision sarki yarismasi'nda lubnan hakkinda bilgi ver",
+        "eurovision sarki yarismasi'nda lubnan hakkinda konus"
       ],
       "responses": [
         "Lübnan bunun sonrasında üç yıllık bir yasak almış, Lübnan asıllı Britanyalı şarkıcı Mika ülke adına yarışmaya katılma isteğini belirtse de günümüze dek ülke, yarışmaya başka bir katılım başvurusunda bulunmamıştır.",
@@ -2062,30 +2096,31 @@
       ]
     },
     {
-      "tag": "vince kasırgası",
+      "tag": "vince kasirgasi",
       "patterns": [
-        "vince kasırgası nedir",
-        "vince kasırgası hakkinda bilgi ver",
-        "vince kasırgası ne demek",
-        "vince kasırgası anlat",
-        "bana vince kasırgası hakkinda bilgi ver",
-        "vince kasırgası hakkinda konus"
+        "vince kasirgasi nedir",
+        "vince kasirgasi hakkinda bilgi ver",
+        "vince kasirgasi ne demek",
+        "vince kasirgasi anlat",
+        "bana vince kasirgasi hakkinda bilgi ver",
+        "vince kasirgasi hakkinda konus"
       ],
       "responses": [
         "Kasırga, çok aktif geçen bu kasırga mevsiminde gerçekleşen 20.",
         "2005 Atlantik kasırga mevsiminin bir parçası olup tropikal siklonlar için çok soğuk olduğu düşünülen sularda ortaya çıkmıştır.",
-        "ABD Ulusal Kasırga Merkezi bu sistemi ertesi gün, etkinlik kasırgaya dönüşmeden hemen önce adlandırmıştır."
+        "ABD Ulusal Kasırga Merkezi bu sistemi ertesi gün, etkinlik kasırgaya dönüşmeden hemen önce adlandırmıştır.",
+        "8 Ekim tarihinde ekstratropikal sistem olarak başlayan bu hava hareketi, Azorlar'ın güneydoğusunda subtropikal fırtına özelliği göstermeye başlamıştır."
       ]
     },
     {
-      "tag": "1963 suriye askerî darbesi",
+      "tag": "1963 suriye askeri darbesi",
       "patterns": [
-        "1963 suriye askerî darbesi nedir",
-        "1963 suriye askerî darbesi hakkinda bilgi ver",
-        "1963 suriye askerî darbesi ne demek",
-        "1963 suriye askerî darbesi anlat",
-        "bana 1963 suriye askerî darbesi hakkinda bilgi ver",
-        "1963 suriye askerî darbesi hakkinda konus"
+        "1963 suriye askeri darbesi nedir",
+        "1963 suriye askeri darbesi hakkinda bilgi ver",
+        "1963 suriye askeri darbesi ne demek",
+        "1963 suriye askeri darbesi anlat",
+        "bana 1963 suriye askeri darbesi hakkinda bilgi ver",
+        "1963 suriye askeri darbesi hakkinda konus"
       ],
       "responses": [
         "Başarıyla gerçekleşen darbe sonrası Suriye'de kısa ve çalkantılı bir geçmişe sahip olan parlamenter demokrasi ortadan kaldırılırken Baas Partisinin, Esad rejiminin 2024'te devrilmesine kadar devam eden egemenliği başladı.",
@@ -2094,35 +2129,41 @@
       ]
     },
     {
-      "tag": "acemi ocağı",
+      "tag": "acemi ocagi",
       "patterns": [
-        "acemi ocağı nedir",
-        "acemi ocağı hakkinda bilgi ver",
-        "acemi ocağı ne demek",
-        "acemi ocağı anlat",
-        "bana acemi ocağı hakkinda bilgi ver",
-        "acemi ocağı hakkinda konus"
+        "acemi ocagi nedir",
+        "acemi ocagi hakkinda bilgi ver",
+        "acemi ocagi ne demek",
+        "acemi ocagi anlat",
+        "bana acemi ocagi hakkinda bilgi ver",
+        "acemi ocagi hakkinda konus"
       ],
       "responses": [
         "Acemi Ocağı, Yeniçeri Ocağının kaldırıldığı 1826'ya kadar varlığını devam ettirdi.",
         "Bu ocağın en yetkilisi \"İstanbul ağası\" idi.",
-        "İstanbul'un Fethi'nden sonra İstanbul'da Gelibolu'dakinden bağımsız bir Acemi Ocağı daha kuruldu."
+        "İstanbul'un Fethi'nden sonra İstanbul'da Gelibolu'dakinden bağımsız bir Acemi Ocağı daha kuruldu.",
+        "Acemiler mavi renkli \"dolama\" adında bir elbise giyer ve sivri uçlu \"serpuş\" adı verilen bir başlık takardı.",
+        "Genellikle her 7-8 yılda bir \"kapıya çıkma\" (kapuya çıkma), \"çıkma\" ya da \"bedergâh\" adı verilen yöntem ile en kıdemli acemiler Yeniçeri Ocağına kaydedilirdi.",
+        "Türk ve Müslümanlara daimi maaşlı meslek sağlamak için bağış ve rüşvet karşılığında ocağa kayıt yapılmaya başlandı."
       ]
     },
     {
-      "tag": "babamın sesi",
+      "tag": "babamin sesi",
       "patterns": [
-        "babamın sesi nedir",
-        "babamın sesi hakkinda bilgi ver",
-        "babamın sesi ne demek",
-        "babamın sesi anlat",
-        "bana babamın sesi hakkinda bilgi ver",
-        "babamın sesi hakkinda konus"
+        "babamin sesi nedir",
+        "babamin sesi hakkinda bilgi ver",
+        "babamin sesi ne demek",
+        "babamin sesi anlat",
+        "bana babamin sesi hakkinda bilgi ver",
+        "babamin sesi hakkinda konus"
       ],
       "responses": [
         "Yönetmenlerden Zeynel Doğan'ın ailesinin gerçek hikâyesinden yola çıkılarak oluşturuldu ve filmin merkezinde Doğan'ın babasından kalan kasetler yer aldı.",
         "Ayrıca İki Dil Bir Bavul filmiyle kıyaslandı.",
-        "Maraş Katliamı'ndan etkilenen Kürt-Alevi bir ailenin hikâyesini konu edinmektedir."
+        "Maraş Katliamı'ndan etkilenen Kürt-Alevi bir ailenin hikâyesini konu edinmektedir.",
+        "Galası 29 Ocak 2012'de, Uluslararası Rotterdam Film Festivali'nde düzenlendi, Türkiye'de ilk gösterimi 11 Nisan 2012'de 31.",
+        "Babamın Sesi, Türkiye'deki sinemalarda 2 Kasım 2012'de on üç salonda gösterilerek vizyona girdi.",
+        "Uluslararası Altın Koza Film Festivali'nde En İyi Film Ödülü'nü kazanan film, eleştirmenlerden olumlu yorumlar aldı ve \"bu topraklarda yaşanan katliamlarla yüzleşmek ve hesaplaşmak için izlememiz gereken bir film\" olarak nitelendirildi."
       ]
     },
     {
@@ -2142,30 +2183,32 @@
       ]
     },
     {
-      "tag": "belarus bayrağı",
+      "tag": "belarus bayragi",
       "patterns": [
-        "belarus bayrağı nedir",
-        "belarus bayrağı hakkinda bilgi ver",
-        "belarus bayrağı ne demek",
-        "belarus bayrağı anlat",
-        "bana belarus bayrağı hakkinda bilgi ver",
-        "belarus bayrağı hakkinda konus"
+        "belarus bayragi nedir",
+        "belarus bayragi hakkinda bilgi ver",
+        "belarus bayragi ne demek",
+        "belarus bayragi anlat",
+        "bana belarus bayragi hakkinda bilgi ver",
+        "belarus bayragi hakkinda konus"
       ],
       "responses": [
         "Hükûmet karşıtı muhalif gruplar bu bayrağı protestolarda ve ülke dışındaki Belarus diasporası desteklemek amacıyla kullanmaktadır.",
         "Dünya Savaşı sırasında Nazi Almanyası'nın Belarus'u işgali ve Nazilerle yapılan işbirliğinin sembolü sayılması gerekçesiyle hükûmet tarafından kısıtlanmıştır.",
-        "Günümüzde beyaz-kırmızı-beyaz bayrağın kullanımı II."
+        "Günümüzde beyaz-kırmızı-beyaz bayrağın kullanımı II.",
+        "Göndere çekilen taraftaki beyaz zemin üzerine kırmızı süsleme deseni ile birlikte kırmızı ve yeşil renkten oluşan bayrak, Belarus devlet sembolleri arasında yer alır.",
+        "Sovyetler Birliği döneminde kullanılan eski bayraktan komünizmin sembolleri olan orak ve çekiç ve kızıl yıldızın kaldırılması ve süsleme desenindeki beyaz-kırmızı renklerin tersine dönüştürülmesiyle tasarlandı."
       ]
     },
     {
-      "tag": "en i̇yi aranjman grammy ödülü",
+      "tag": "en iyi aranjman grammy odulu",
       "patterns": [
-        "en i̇yi aranjman grammy ödülü nedir",
-        "en i̇yi aranjman grammy ödülü hakkinda bilgi ver",
-        "en i̇yi aranjman grammy ödülü ne demek",
-        "en i̇yi aranjman grammy ödülü anlat",
-        "bana en i̇yi aranjman grammy ödülü hakkinda bilgi ver",
-        "en i̇yi aranjman grammy ödülü hakkinda konus"
+        "en iyi aranjman grammy odulu nedir",
+        "en iyi aranjman grammy odulu hakkinda bilgi ver",
+        "en iyi aranjman grammy odulu ne demek",
+        "en iyi aranjman grammy odulu anlat",
+        "bana en iyi aranjman grammy odulu hakkinda bilgi ver",
+        "en iyi aranjman grammy odulu hakkinda konus"
       ],
       "responses": [
         "En İyi Aranjman Grammy Ödülü, Grammy Ödülleri kapsamında, yılın en iyi aranjmanına sahip olduğu belirlenen şarkının veya albümün aranjörüne verilen ödüldür.",
@@ -2174,30 +2217,35 @@
       ]
     },
     {
-      "tag": "mansur el-atraş",
+      "tag": "mansur el-atras",
       "patterns": [
-        "mansur el-atraş nedir",
-        "mansur el-atraş hakkinda bilgi ver",
-        "mansur el-atraş ne demek",
-        "mansur el-atraş anlat",
-        "bana mansur el-atraş hakkinda bilgi ver",
-        "mansur el-atraş hakkinda konus"
+        "mansur el-atras nedir",
+        "mansur el-atras hakkinda bilgi ver",
+        "mansur el-atras ne demek",
+        "mansur el-atras anlat",
+        "bana mansur el-atras hakkinda bilgi ver",
+        "mansur el-atras hakkinda konus"
       ],
       "responses": [
         "Solcu Baasçı subaylar tarafından gerçekleştirilen ikinci bir askerî darbeyle birlikte parti içinde Askeri Komite liderliğindeki darbeci subaylar ile Mişel Eflak liderliğindeki kurucular arasında çıkan bölünmede el-Atraş, Eflak'ı destekledi.",
         "Birleşik Arap Cumhuriyeti döneminde (1958-61), Mısır'ın Panarabist Cumhurbaşkanı Cemal Abdünnâsır'ın destekçilerindendi.",
-        "Lübnan'da iki yıl süren sürgün hayatından sonra Suriye'ye döndü ve siyasi hayatını büyük ölçüde terk etti."
+        "Lübnan'da iki yıl süren sürgün hayatından sonra Suriye'ye döndü ve siyasi hayatını büyük ölçüde terk etti.",
+        "14 Kasım 2006'da öldü ve doğum yeri olan el-Kureyya yakınlarında defnedildi.",
+        "Daha sonra hapse atılsa da, Suriye'nin 1967'de İsrail ile yaptığı savaşta yenilmesinin ardından serbest bırakıldı.",
+        "El-Atraş, üniversite arkadaşlarıyla birlikte 1947'de Baas Partisinin ve Suriye bölgesel kolunun kurucu üyelerindendi.",
+        "Suriye'nin Birleşik Arap Cumhuriyeti'nden ayrılmasına karşı çıktı ve bunu protesto etmek için art arda gelen ayrılıkçı hükûmetlerde görev alma tekliflerini geri çevirdi.",
+        "Edib Çiçekli'nin devlet başkanlığı sırasında (1951-54) hükûmet karşıtı bir aktivist oldu ve iki kez mahkûm edildi."
       ]
     },
     {
-      "tag": "nótt",
+      "tag": "nott",
       "patterns": [
-        "nótt nedir",
-        "nótt hakkinda bilgi ver",
-        "nótt ne demek",
-        "nótt anlat",
-        "bana nótt hakkinda bilgi ver",
-        "nótt hakkinda konus"
+        "nott nedir",
+        "nott hakkinda bilgi ver",
+        "nott ne demek",
+        "nott anlat",
+        "bana nott hakkinda bilgi ver",
+        "nott hakkinda konus"
       ],
       "responses": [
         "Bir özel isim olan nótt kelimesi, Eski Norsça edebiyatında da geçer.",
@@ -2206,14 +2254,14 @@
       ]
     },
     {
-      "tag": "simpsonların yılbaşı sefası",
+      "tag": "simpsonlarin yilbasi sefasi",
       "patterns": [
-        "simpsonların yılbaşı sefası nedir",
-        "simpsonların yılbaşı sefası hakkinda bilgi ver",
-        "simpsonların yılbaşı sefası ne demek",
-        "simpsonların yılbaşı sefası anlat",
-        "bana simpsonların yılbaşı sefası hakkinda bilgi ver",
-        "simpsonların yılbaşı sefası hakkinda konus"
+        "simpsonlarin yilbasi sefasi nedir",
+        "simpsonlarin yilbasi sefasi hakkinda bilgi ver",
+        "simpsonlarin yilbasi sefasi ne demek",
+        "simpsonlarin yilbasi sefasi anlat",
+        "bana simpsonlarin yilbasi sefasi hakkinda bilgi ver",
+        "simpsonlarin yilbasi sefasi hakkinda konus"
       ],
       "responses": [
         "Bölüm, Mimi Pond tarafından yazıldı ve David Silverman tarafından yönetildi.",
@@ -2222,14 +2270,14 @@
       ]
     },
     {
-      "tag": "1998 kış olimpiyatları'nda türkiye",
+      "tag": "1998 kis olimpiyatlari'nda turkiye",
       "patterns": [
-        "1998 kış olimpiyatları'nda türkiye nedir",
-        "1998 kış olimpiyatları'nda türkiye hakkinda bilgi ver",
-        "1998 kış olimpiyatları'nda türkiye ne demek",
-        "1998 kış olimpiyatları'nda türkiye anlat",
-        "bana 1998 kış olimpiyatları'nda türkiye hakkinda bilgi ver",
-        "1998 kış olimpiyatları'nda türkiye hakkinda konus"
+        "1998 kis olimpiyatlari'nda turkiye nedir",
+        "1998 kis olimpiyatlari'nda turkiye hakkinda bilgi ver",
+        "1998 kis olimpiyatlari'nda turkiye ne demek",
+        "1998 kis olimpiyatlari'nda turkiye anlat",
+        "bana 1998 kis olimpiyatlari'nda turkiye hakkinda bilgi ver",
+        "1998 kis olimpiyatlari'nda turkiye hakkinda konus"
       ],
       "responses": [
         "Ülke adına yarışan tek sporcu olan Arif Alaftargil, mücadele ettiği erkekler slalom kategorisini, 2:25.09'luk derecesiyle 29.",
@@ -2238,14 +2286,14 @@
       ]
     },
     {
-      "tag": "2013 süper kupa",
+      "tag": "2013 super kupa",
       "patterns": [
-        "2013 süper kupa nedir",
-        "2013 süper kupa hakkinda bilgi ver",
-        "2013 süper kupa ne demek",
-        "2013 süper kupa anlat",
-        "bana 2013 süper kupa hakkinda bilgi ver",
-        "2013 süper kupa hakkinda konus"
+        "2013 super kupa nedir",
+        "2013 super kupa hakkinda bilgi ver",
+        "2013 super kupa ne demek",
+        "2013 super kupa anlat",
+        "bana 2013 super kupa hakkinda bilgi ver",
+        "2013 super kupa hakkinda konus"
       ],
       "responses": [
         "Galatasaray, rakibini normal süresi golsüz biten mücadelenin ekstra uzatma bölümünde bulduğu golle 1-0 mağlup ederek kupayı üst üste ikinci kez kazandı.",
@@ -2272,14 +2320,14 @@
       ]
     },
     {
-      "tag": "bahriye üçok",
+      "tag": "bahriye ucok",
       "patterns": [
-        "bahriye üçok nedir",
-        "bahriye üçok hakkinda bilgi ver",
-        "bahriye üçok ne demek",
-        "bahriye üçok anlat",
-        "bana bahriye üçok hakkinda bilgi ver",
-        "bahriye üçok hakkinda konus"
+        "bahriye ucok nedir",
+        "bahriye ucok hakkinda bilgi ver",
+        "bahriye ucok ne demek",
+        "bahriye ucok anlat",
+        "bana bahriye ucok hakkinda bilgi ver",
+        "bahriye ucok hakkinda konus"
       ],
       "responses": [
         "Ölümüyle bağlantılı bu davada, Türkiye'de aydın cinayetlerinin ve tehditlerinin ciddiyeti ve tehlikesi vurgulandı.",
@@ -2288,14 +2336,14 @@
       ]
     },
     {
-      "tag": "dilber koçarslanlı",
+      "tag": "dilber kocarslanli",
       "patterns": [
-        "dilber koçarslanlı nedir",
-        "dilber koçarslanlı hakkinda bilgi ver",
-        "dilber koçarslanlı ne demek",
-        "dilber koçarslanlı anlat",
-        "bana dilber koçarslanlı hakkinda bilgi ver",
-        "dilber koçarslanlı hakkinda konus"
+        "dilber kocarslanli nedir",
+        "dilber kocarslanli hakkinda bilgi ver",
+        "dilber kocarslanli ne demek",
+        "dilber kocarslanli anlat",
+        "bana dilber kocarslanli hakkinda bilgi ver",
+        "dilber kocarslanli hakkinda konus"
       ],
       "responses": [
         "Dilber Koçarslanlı, Adana'dan İstanbul'a abileri Selahattin ve Bahattin Koçarslanlı'nın yanına gelir ve bir müddet sonra Sütçüoğlu Apartmanı'nda yaşamaya başlar.",
@@ -2378,35 +2426,41 @@
       ]
     },
     {
-      "tag": "büyülü bir gece",
+      "tag": "buyulu bir gece",
       "patterns": [
-        "büyülü bir gece nedir",
-        "büyülü bir gece hakkinda bilgi ver",
-        "büyülü bir gece ne demek",
-        "büyülü bir gece anlat",
-        "bana büyülü bir gece hakkinda bilgi ver",
-        "büyülü bir gece hakkinda konus"
+        "buyulu bir gece nedir",
+        "buyulu bir gece hakkinda bilgi ver",
+        "buyulu bir gece ne demek",
+        "buyulu bir gece anlat",
+        "bana buyulu bir gece hakkinda bilgi ver",
+        "buyulu bir gece hakkinda konus"
       ],
       "responses": [
         "Aradıkları şirketten Bayan Botz'u gönderirler.",
         "\"Some Enchanted Evening\", Amerikan animasyon televizyon dizisi Simpsonlar'ın birinci sezonunun on üçüncü ve final bölümüdür.",
-        "Homer ile Marge bir bebek bakıcısı bulup, aralarındaki sorunları çözmek için geceyi dışarıda geçirmek isterler."
+        "Homer ile Marge bir bebek bakıcısı bulup, aralarındaki sorunları çözmek için geceyi dışarıda geçirmek isterler.",
+        "Sonrasında Bayan Botz'un sahte bebek bakıcısı olduğu ve büyük çocukları bağlayıp aileyi soyduğu ortaya çıkar.",
+        "Bazı eleştirmenler bölümü sezonun en iyisi olarak değerlendirirken diğerleri en kötü bölüm olduğunu belirttiler.",
+        "Bölümde Bart, Lisa ve Maggie sahte bebek bakıcısı Ms."
       ]
     },
     {
-      "tag": "keskin nişancı",
+      "tag": "keskin nisanci",
       "patterns": [
-        "keskin nişancı nedir",
-        "keskin nişancı hakkinda bilgi ver",
-        "keskin nişancı ne demek",
-        "keskin nişancı anlat",
-        "bana keskin nişancı hakkinda bilgi ver",
-        "keskin nişancı hakkinda konus"
+        "keskin nisanci nedir",
+        "keskin nisanci hakkinda bilgi ver",
+        "keskin nisanci ne demek",
+        "keskin nisanci anlat",
+        "bana keskin nisanci hakkinda bilgi ver",
+        "keskin nisanci hakkinda konus"
       ],
       "responses": [
         "Keskin nişancı, uzun namlulu silahlarla —genellikle— uzun mesafeden hassas atış yapmak üzere yetiştirilmiş kimsedir.",
         "Çoğunlukla polis, asker gibi silahlı bir birlikte görev alan bu kimselere keskin nişancı tüfekleri ile özel eğitim verilir.",
-        "Genellikle deneyimli avcılar da keskin nişancıların kullandığı bazı yöntem ve teçhizatları kullanırlar."
+        "Genellikle deneyimli avcılar da keskin nişancıların kullandığı bazı yöntem ve teçhizatları kullanırlar.",
+        "Keskin nişancılar hedeflere çok uzaktan isabet kaydetmek ya da çok küçük hedefleri vurmak için keskin nişancı ekipmanlarını kullanırlar.",
+        "Ayrıca, düşman tarafından görülmemeleri için gizlilik ve kamuflaj eğitimi alırlar.",
+        "Ordunun yanı sıra birçok polis departmanı da, özel eğitimli ekiplerinde keskin nişancılara yer verir."
       ]
     },
     {
@@ -2450,14 +2504,14 @@
       ]
     },
     {
-      "tag": "i̇nyupikler",
+      "tag": "inyupikler",
       "patterns": [
-        "i̇nyupikler nedir",
-        "i̇nyupikler hakkinda bilgi ver",
-        "i̇nyupikler ne demek",
-        "i̇nyupikler anlat",
-        "bana i̇nyupikler hakkinda bilgi ver",
-        "i̇nyupikler hakkinda konus"
+        "inyupikler nedir",
+        "inyupikler hakkinda bilgi ver",
+        "inyupikler ne demek",
+        "inyupikler anlat",
+        "bana inyupikler hakkinda bilgi ver",
+        "inyupikler hakkinda konus"
       ],
       "responses": [
         "İnyupiklerin Kanada'da yaşayan ırkdaşları (Uummarmiut) siyasi ve idari kaygılarla Batı Kanada İnuitleri ile birlikte Inuvialuit adı altında toplanırlar.",
@@ -2537,25 +2591,6 @@
       ]
     },
     {
-      "tag": "mansur el-atras",
-      "patterns": [
-        "mansur el-atras nedir",
-        "mansur el-atras hakkinda bilgi ver",
-        "mansur el-atras ne demek",
-        "mansur el-atras anlat",
-        "bana mansur el-atras hakkinda bilgi ver",
-        "mansur el-atras hakkinda konus"
-      ],
-      "responses": [
-        "14 Kasım 2006'da öldü ve doğum yeri olan el-Kureyya yakınlarında defnedildi.",
-        "Daha sonra hapse atılsa da, Suriye'nin 1967'de İsrail ile yaptığı savaşta yenilmesinin ardından serbest bırakıldı.",
-        "Birleşik Arap Cumhuriyeti döneminde (1958-61), Mısır'ın Panarabist Cumhurbaşkanı Cemal Abdünnâsır'ın destekçilerindendi.",
-        "El-Atraş, üniversite arkadaşlarıyla birlikte 1947'de Baas Partisinin ve Suriye bölgesel kolunun kurucu üyelerindendi.",
-        "Suriye'nin Birleşik Arap Cumhuriyeti'nden ayrılmasına karşı çıktı ve bunu protesto etmek için art arda gelen ayrılıkçı hükûmetlerde görev alma tekliflerini geri çevirdi.",
-        "Edib Çiçekli'nin devlet başkanlığı sırasında (1951-54) hükûmet karşıtı bir aktivist oldu ve iki kez mahkûm edildi."
-      ]
-    },
-    {
       "tag": "onur aniti",
       "patterns": [
         "onur aniti nedir",
@@ -2624,56 +2659,19 @@
       ]
     },
     {
-      "tag": "izmit saat kulesi",
+      "tag": "scheisse",
       "patterns": [
-        "izmit saat kulesi nedir",
-        "izmit saat kulesi hakkinda bilgi ver",
-        "izmit saat kulesi ne demek",
-        "izmit saat kulesi anlat",
-        "bana izmit saat kulesi hakkinda bilgi ver",
-        "izmit saat kulesi hakkinda konus"
-      ],
-      "responses": [
-        "Yapının çatısı piramidal koni şeklindedir.",
-        "İkinci katında bir seyir balkonu bulunan yapının gövdesinde pencereler vardır.",
-        "Kule, tek katlı kaide kısmı ile üç katlı gövde kısmı olmak üzere iki kare prizmadan oluşur.",
-        "yıl dönümünü anma amacıyla, İzmit Mutasarrıflığı tarafından yaptırıldı.",
-        "İzmit Saat Kulesi ya da diğer adıyla Kocaeli Saat Kulesi, Kocaeli'nin idarî merkezi İzmit'te bulunan bir saat kulesidir."
-      ]
-    },
-    {
-      "tag": "scheiße",
-      "patterns": [
-        "scheiße nedir",
-        "scheiße hakkinda bilgi ver",
-        "scheiße ne demek",
-        "scheiße anlat",
-        "bana scheiße hakkinda bilgi ver",
-        "scheiße hakkinda konus"
+        "scheisse nedir",
+        "scheisse hakkinda bilgi ver",
+        "scheisse ne demek",
+        "scheisse anlat",
+        "bana scheisse hakkinda bilgi ver",
+        "scheisse hakkinda konus"
       ],
       "responses": [
         "Şarkıda ayrıca hızlı tekno ritimler ile electroclash ve euro disco etkileri bulunmaktadır.",
         "Şarkı, ağır dans ritimlerini ve akılda kalıcı nakaratını beğenen; fakat Almanca sözlerinde ve Gaga'nın aksanında kusur bulan çağdaş müzik eleştirmenlerinden olumlu geri dönüşler aldı.",
         "Feminist temalı şarkının sözleri kadınların güçlendirilmesi hakkındadır."
-      ]
-    },
-    {
-      "tag": "usame bin ladin'in oldurulmesi",
-      "patterns": [
-        "usame bin ladin'in oldurulmesi nedir",
-        "usame bin ladin'in oldurulmesi hakkinda bilgi ver",
-        "usame bin ladin'in oldurulmesi ne demek",
-        "usame bin ladin'in oldurulmesi anlat",
-        "bana usame bin ladin'in oldurulmesi hakkinda bilgi ver",
-        "usame bin ladin'in oldurulmesi hakkinda konus"
-      ],
-      "responses": [
-        "Bu haberin ardından dünyanın farklı noktalarında kutlamalar yapılırken birçok ülkeden harekâtın memnuniyetle karşılandığına dair açıklamalar geldi.",
-        "Görevlerini tamamladıktan sonra helikopterlerle bölgeden ayrılan harekâtçıların, yanlarına aldıkları bin Ladin'in cesedini 24 saat içinde Umman Denizi'ne bıraktıkları açıklandı.",
-        "Afganistan'dan kalkan iki hayalet helikopterle taşınan 23 harekâtçının düzenlediği baskında Usame bin Ladin'in oğlu Halid bin Ladin'in yanı sıra komplekste yaşayan üç kişi daha öldürüldü.",
-        "Bazı İslamcı örgütler bu olayın intikamının alınacağı yönünde açıklamalarda bulundu.",
-        "Amerika Birleşik Devletleri Başkanı Barack Obama, yerel saatle 23.35'te başlayan ulusa sesleniş konuşmasında bin Ladin'in öldürüldüğünü açıkladı.",
-        "6 Mayıs'ta kendisine yakın web sitelerinde yayımlanan bir bildiriyle el-Kaide, bin Ladin'in öldürüldüğünü doğruladı."
       ]
     },
     {
@@ -2719,7 +2717,7 @@
       ],
       "responses": [
         "Günümüzde Türkiye sınırları içinde yer alır ve Artvin ilinin Borçka ilçesine bağlı Maralköy'ün (Mindieti) bir mahallesidir.",
-        "Kavtareti (Gürcüce: ქავთარეთი), tarihsel Gürcü coğrafyasında, Maçaheli bölgesinin yerleşim yerlerinden biridir."
+        "Kavtareti (Gürcüce: ), tarihsel Gürcü coğrafyasında, Maçaheli bölgesinin yerleşim yerlerinden biridir."
       ]
     },
     {
@@ -2734,7 +2732,7 @@
       ],
       "responses": [
         "Hatta Sokrates, Perikles'in Peloponez Savaşı sonrası yaptığı ünlü konuşması Pericles' Funeral Orationu Aspasia'nın yazdığını düşünmektedir ve kendisinden retorik (hitabet) sanatında mükemmel bir kadın öğretmen olarak söz etmiştir.",
-        "Miletli Aspasia (Grekçe: Ἀσπασία; y.",
+        "Miletli Aspasia (Grekçe: ; y.",
         "MÖ 470 – MÖ 428 sonrası) Hayatının büyük bir kısmını Atina'da geçirmiş önde gelen kadın filozoflardan biridir.",
         "Koyun ticareti yapan Lysikles'in Atina'da politik bir lider ve general olmasına katkıda bulunmuştur."
       ]
@@ -2768,7 +2766,7 @@
       "responses": [
         "Mişna'da Purim bayramının Adar II'de kutlanması gerektiği söylendiği için Adar I artık ay olarak tanımlanır.",
         "Adar I ve Adar II Gregoryen takviminde Şubat-Mart aylarına düşer.",
-        "Adar (İbranice: אֲדָר) İbrani takvimine göre resmi yılın altıncı ayıdır (yıl 1 Tişri'de başlar) ve dini yılın on ikinci ayıdır (dini yıl 1 Nisan'da başlar)."
+        "Adar (İbranice: ) İbrani takvimine göre resmi yılın altıncı ayıdır (yıl 1 Tişri'de başlar) ve dini yılın on ikinci ayıdır (dini yıl 1 Nisan'da başlar)."
       ]
     },
     {
@@ -2830,7 +2828,7 @@
         "merkezciler birligi hakkinda konus"
       ],
       "responses": [
-        "Merkezciler Birliği (Yunanca: Ένωση Κεντρώων, Enosi Kentroon), Yunanistan'da bir liberal siyasi partidir.",
+        "Merkezciler Birliği (Yunanca: , Enosi Kentroon), Yunanistan'da bir liberal siyasi partidir.",
         "Parti, 2 Mart 1992 tarihinde kurulmuş olup eski Merkez Birliği'nin ve Venizelist siyasi geleneğini devamı olarak tanımlanmaktadır."
       ]
     },
@@ -2865,25 +2863,6 @@
         "Olimpiyat Oyunları tarihinde ilk kez 1964 Yaz Olimpiyatları'nda temsil edilen ülke, Yaz Olimpiyatları tarihindeki üçüncü katılımını gerçekleştirdi.",
         "Nepal, 17 Temmuz - 1 Ağustos tarihleri arasında Kanada'nın Montreal şehrinde düzenlenen 1976 Yaz Olimpiyatları'na, yalnızca atletizmde bir sporcuyla katıldı.",
         "Ülke adına tek sporcu olan Baikuntha Manandhar, mücadele ettiği erkekler maraton kategorisini 2:30:07'lik derecesiyle 50."
-      ]
-    },
-    {
-      "tag": "2003 istanbul saldirilari",
-      "patterns": [
-        "2003 istanbul saldirilari nedir",
-        "2003 istanbul saldirilari hakkinda bilgi ver",
-        "2003 istanbul saldirilari ne demek",
-        "2003 istanbul saldirilari anlat",
-        "bana 2003 istanbul saldirilari hakkinda bilgi ver",
-        "2003 istanbul saldirilari hakkinda konus"
-      ],
-      "responses": [
-        "Başlatılan soruşturmalar sonucunda saldırıların el-Kaide'nin Türkiye yapılanması tarafından gerçekleştirdiği tespit edildi.",
-        "15 Kasım'da saat 9.30 (UTC+02.00) civarında Şişli'deki Bet İsrael Sinagogu, saat 9.34 civarında ise Beyoğlu'ndaki Neve Şalom Sinagogu'nun önünde birer kamyonet infilak etti.",
-        "15 ve 20 Kasım 2003 tarihlerinde İstanbul'un dört noktasında, her iki günde de ikişer patlayıcı yüklü kamyonetin infilak ettirilmesiyle dört intihar saldırısı gerçekleştirildi.",
-        "Patlamalar sonucunda saldırganlar dâhil 26 kişi öldü, 300'den fazla kişi yaralandı.",
-        "Yargıtay'ın davada alınan kararları bazı sanıklar yönünden bozması sebebiyle yeniden yapılan yargılama sonrasında ise 16 sanık hakkında çeşitli kademelerde hapis cezalarına hükmedildi.",
-        "Saldırılarla ilgili olarak Şubat 2004'te 69 sanıkla başlanan ve süreç içinde yapılan eklemelerle 76 sanığa ulaşan dava, Nisan 2007'de 7'si müebbet olmak üzere 48 sanığın çeşitli kademelerde hapis cezalarına çarptırılmasıyla sonuçlandı."
       ]
     },
     {
@@ -3052,52 +3031,9 @@
         "cesma hakkinda konus"
       ],
       "responses": [
-        "Çesma (Rusça: Чесма), 1880'lerde Rus İmparatorluk Donanması için inşa edilen Yekaterina II sınıfının ikinci gemisi olan zırhlıdır.",
+        "Çesma (Rusça: ), 1880'lerde Rus İmparatorluk Donanması için inşa edilen Yekaterina II sınıfının ikinci gemisi olan zırhlıdır.",
         "Rus şirketleri, Donanma Genel Komutanlığının istediği gelişmiş zırh ve makineleri üretemediği için bu parçalar Birleşik Krallık ve Belçika'dan ithal edildi.",
         "Çesma, 14 Ağustos 1907'de envanterden düşülmeden önce Sivastopol liman yetkililerine teslim edildi."
-      ]
-    },
-    {
-      "tag": "1964 brinks oteli bombali saldirisi",
-      "patterns": [
-        "1964 brinks oteli bombali saldirisi nedir",
-        "1964 brinks oteli bombali saldirisi hakkinda bilgi ver",
-        "1964 brinks oteli bombali saldirisi ne demek",
-        "1964 brinks oteli bombali saldirisi anlat",
-        "bana 1964 brinks oteli bombali saldirisi hakkinda bilgi ver",
-        "1964 brinks oteli bombali saldirisi hakkinda konus"
-      ],
-      "responses": [
-        "Askerî personel ile Vietnamlı sivillerden oluşan yaklaşık altmış kişi ise saldırıyı yaralı olarak atlattı.",
-        "İki Vietkong casusunun, ABD Ordusu'na ev sahipliği yapan otelin altındaki bir arabaya koydukları bombanın patlaması sonucunda biri subay, biri ise astsubay olmak üzere iki Amerikalı öldü.",
-        "Vietnam komutanları saldırıyı iki amaçla planlamışlardı.",
-        "Saldırı, ABD Başkanı Lyndon B.",
-        "İkincisi ise; Güney Vietnamlılara, Amerikalıların zayıf olduğunu ve korunma amaçlı olarak onlara güvenemeyeceklerini göstermekti.",
-        "Johnson'ın yönetimi içinde tartışmalara neden oldu."
-      ]
-    },
-    {
-      "tag": "akciger kanseri",
-      "patterns": [
-        "akciger kanseri nedir",
-        "akciger kanseri hakkinda bilgi ver",
-        "akciger kanseri ne demek",
-        "akciger kanseri anlat",
-        "bana akciger kanseri hakkinda bilgi ver",
-        "akciger kanseri hakkinda konus"
-      ],
-      "responses": [
-        "Akciğer kanserinin birçok histolojik alttipi olmasına karşın, klinikte genellikle küçük hücreli ve küçük hücreli dışı akciğer kanseri olmak üzere iki başlıkta incelenir; çünkü tedavide izlenecek yolu bu gruplandırma belirler.",
-        "Akciğer kanserinin belirtileri hastalığın nerede başladığına, nasıl yayılmış olduğuna ve vücudun hastalığa tepkilerinin varlığına bağlı olarak fark edebilir.",
-        "Biyopsi genelde bronkoskopi veya BT-yardımlı biyopsi ile yapılır.",
-        "Akciğer kanseri, göğüs röntgeni ve bilgisayarlı tomografi (BT) ile görülebilir.",
-        "En sık görülen belirtileri, nefes darlığı (dispne), öksürme (kanlı öksürme da dahil) ve kilo kaybıdır.",
-        "Bu belirtiler sadece akciğer kanserine özgü olmadıklarından hastaların tanı almaları gecikebilir.",
-        "Dünya Sağlık Örgütünün (WHO) raporuna göre akciğer kanseri tüm dünyada kanser türleri arasında en sık ölüme neden olan kanser türüdür ve tüm dünyada her yıl yaklaşık 1,6 milyon ölüme neden olmaktadır.",
-        "Akciğer kanseri, akciğer dokularındaki hücrelerin kontrolsüz çoğaldığı bir hastalıktır.",
-        "Bu nedenler arasında; genetik faktörler, radon gazı, asbest ve hava kirliliği gibi faktörler sorumlu tutulmaktadır.",
-        "Tedavi ve prognozu belirleyen faktörler; kanserin histolojik tipi, kanserin evresi ve hastanın genel performans durumudur.",
-        "Tüm alttipler ve evreler göz önüne alındığında, tedavi ile beş yıllık sağkalım oranı Amerika Birleşik Devletleri'nde %18,1'dir (2017 için); ancak sağkalım oranları gelişmekte olan ülkelerde daha düşüktür."
       ]
     },
     {
@@ -3260,33 +3196,14 @@
       ]
     },
     {
-      "tag": "babamin sesi",
+      "tag": "djibril cisse",
       "patterns": [
-        "babamin sesi nedir",
-        "babamin sesi hakkinda bilgi ver",
-        "babamin sesi ne demek",
-        "babamin sesi anlat",
-        "bana babamin sesi hakkinda bilgi ver",
-        "babamin sesi hakkinda konus"
-      ],
-      "responses": [
-        "Maraş Katliamı'ndan etkilenen Kürt-Alevi bir ailenin hikâyesini konu edinmektedir.",
-        "Galası 29 Ocak 2012'de, Uluslararası Rotterdam Film Festivali'nde düzenlendi, Türkiye'de ilk gösterimi 11 Nisan 2012'de 31.",
-        "Yönetmenlerden Zeynel Doğan'ın ailesinin gerçek hikâyesinden yola çıkılarak oluşturuldu ve filmin merkezinde Doğan'ın babasından kalan kasetler yer aldı.",
-        "Babamın Sesi, Türkiye'deki sinemalarda 2 Kasım 2012'de on üç salonda gösterilerek vizyona girdi.",
-        "Uluslararası Altın Koza Film Festivali'nde En İyi Film Ödülü'nü kazanan film, eleştirmenlerden olumlu yorumlar aldı ve \"bu topraklarda yaşanan katliamlarla yüzleşmek ve hesaplaşmak için izlememiz gereken bir film\" olarak nitelendirildi.",
-        "Ayrıca İki Dil Bir Bavul filmiyle kıyaslandı."
-      ]
-    },
-    {
-      "tag": "djibril cissé",
-      "patterns": [
-        "djibril cissé nedir",
-        "djibril cissé hakkinda bilgi ver",
-        "djibril cissé ne demek",
-        "djibril cissé anlat",
-        "bana djibril cissé hakkinda bilgi ver",
-        "djibril cissé hakkinda konus"
+        "djibril cisse nedir",
+        "djibril cisse hakkinda bilgi ver",
+        "djibril cisse ne demek",
+        "djibril cisse anlat",
+        "bana djibril cisse hakkinda bilgi ver",
+        "djibril cisse hakkinda konus"
       ],
       "responses": [
         "Panathinaikos'taki ilk yılının ardından, kulübe olan bağlılığını göstermek amacıyla sağ dizine kulübün simgesi olan yonca dövmesi yaptırdı.",
@@ -3903,7 +3820,7 @@
         "oboyan hakkinda konus"
       ],
       "responses": [
-        "(Rusça: Обоянь), Rusya'nın Merkez Rusya Federal Bölgesi'nde yer alan Kursk Oblastı'nın merkzi olan şehir.",
+        "(Rusça: ), Rusya'nın Merkez Rusya Federal Bölgesi'nde yer alan Kursk Oblastı'nın merkzi olan şehir.",
         "Şehrin nüfusu 2008 yıl itibarıyla 13.706 'dır."
       ]
     },
@@ -3966,7 +3883,6 @@
         "marie-christine koundja hakkinda konus"
       ],
       "responses": [
-        "Marie-Christine Koundja (d.",
         "Bir süre Kamerun elçiliği de yapan Koundja, şu an Nijerya'daki Çad büyükelçiliğinde genel sekreter olarak çalışmaktadır.",
         "2001 yılında yazdığı 'Al-Istifakh, ou L'idylle de mes amis' romanıyla tanınır."
       ]
@@ -4050,7 +3966,7 @@
       ],
       "responses": [
         "17 Haziran 1994, Mahilyov), Avrupa şampiyonu Belaruslu güreşçidir.",
-        "İrina Kuraçkina (Belarusça: Ірына Аляксандраўна Курачкіна; d.",
+        "İrina Kuraçkina (Belarusça: ; d.",
         "2021 Avrupa Güreş Şampiyonası'nda altın madalya ve 2020 Yaz Olimpiyatlarında gümüş madalya kazanmıştır."
       ]
     },
@@ -4146,24 +4062,8 @@
       ],
       "responses": [
         "Adalara Dōgo'da bulunan Oki Havalimanı ile anakaradan kalkan feribotlar hizmet vermektedir.",
-        "Oki Adaları (Japonca: 隠岐諸島 Oki-shotō veya 隠岐の島 Oki-no-shima), Japon Denizi'nin üzerinde bulunan takımadalardır.",
+        "Oki Adaları (Japonca: Oki-shotō veya Oki-no-shima), Japon Denizi'nin üzerinde bulunan takımadalardır.",
         "Adaların jeolojik mirası nedeniyle Eylül 2014 tarihinde UNESCO Küresel Jeopark'a dahil edilmiştir."
-      ]
-    },
-    {
-      "tag": "denizyildizi",
-      "patterns": [
-        "denizyildizi nedir",
-        "denizyildizi hakkinda bilgi ver",
-        "denizyildizi ne demek",
-        "denizyildizi anlat",
-        "bana denizyildizi hakkinda bilgi ver",
-        "denizyildizi hakkinda konus"
-      ],
-      "responses": [
-        "Pisaster ochraceus ve Stichaster australis gibi denizyıldızı türleri ekolojide kilittaşı türler kavramının yaygın olarak bilinen örnekleridir.",
-        "Çeşitli türleri midelerini dışarı çıkarma ya da suda asılı besin maddelerini filtreleme gibi özelleşmiş beslenme davranışları gösterir.",
-        "Tropikal Acanthaster planci, Hint Okyanusu ve Büyük Okyanus'un doymak bilmez bir avcısıdır."
       ]
     },
     {
@@ -4209,7 +4109,7 @@
         "ming mezarlari hakkinda konus"
       ],
       "responses": [
-        "Bununla birlikte, Ming Mezarları'nın çoğunluğu Pekin yakınlarında bulunur ve topluca Ming Hanedanı'nın On Üç Mezarı (Çince: 明十三陵; pinyin: Míng Shísān Líng; tam anlamıyla: \"Ming On Üçüncü Anıt Mezarları\") olarak bilinmektedirler.",
+        "Bununla birlikte, Ming Mezarları'nın çoğunluğu Pekin yakınlarında bulunur ve topluca Ming Hanedanı'nın On Üç Mezarı (Çince: ; pinyin: Míng Shísān Líng; tam anlamıyla: \"Ming On Üçüncü Anıt Mezarları\") olarak bilinmektedirler.",
         "Mezarlar, \"Ming ve Qing Hanedanlarının İmparatorluk Mezarları, Ming Hanedanı Mezarları ve Ming Xiaoling Mozolesi dahil\" adı ile UNESCO Dünya Mirası listesinde yer almaktadır.",
         "Ming Mezarları, Çin'de Ming Hanedanı imparatorlarının yaptırdığı mezarlıklardır."
       ]
@@ -4295,14 +4195,14 @@
       ]
     },
     {
-      "tag": "orri óskarsson",
+      "tag": "orri oskarsson",
       "patterns": [
-        "orri óskarsson nedir",
-        "orri óskarsson hakkinda bilgi ver",
-        "orri óskarsson ne demek",
-        "orri óskarsson anlat",
-        "bana orri óskarsson hakkinda bilgi ver",
-        "orri óskarsson hakkinda konus"
+        "orri oskarsson nedir",
+        "orri oskarsson hakkinda bilgi ver",
+        "orri oskarsson ne demek",
+        "orri oskarsson anlat",
+        "bana orri oskarsson hakkinda bilgi ver",
+        "orri oskarsson hakkinda konus"
       ],
       "responses": [
         "Forvet mevkiinde görev almaktadır.",
@@ -4370,7 +4270,7 @@
       ],
       "responses": [
         "Köprü, 14 Aralık 2006 tarihinde açılmış olup inşaatı Larsen & Toubro Limited tarafından gerçekleştirilmiştir.",
-        "Abdun Köprüsü (Arapça: جسر عبدون (Cisir Abdun), Ürdün'ün başkenti Amman'da bulunan bir gergin eğik askılı köprüdür.",
+        "Abdun Köprüsü (Arapça: (Cisir Abdun), Ürdün'ün başkenti Amman'da bulunan bir gergin eğik askılı köprüdür.",
         "Köprü, Amman çevre yolu projesinin bir parçasıdır ve Amman'ın güneyini 4."
       ]
     },
@@ -4386,7 +4286,7 @@
       ],
       "responses": [
         "Dağlık bir bölgede yer alan köyün yüzölçümü 23,34 km²'dir.",
-        "Akçaalan (Bulgarca: Белополци), Bulgaristan'ın güneyinde, Hasköy iline bağlı İvaylovgrad (Ortaköy) belediyesi sınırları içinde bulunan bir köydür."
+        "Akçaalan (Bulgarca: ), Bulgaristan'ın güneyinde, Hasköy iline bağlı İvaylovgrad (Ortaköy) belediyesi sınırları içinde bulunan bir köydür."
       ]
     },
     {
@@ -4520,7 +4420,7 @@
       "responses": [
         "İlçenin merkezi Jelezinka'dır.",
         "Yüzölçümü 7.666 km² olan ilçenin nüfusu 1 Ocak 2023 tarihi itibarı ile 15.234'dur.",
-        "Jelezin ilçesi (Kazakça: Jelezin audany; Rusça: Железинский район, romanize: Jelezinski rayon), Kazakistan'ın Pavlodar ilinde bulunan bir ilçedir."
+        "Jelezin ilçesi (Kazakça: Jelezin audany; Rusça: , romanize: Jelezinski rayon), Kazakistan'ın Pavlodar ilinde bulunan bir ilçedir."
       ]
     },
     {
@@ -4718,25 +4618,6 @@
       ]
     },
     {
-      "tag": "izmir suikasti",
-      "patterns": [
-        "izmir suikasti nedir",
-        "izmir suikasti hakkinda bilgi ver",
-        "izmir suikasti ne demek",
-        "izmir suikasti anlat",
-        "bana izmir suikasti hakkinda bilgi ver",
-        "izmir suikasti hakkinda konus"
-      ],
-      "responses": [
-        "İzmir Suikastı, Türkiye Cumhurbaşkanı Mustafa Kemal Paşa'ya 14 Haziran 1926 tarihinde, İzmir'de yapılması planlanan suikast girişimidir.",
-        "Aralarında eski bakanların, milletvekillerinin ve valilerin de bulunduğu bir grup tarafından planlanmış ancak hayata geçirilmeden engellenmiştir.",
-        "Suikastın İzmir'in Kemeraltı semtinde yapılması planlanmıştı.",
-        "İzmir'de 26 Haziran-13 Temmuz günleri arasında yargılanan kırk kişiden, ikisi gıyabında olmak üzere on beşi idamla, biri ise sürgünle cezalandırıldı.",
-        "Bu olaydan sonra İzmir'e gelen istiklâl mahkemesi heyetince yapılan duruşmalarda, olayın arkasında daha geniş muhalif grupların olduğu belirlendi.",
-        "Bir müddet sonra dört kişi yakalandı ve suçlarını itiraf ettiler."
-      ]
-    },
-    {
       "tag": "2010 kis olimpiyatlari'nda azerbaycan",
       "patterns": [
         "2010 kis olimpiyatlari'nda azerbaycan nedir",
@@ -4896,8 +4777,7 @@
       ],
       "responses": [
         "1949, Seattle Washington), Amerikalı bir tarihçidir.",
-        "Şu anda Temple Üniversitesi'nde kadrolu bir din profesörüsdür.",
-        "Khalid Yahya Blankinship (d."
+        "Şu anda Temple Üniversitesi'nde kadrolu bir din profesörüsdür."
       ]
     },
     {
@@ -5016,7 +4896,7 @@
       ],
       "responses": [
         "İstasyon, 18 Ocak 1961 tarihinde Sovyetler Birliği döneminde açılmış olup Kraliçe Maud Toprakları'nda bulunan Schirmacher Vahası'nda yer almaktadır.",
-        "Novolazarevskaya İstasyonu (Rusça: Новолазаревская), Antarktika'da bulunan bir Rus araştırma istasyonudur."
+        "Novolazarevskaya İstasyonu (Rusça: ), Antarktika'da bulunan bir Rus araştırma istasyonudur."
       ]
     },
     {
@@ -5129,7 +5009,7 @@
       ],
       "responses": [
         "Âmirîler'in sarayında yetişen Saklebî komutan Hayrân el-Âmirî tarafından 1012 yılında kuruldu.",
-        "Mürsiye Emirliği (Arapça: طائفة مرسية) (İspanyolca: Taifa de Murcia), İber Yarımadası'nın güneydoğusunda yer alan bir arap taifa devletiydi.",
+        "Mürsiye Emirliği (Arapça: ) (İspanyolca: Taifa de Murcia), İber Yarımadası'nın güneydoğusunda yer alan bir arap taifa devletiydi.",
         "1012-1014, 1049-1078, 1145-1147, 1147-1172 ve 1228-1266 yıllarında."
       ]
     },
@@ -5212,25 +5092,6 @@
       ]
     },
     {
-      "tag": "sarayonu camii",
-      "patterns": [
-        "sarayonu camii nedir",
-        "sarayonu camii hakkinda bilgi ver",
-        "sarayonu camii ne demek",
-        "sarayonu camii anlat",
-        "bana sarayonu camii hakkinda bilgi ver",
-        "sarayonu camii hakkinda konus"
-      ],
-      "responses": [
-        "2005 yılındaysa Türkiye'de iktidarda olan Adalet ve Kalkınma Partisi çevrelerinin caminin bu maksatla kullanımına itiraz etmesinin ardından yeni bir evlendirme dairesi yaptırılarak yapı tekrar camiye çevrildi.",
-        "Mevcut cami 1902 yılında tamamlanmış olup, daha önce aynı yerde bulunan bina kiliseden camiye çevrilmişti.",
-        "Sarayönü Camii, Lefkoşa'nın kuzey kesiminde yer alan bir camidir.",
-        "Gotik mimari özelliklerini taşıyan bu kilise, 1570 yılında Lefkoşa'nın Osmanlı İmparatorluğu tarafından ele geçirilmesi sonrası camiye çevrildi.",
-        "Bu dönemde Orduönü Mescidi, İbrahim Paşa Camii ve Ali Paşa Camii isimleriyle de anıldı.",
-        "Tarihsel olarak Lefkoşa'nın idari merkezi niteliğindeki Sarayönü Meydanı'nda yer almış olan caminin meydanla bağlantısı 1960'larda kesildi."
-      ]
-    },
-    {
       "tag": "sigircik",
       "patterns": [
         "sigircik nedir",
@@ -5275,7 +5136,6 @@
         "fernando tissone hakkinda konus"
       ],
       "responses": [
-        "Fernando Damián Tissone Rodrigues (d.",
         "Profesyonel kariyerine Lanús kulübünde başladı.",
         "Daha sonra sırasıyla Udinese, Atalanta, Udinese, Sampdoria, Mallorca, Mallorca, Málaga ve Karpaty Lviv kulüplerinde oynadı."
       ]
@@ -5293,22 +5153,6 @@
       "responses": [
         "Halliday, Amerika Birleşik Devletleri'nin Kuzey Dakota eyaletinde yer alan ve Dunn ilçesinde yer alan bir şehirdir.",
         "Şehrin nüfusu 26 Kasım 2009 tarihinde 188'dir."
-      ]
-    },
-    {
-      "tag": "marias katliami",
-      "patterns": [
-        "marias katliami nedir",
-        "marias katliami hakkinda bilgi ver",
-        "marias katliami ne demek",
-        "marias katliami anlat",
-        "bana marias katliami hakkinda bilgi ver",
-        "marias katliami hakkinda konus"
-      ],
-      "responses": [
-        "Baker komutasındaki Amerika Birleşik Devletleri Ordusu tarafından Montana'da Marias Nehri yakınlarında Karaayaklar konfederasyonundan Pikani (Piegan) Karaayaklarına yapılan katliam.",
-        "Marias Katliamı ya da Baker Katliamı veya Heavy Runner Katliamı (İngilizce Baker Massacre, Baker's Massacre, Marias Massacre, Marias River Massacre, Bear River Massacre, Heavy Runner Massacre, Piegan Massacre), 19.",
-        "yüzyılın sonlarında Kızılderili savaşları sırasında 23 Ocak 1870 tarihinde binbaşı Eugene M."
       ]
     },
     {
@@ -5356,22 +5200,6 @@
         "Bölümde Homer, bir karavan satın alır ve ailesini, karavanla tenha bir yerde bir tatile çıkarır.",
         "Homer ile Bart, medeniyete dönme yolu ararken Homer kendini çamurla kaplar ve bir doğacı tarafından yanlışlıkla Kocaayak olarak tanımlanır.",
         "Yanlışlıkla bir uçurumun kenarına sürmesiyle aile kendini ormanda bulur."
-      ]
-    },
-    {
-      "tag": "belarus bayragi",
-      "patterns": [
-        "belarus bayragi nedir",
-        "belarus bayragi hakkinda bilgi ver",
-        "belarus bayragi ne demek",
-        "belarus bayragi anlat",
-        "bana belarus bayragi hakkinda bilgi ver",
-        "belarus bayragi hakkinda konus"
-      ],
-      "responses": [
-        "Hükûmet karşıtı muhalif gruplar bu bayrağı protestolarda ve ülke dışındaki Belarus diasporası desteklemek amacıyla kullanmaktadır.",
-        "Göndere çekilen taraftaki beyaz zemin üzerine kırmızı süsleme deseni ile birlikte kırmızı ve yeşil renkten oluşan bayrak, Belarus devlet sembolleri arasında yer alır.",
-        "Sovyetler Birliği döneminde kullanılan eski bayraktan komünizmin sembolleri olan orak ve çekiç ve kızıl yıldızın kaldırılması ve süsleme desenindeki beyaz-kırmızı renklerin tersine dönüştürülmesiyle tasarlandı."
       ]
     },
     {
@@ -5549,18 +5377,18 @@
       "responses": [
         "Böylelikle imparatorluğun ömrü kısa sürmüş oldu.",
         "Stefan Uroş ise babasının fethettiği toprakların çoğunu kaybetti.",
-        "Sırp İmparatorluğu, (Sırpça: Sırpça: Српско царство / Sırpça: Srpsko carstvo, Sırpça telaffuz: [sr̩̂pskoː tsâːrstʋo]) Sırp Krallığı'nın devamı olarak kurulan bir Orta Çağ devletiydi."
+        "Sırp İmparatorluğu, (Sırpça: Sırpça: / Sırpça: Srpsko carstvo, Sırpça telaffuz: [sr̩̂pskoː tsâːrstʋo]) Sırp Krallığı'nın devamı olarak kurulan bir Orta Çağ devletiydi."
       ]
     },
     {
-      "tag": "vendée",
+      "tag": "vendee",
       "patterns": [
-        "vendée nedir",
-        "vendée hakkinda bilgi ver",
-        "vendée ne demek",
-        "vendée anlat",
-        "bana vendée hakkinda bilgi ver",
-        "vendée hakkinda konus"
+        "vendee nedir",
+        "vendee hakkinda bilgi ver",
+        "vendee ne demek",
+        "vendee anlat",
+        "bana vendee hakkinda bilgi ver",
+        "vendee hakkinda konus"
       ],
       "responses": [
         "İl, Fransa'nın batı kuşağında, Atlas Okyanusu kıyısında yer almaktadır.",
@@ -5613,23 +5441,6 @@
         "Jonah Jameson ve Harry Osborn gibi birçok destekleyici karakter verdi; romantik ilgi alanları Gwen Stacy, Mary Jane Watson, Kara Kedi; Doktor Octopus, Green Goblin ve Venom gibi düşmanlar.",
         "Marvel ayrıca Spider-Man 2099 dahil olmak üzere Spider-Man'in alternatif versiyonlarını içeren kitaplar yayınladı.",
         "Spider-Man bir süper kahraman ve çizgi roman karakteri olarak iyi karşılandı ve genellikle tüm zamanların en popüler ve ikonik çizgi roman karakterlerinden biri ve tüm kurgudaki en popüler karakterlerden biri olarak gösteriliyor."
-      ]
-    },
-    {
-      "tag": "2008 yaz olimpiyatlari'nda belize",
-      "patterns": [
-        "2008 yaz olimpiyatlari'nda belize nedir",
-        "2008 yaz olimpiyatlari'nda belize hakkinda bilgi ver",
-        "2008 yaz olimpiyatlari'nda belize ne demek",
-        "2008 yaz olimpiyatlari'nda belize anlat",
-        "bana 2008 yaz olimpiyatlari'nda belize hakkinda bilgi ver",
-        "2008 yaz olimpiyatlari'nda belize hakkinda konus"
-      ],
-      "responses": [
-        "Erkekler 400 metre engelli kategorisinde yarışan atlet Jonathan Williams serileri geçerek yarı finale yükseldi ve bu aşamaya kadar gelebilen ilk Belizeli atlet oldu.",
-        "Erkekler 200 metre kategorisinde yarışan Jayson Jones ile kadınlar uzun atlamada yarışan Tricia Flores ise serileri geçemedi.",
-        "Belize, Çin'in başkenti Pekin'de düzenlenen 2008 Yaz Olimpiyatları'na üçü atletizmde, biri ise tekvandoda olmak üzere dört sporcuyla katıldı.",
-        "Erkekler 58 kg kategorisinde mücadele eden tekvandocu Alfonso Martínez, mücadele ettiği ilk turda rakibine yenilerek turnuvadan elendi."
       ]
     },
     {
@@ -5892,17 +5703,17 @@
       ]
     },
     {
-      "tag": "hōjō tokimune",
+      "tag": "hojo tokimune",
       "patterns": [
-        "hōjō tokimune nedir",
-        "hōjō tokimune hakkinda bilgi ver",
-        "hōjō tokimune ne demek",
-        "hōjō tokimune anlat",
-        "bana hōjō tokimune hakkinda bilgi ver",
-        "hōjō tokimune hakkinda konus"
+        "hojo tokimune nedir",
+        "hojo tokimune hakkinda bilgi ver",
+        "hojo tokimune ne demek",
+        "hojo tokimune anlat",
+        "bana hojo tokimune hakkinda bilgi ver",
+        "hojo tokimune hakkinda konus"
       ],
       "responses": [
-        "Hōjō Tokimune (Japonca: 北条 時宗; 5 Haziran 1251-20 Nisan 1284), Kamakura şogunluğunun sekizinci shikkenidir.",
+        "Hōjō Tokimune (Japonca: ; 5 Haziran 1251-20 Nisan 1284), Kamakura şogunluğunun sekizinci shikkenidir.",
         "Hōjō boyuna mensup olup Moğol işgaline karşı Japon güçlerine liderlik etmesi ve Zen Budizmi'ni yaymaya çalışması ile bilinmektedir."
       ]
     },
@@ -6036,19 +5847,19 @@
       ]
     },
     {
-      "tag": "go-nijō",
+      "tag": "go-nijo",
       "patterns": [
-        "go-nijō nedir",
-        "go-nijō hakkinda bilgi ver",
-        "go-nijō ne demek",
-        "go-nijō anlat",
-        "bana go-nijō hakkinda bilgi ver",
-        "go-nijō hakkinda konus"
+        "go-nijo nedir",
+        "go-nijo hakkinda bilgi ver",
+        "go-nijo ne demek",
+        "go-nijo anlat",
+        "bana go-nijo hakkinda bilgi ver",
+        "go-nijo hakkinda konus"
       ],
       "responses": [
         "Nijō\" olarak da adlandırılabilmektedir.",
         "Saltanatı 1301'den 1308 yılında ölümüne kadar sürmüştür.",
-        "Go-Nijō (Japonca: 後二条天皇 Go-Nijō-tennō; 9 Mart 1285 - 10 Eylül 1308), Japonya'nın geleneksel veraset düzenine göre 94."
+        "Go-Nijō (Japonca: Go-Nijō-tennō; 9 Mart 1285 - 10 Eylül 1308), Japonya'nın geleneksel veraset düzenine göre 94."
       ]
     },
     {
@@ -6126,7 +5937,6 @@
         "elvis costello hakkinda konus"
       ],
       "responses": [
-        "Elvis Costello asıl adıyla Declan Patrick MacManus (d.",
         "1970'li yılların ortasında Londra'daki pub rock sahnesindeki ilk çalışmalarıyla tanındı ve daha sonra, punk rock ile New Wave müzik türleri ile ilgilendi.",
         "25 Ağustos 1954, Londra), İngiliz şarkıcı ve söz yazarı."
       ]
@@ -6161,38 +5971,6 @@
         "31 Mayıs 1989), sağ kanat ve sol kanat mevkiinde görev yapan Alman millî futbolcudur.",
         "Major League Soccer takımlarından Los Angeles Galaxy'de oynamaktadır.",
         "Marco Reus (Almanca telaffuz: [ˈmaɐ̯koː ˈʁɔʏ̯s] d."
-      ]
-    },
-    {
-      "tag": "senay aybuke yalcin'in olumu",
-      "patterns": [
-        "senay aybuke yalcin'in olumu nedir",
-        "senay aybuke yalcin'in olumu hakkinda bilgi ver",
-        "senay aybuke yalcin'in olumu ne demek",
-        "senay aybuke yalcin'in olumu anlat",
-        "bana senay aybuke yalcin'in olumu hakkinda bilgi ver",
-        "senay aybuke yalcin'in olumu hakkinda konus"
-      ],
-      "responses": [
-        "2017 yılında PKK'nın Kozluk Belediye Başkanı'na yönelik saldırısı sırasında vücuduna mermi isabet etmesi sonucu ölmüştür.",
-        "2016 yılında Batman'ın Kozluk ilçesindeki Kozluk Çok Programlı Anadolu Lisesi'ne müzik öğretmeni olarak atandı.",
-        "Şenay Yalçın'ın PKK tarafından öldürülmesinden sonra anısına ülkedeki çeşitli kurumlara ve yerlere ismi verildi, adına yarışmalar ve turnuvalar düzenlendi."
-      ]
-    },
-    {
-      "tag": "1998 kis olimpiyatlari'nda turkiye",
-      "patterns": [
-        "1998 kis olimpiyatlari'nda turkiye nedir",
-        "1998 kis olimpiyatlari'nda turkiye hakkinda bilgi ver",
-        "1998 kis olimpiyatlari'nda turkiye ne demek",
-        "1998 kis olimpiyatlari'nda turkiye anlat",
-        "bana 1998 kis olimpiyatlari'nda turkiye hakkinda bilgi ver",
-        "1998 kis olimpiyatlari'nda turkiye hakkinda konus"
-      ],
-      "responses": [
-        "Bu, Türkiye'nin katıldığı 12.",
-        "Ülke adına yarışan tek sporcu olan Arif Alaftargil, mücadele ettiği erkekler slalom kategorisini, 2:25.09'luk derecesiyle 29.",
-        "Türkiye, 7-22 Şubat tarihleri arasında Japonya'nın Nagano şehrinde yapılan 1998 Kış Olimpiyatları'nda, alp disiplinindeki bir sporcuyla mücadele etti."
       ]
     },
     {
@@ -6238,7 +6016,7 @@
         "saitama demiryolu hatti hakkinda konus"
       ],
       "responses": [
-        "Saitama Demiryolu Hattı (埼玉高速鉄道線, Saitama Kōsoku Tetsudō sen) Japon Saitama Demiryolu Şirketi tarafından işletilen, çoğunlukla yer altından ilerleyen hızlı tren hattıdır.",
+        "Saitama Demiryolu Hattı ( , Saitama Kōsoku Tetsudō sen) Japon Saitama Demiryolu Şirketi tarafından işletilen, çoğunlukla yer altından ilerleyen hızlı tren hattıdır.",
         "İstasyon numaralandırmasında kullanılan hat sembolü “SR”dir.",
         "Hat, 2002 Saitama Stadyumu'na ana ulaşım aracı olarak kullanılmaktadır."
       ]
@@ -6272,7 +6050,7 @@
       "responses": [
         "İbadethanelerin hangi kısımlarında hangi ikonaların nasıl bir kompozisyonla işleneceği de yine kurallarla belirlenmiş, kurumsallaşan Bizans sanatı Orta Çağ sanatı hüviyetine bürünmüştür.",
         "Grekçe bir terim olan ikonoklazm, \"tasvir kırıcılık\" anlamına gelmekle beraber kültürel değer taşıyan çeşitli maddi ögelerin siyasi ya da dinî sebeplerle bilinçli olarak imha edilmesini tanımlamaktadır.",
-        "Bizans ikonoklazmı (Grekçe: Εἰκονομαχία, İkonomahia), Bizans İmparatorluğu'nda ikonaların tahrip edildiği ve ikonalarla ilişkili her türlü dinî pratiğin yasaklandığı dönemdir.",
+        "Bizans ikonoklazmı (Grekçe: , İkonomahia), Bizans İmparatorluğu'nda ikonaların tahrip edildiği ve ikonalarla ilişkili her türlü dinî pratiğin yasaklandığı dönemdir.",
         "Bunun bir sonucu olarak Roma Kilisesinin Bizans'tan uzaklaşarak Franklar ile yakınlık kurması Papalık Devleti'nin ortaya çıkmasına ve Roma imparatorluk mirasının bölünmesine neden olarak Orta Çağ tarihinde yeni bir dönemin açılmasını sağlamıştır.",
         "Leon'un 726 yılında Halki Kapısı üzerinde bulunan İsa heykelini indirmesi ile başlayıp 787'de İkinci İznik Konsili'nin ikonoklazmı lanetlemesi ile son bulurken ikinci devre ise 814'te V.",
         "Bu inançlar On Emir'in \"oyma put yapmayacaksın ve onlara tapınmayacaksın\" buyruğuna karşıtlık olarak görülüp putperestlikle bağdaştırılarak 4."
@@ -6321,7 +6099,7 @@
         "araplus hakkinda konus"
       ],
       "responses": [
-        "Araplus veya Araplos (Grekçe: Ἄραπλος), antik Trakya'da, Trakya Chersonesosu (Gelibolu Yarımadası) bölgesinde yer alan bir antik Yunan şehridir.",
+        "Araplus veya Araplos (Grekçe: ), antik Trakya'da, Trakya Chersonesosu (Gelibolu Yarımadası) bölgesinde yer alan bir antik Yunan şehridir.",
         "Yerleşimin kesin yeri belirtilmemiştir.",
         "Pseudo-Skylaks'ın Periplusu'nda (denizcilik rehberi), Trakya Chersonesosu kasabalarını sayarken beşinci sırada Kardiya, Ide, Paeon, Alopeconnesus, Elaeus ve Sestos ile birlikte adı geçmektedir."
       ]
@@ -6368,7 +6146,7 @@
         "kazakistan menkul kiymetler borsasi hakkinda konus"
       ],
       "responses": [
-        "Kazakistsan Menkul Kıymetler Borsası (KASE) (Kazakça: Қазақстан қор биржасы), Kazakistan'ın ana menkul kıymetler borsasıdır.",
+        "Kazakistsan Menkul Kıymetler Borsası (KASE) (Kazakça: ), Kazakistan'ın ana menkul kıymetler borsasıdır.",
         "1993 yılında kurulmuş olup merkezi Almatı'da yer almaktadır."
       ]
     },
@@ -6612,14 +6390,14 @@
       ]
     },
     {
-      "tag": "gerðr",
+      "tag": "gerdr",
       "patterns": [
-        "gerðr nedir",
-        "gerðr hakkinda bilgi ver",
-        "gerðr ne demek",
-        "gerðr anlat",
-        "bana gerðr hakkinda bilgi ver",
-        "gerðr hakkinda konus"
+        "gerdr nedir",
+        "gerdr hakkinda bilgi ver",
+        "gerdr ne demek",
+        "gerdr anlat",
+        "bana gerdr hakkinda bilgi ver",
+        "gerdr hakkinda konus"
       ],
       "responses": [
         "İskandinav mitolojisinde, Gerðr (Eski Norsça \"çevrili\"); jötunn, tanrıça ve tanrı Freyr'in karısıdır.",
@@ -6709,14 +6487,14 @@
       ]
     },
     {
-      "tag": "jacques prévert",
+      "tag": "jacques prevert",
       "patterns": [
-        "jacques prévert nedir",
-        "jacques prévert hakkinda bilgi ver",
-        "jacques prévert ne demek",
-        "jacques prévert anlat",
-        "bana jacques prévert hakkinda bilgi ver",
-        "jacques prévert hakkinda konus"
+        "jacques prevert nedir",
+        "jacques prevert hakkinda bilgi ver",
+        "jacques prevert ne demek",
+        "jacques prevert anlat",
+        "bana jacques prevert hakkinda bilgi ver",
+        "jacques prevert hakkinda konus"
       ],
       "responses": [
         "Paroles adlı şiir derlemesindeki kelime oyunlarıyla büyük yankı buldu.",
@@ -6930,8 +6708,7 @@
       ],
       "responses": [
         "Super League 1 ekiplerinden PAS Lamia'da forma giymektedir.",
-        "Forvet mevkiinde görev almaktadır.",
-        "Bilal Mazhar (Arapça: بلال مظهر عبد الرحمن عبد الجليل) (d."
+        "Forvet mevkiinde görev almaktadır."
       ]
     },
     {
@@ -6995,7 +6772,7 @@
       "responses": [
         "Yanaizu'nun ekonomisi ağırlıklı olarak tarım ve turizme dayanmaktadır.",
         "Kasaba, prefektörlüğün batısında Aizu bölgesinde Tadami Nehri'nin kıyısında yer almaktadır.",
-        "Yanaizu (Japonca: 柳津町, romanize: Yanaizu-machi), Japonya'nın Fukuşima prefektörlüğünde bulunan bir kasabadır."
+        "Yanaizu (Japonca: , romanize: Yanaizu-machi), Japonya'nın Fukuşima prefektörlüğünde bulunan bir kasabadır."
       ]
     },
     {
@@ -7270,8 +7047,7 @@
       ],
       "responses": [
         "Her iki ülke de Avrupa Konseyi'nin tam üyesidir.",
-        "İşbirliği, mal taşımacılığı ve transiti, turizm, ilaç, tarım, bilim ve yüksek teknolojiler, eğitim, askeri teçhizat vb.",
-        "alanlarda yürütülmektedir."
+        "İşbirliği, mal taşımacılığı ve transiti, turizm, ilaç, tarım, bilim ve yüksek teknolojiler, eğitim, askeri teçhizat vb."
       ]
     },
     {
@@ -7655,7 +7431,7 @@
         "mohammed bijeh hakkinda konus"
       ],
       "responses": [
-        "Mohammed Bijeh (Farsça: محمد بيجه) (7 Şubat 1987 - 16 Mart 2005), İranlı seri katil.",
+        "Mohammed Bijeh (Farsça: ) (7 Şubat 1987 - 16 Mart 2005), İranlı seri katil.",
         "\"Sırtlan\" ve \"Tahran Çölü Vampiri\" lakaplarıyla bilinir.‎ Bilinen kadarıyla 17'si çocuk (8-15 yaş arası erkek çocuklar) ve 3'ü yetişkin olmak üzere en az 20 kişiye önce tecavüz etmiş, sonra öldürmüştür."
       ]
     },
@@ -7686,7 +7462,6 @@
       ],
       "responses": [
         "10 Şubat 2018), B12 vitamininin biyosentezindeki kimyasal reaksiyon ara ürünleri ve enzimlerin reaksiyon mekanizmalarını tanımlayan İngiliz organik kimyacıydı.",
-        "Sir Alan Rushton Battersby (d.",
         "İçinde bulunduğu araştırma grubu, alkaloid biyosentezi ve enzimatik reaksiyonların stereokimyasını incelemek için radyoaktif işaretli öncül madde sentezi çalışmalarıyla adını duyurmuştur."
       ]
     },
@@ -7809,14 +7584,14 @@
       ]
     },
     {
-      "tag": "ivan mikloš",
+      "tag": "ivan miklos",
       "patterns": [
-        "ivan mikloš nedir",
-        "ivan mikloš hakkinda bilgi ver",
-        "ivan mikloš ne demek",
-        "ivan mikloš anlat",
-        "bana ivan mikloš hakkinda bilgi ver",
-        "ivan mikloš hakkinda konus"
+        "ivan miklos nedir",
+        "ivan miklos hakkinda bilgi ver",
+        "ivan miklos ne demek",
+        "ivan miklos anlat",
+        "bana ivan miklos hakkinda bilgi ver",
+        "ivan miklos hakkinda konus"
       ],
       "responses": [
         "2 Haziran 1960) Slovak siyasetçi, eski bakan.",
@@ -7945,7 +7720,7 @@
         "mikoyan-gurevic mig-at hakkinda konus"
       ],
       "responses": [
-        "Mikoyan-Gureviç MiG-AT (Rusça: Микоян и Гуревич МиГ-АТ), Mikoyan-Gureviç tarafından üretilen Rus yapımı bir jet eğitim uçağıdır.",
+        "Mikoyan-Gureviç MiG-AT (Rusça: - ), Mikoyan-Gureviç tarafından üretilen Rus yapımı bir jet eğitim uçağıdır.",
         "Ancak, proje 2002 yılında Yakovlev Yak-130'un kabul görmesi nedeniyle iptal edildi.",
         "MiG-AT, Rusya ve Fransa arasındaki ilk ortak uçak geliştirme programı ve Rusya ile Batı arasındaki ilk askeri işbirliği projesidir."
       ]
@@ -7963,38 +7738,6 @@
       "responses": [
         "Tanzot Ermeni Kilisesi, tarihsel Klarceti bölgesinde, günümüzde Artvin ilinin Ardanuç ilçesine bağlı ve eski adı Tanzot olan Aydınköy'de Ermenilerden kalma kilisedir.",
         "1843 yılında inşa edilmiş olan yapıdan günümüze sadece duvarların bir kısmı kalmıştır."
-      ]
-    },
-    {
-      "tag": "1997 karapinar trafik kazasi",
-      "patterns": [
-        "1997 karapinar trafik kazasi nedir",
-        "1997 karapinar trafik kazasi hakkinda bilgi ver",
-        "1997 karapinar trafik kazasi ne demek",
-        "1997 karapinar trafik kazasi anlat",
-        "bana 1997 karapinar trafik kazasi hakkinda bilgi ver",
-        "1997 karapinar trafik kazasi hakkinda konus"
-      ],
-      "responses": [
-        "Bunun üzerine biri bizzat kendisi tarafından üçü de mahkeme tarafından hazırlatılan dört bilirkişi raporu daha dava dosyasına eklenmiştir.",
-        "Altıncı ve son rapor ise yine tazminat davaları sırasında hazırlanan ve tarafların kusurlarını belirlemeyi amaçlayan hukuk bilirkişi raporudur.",
-        "Ceza davasının 1 Aralık 2000 tarihli duruşmasında otobüs şoförü beraat etti."
-      ]
-    },
-    {
-      "tag": "acemi ocagi",
-      "patterns": [
-        "acemi ocagi nedir",
-        "acemi ocagi hakkinda bilgi ver",
-        "acemi ocagi ne demek",
-        "acemi ocagi anlat",
-        "bana acemi ocagi hakkinda bilgi ver",
-        "acemi ocagi hakkinda konus"
-      ],
-      "responses": [
-        "Acemiler mavi renkli \"dolama\" adında bir elbise giyer ve sivri uçlu \"serpuş\" adı verilen bir başlık takardı.",
-        "Genellikle her 7-8 yılda bir \"kapıya çıkma\" (kapuya çıkma), \"çıkma\" ya da \"bedergâh\" adı verilen yöntem ile en kıdemli acemiler Yeniçeri Ocağına kaydedilirdi.",
-        "Türk ve Müslümanlara daimi maaşlı meslek sağlamak için bağış ve rüşvet karşılığında ocağa kayıt yapılmaya başlandı."
       ]
     },
     {
@@ -8029,14 +7772,14 @@
       ]
     },
     {
-      "tag": "hægebostad",
+      "tag": "haegebostad",
       "patterns": [
-        "hægebostad nedir",
-        "hægebostad hakkinda bilgi ver",
-        "hægebostad ne demek",
-        "hægebostad anlat",
-        "bana hægebostad hakkinda bilgi ver",
-        "hægebostad hakkinda konus"
+        "haegebostad nedir",
+        "haegebostad hakkinda bilgi ver",
+        "haegebostad ne demek",
+        "haegebostad anlat",
+        "bana haegebostad hakkinda bilgi ver",
+        "haegebostad hakkinda konus"
       ],
       "responses": [
         "Belediyenin merkezi Tingvatn'dır.",
@@ -8154,8 +7897,7 @@
         "randal cremer hakkinda konus"
       ],
       "responses": [
-        "22 Temmuz 1908), genellikle Randal olan göbek adıyla tanınan 1903 yılında Nobel Barış Ödülünü kazanan, İngiliz Liberal Parlamento üyesi ve pasifist.",
-        "Sir William Randal Cremer (d."
+        "22 Temmuz 1908), genellikle Randal olan göbek adıyla tanınan 1903 yılında Nobel Barış Ödülünü kazanan, İngiliz Liberal Parlamento üyesi ve pasifist."
       ]
     },
     {
@@ -8185,7 +7927,7 @@
         "gaserbrum iii hakkinda konus"
       ],
       "responses": [
-        "Gaşerbrum III (Urduca: 3-گاشر برم; Çince: 加舒尔布鲁木III峰; pinyin: Jiāshūěrbùlǔmù III Fēng), Çin ve Pakistan arasında Gaşerbrum masifinde bulunan bir dağdır.",
+        "Gaşerbrum III (Urduca: 3- ; Çince: III ; pinyin: Jiāshūěrbùlǔmù III Fēng), Çin ve Pakistan arasında Gaşerbrum masifinde bulunan bir dağdır.",
         "Dağ, Karakurum sıradağlarında Gaşerbrum II ve IV arasında yer almaktadır."
       ]
     },
@@ -8265,7 +8007,7 @@
       ],
       "responses": [
         "İç mekanı dairesel olan kuleye içerisinden spiral bir merdivenle tırmanılır.",
-        "Tebriz Yangın Kulesi (Farsça: برج آتش نشانی, Azerice: يانگين کوله سی), İran'ın Tebriz şehrinde bulunan yangın kulesidir.",
+        "Tebriz Yangın Kulesi (Farsça: , Azerice: ), İran'ın Tebriz şehrinde bulunan yangın kulesidir.",
         "O yıllarda iletişim araçlarının olmaması nedeniyle, kent içindeki yangınlara zamanında müdahale etmek için kurulmuştur."
       ]
     },
@@ -8328,7 +8070,7 @@
         "sandallar, magusa hakkinda konus"
       ],
       "responses": [
-        "Sandallar (Yunanca: Σανταλάρης), Kıbrıs'ın Mağusa Bölgesi'ndeki küçük bir köydür.",
+        "Sandallar (Yunanca: ), Kıbrıs'ın Mağusa Bölgesi'ndeki küçük bir köydür.",
         "Bu olaya daha sonradan Muratağa, Sandallar ve Atlılar Katliamı adı verilmiştir.",
         "Köyün Türk halkı EOKA-B militanları tarafından katledilmişlerdir."
       ]
@@ -8519,7 +8261,6 @@
         "marcus holmgren pedersen hakkinda konus"
       ],
       "responses": [
-        "Marcus Holmgren Pedersen (d.",
         "Serie A takımlarından Sassuolo'da forma giymektedir.",
         "16 Temmuz 2000), sağ bek pozisyonunda görev yapan Norveçli millî futbolcudur."
       ]
@@ -8584,8 +8325,7 @@
       ],
       "responses": [
         "8 Ağustos 1994), Ligue 1 takımlarından Marsilya'da defans pozisyonunda görev yapan Demokratik Kongolu millî futbolcudur.",
-        "Profesyonel kariyerine 2013 yılında Anderlecht kulübünde başladı.",
-        "Chancel Mbemba Mangulu (d."
+        "Profesyonel kariyerine 2013 yılında Anderlecht kulübünde başladı."
       ]
     },
     {
@@ -8753,14 +8493,14 @@
       ]
     },
     {
-      "tag": "rubén amorín",
+      "tag": "ruben amorin",
       "patterns": [
-        "rubén amorín nedir",
-        "rubén amorín hakkinda bilgi ver",
-        "rubén amorín ne demek",
-        "rubén amorín anlat",
-        "bana rubén amorín hakkinda bilgi ver",
-        "rubén amorín hakkinda konus"
+        "ruben amorin nedir",
+        "ruben amorin hakkinda bilgi ver",
+        "ruben amorin ne demek",
+        "ruben amorin anlat",
+        "bana ruben amorin hakkinda bilgi ver",
+        "ruben amorin hakkinda konus"
       ],
       "responses": [
         "Orta saha pozisyonunda görev aldığı futbolculuk kariyerinin ardından teknik direktörlük, sonrasında ise spor yazarlığı yapmıştır.",
@@ -8802,14 +8542,14 @@
       ]
     },
     {
-      "tag": "vitória sc",
+      "tag": "vitoria sc",
       "patterns": [
-        "vitória sc nedir",
-        "vitória sc hakkinda bilgi ver",
-        "vitória sc ne demek",
-        "vitória sc anlat",
-        "bana vitória sc hakkinda bilgi ver",
-        "vitória sc hakkinda konus"
+        "vitoria sc nedir",
+        "vitoria sc hakkinda bilgi ver",
+        "vitoria sc ne demek",
+        "vitoria sc anlat",
+        "bana vitoria sc hakkinda bilgi ver",
+        "vitoria sc hakkinda konus"
       ],
       "responses": [
         "Vitoria SC, 2007-08 sezonunda Primeira Liga'yı 3.",
@@ -8868,22 +8608,6 @@
       ]
     },
     {
-      "tag": "vince kasirgasi",
-      "patterns": [
-        "vince kasirgasi nedir",
-        "vince kasirgasi hakkinda bilgi ver",
-        "vince kasirgasi ne demek",
-        "vince kasirgasi anlat",
-        "bana vince kasirgasi hakkinda bilgi ver",
-        "vince kasirgasi hakkinda konus"
-      ],
-      "responses": [
-        "8 Ekim tarihinde ekstratropikal sistem olarak başlayan bu hava hareketi, Azorlar'ın güneydoğusunda subtropikal fırtına özelliği göstermeye başlamıştır.",
-        "Kasırga, çok aktif geçen bu kasırga mevsiminde gerçekleşen 20.",
-        "ABD Ulusal Kasırga Merkezi bu sistemi ertesi gün, etkinlik kasırgaya dönüşmeden hemen önce adlandırmıştır."
-      ]
-    },
-    {
       "tag": "2002 kis olimpiyatlari'nda fiji",
       "patterns": [
         "2002 kis olimpiyatlari'nda fiji nedir",
@@ -8917,14 +8641,14 @@
       ]
     },
     {
-      "tag": "húrin",
+      "tag": "hurin",
       "patterns": [
-        "húrin nedir",
-        "húrin hakkinda bilgi ver",
-        "húrin ne demek",
-        "húrin anlat",
-        "bana húrin hakkinda bilgi ver",
-        "húrin hakkinda konus"
+        "hurin nedir",
+        "hurin hakkinda bilgi ver",
+        "hurin ne demek",
+        "hurin anlat",
+        "bana hurin hakkinda bilgi ver",
+        "hurin hakkinda konus"
       ],
       "responses": [
         "Hurin, Marach Hanedanı'ndan Dor-lóminli Hador’un torunudur.",
@@ -8979,7 +8703,7 @@
       "responses": [
         "İslam'da, pagan (İslam literatüründeki ifadeyle müşrik) bir erkeği öldüren ilk kadın sahabi olarak bilinir.",
         "640), Muhammed'in ve Ali'nin halası, Zübeyr bin Avvam'ın annesi.",
-        "Safiyye bint Abdülmuttalib (Arapça: صفية بنت عبدالمطلب, ö."
+        "Safiyye bint Abdülmuttalib (Arapça: , ö."
       ]
     },
     {
@@ -8999,14 +8723,14 @@
       ]
     },
     {
-      "tag": "pierre abélard",
+      "tag": "pierre abelard",
       "patterns": [
-        "pierre abélard nedir",
-        "pierre abélard hakkinda bilgi ver",
-        "pierre abélard ne demek",
-        "pierre abélard anlat",
-        "bana pierre abélard hakkinda bilgi ver",
-        "pierre abélard hakkinda konus"
+        "pierre abelard nedir",
+        "pierre abelard hakkinda bilgi ver",
+        "pierre abelard ne demek",
+        "pierre abelard anlat",
+        "bana pierre abelard hakkinda bilgi ver",
+        "pierre abelard hakkinda konus"
       ],
       "responses": [
         "Ayrıca şiirleri ve Héloise ile yaşadığı aşk macerasıyla da ünlüdür.",
@@ -9443,7 +9167,7 @@
       ],
       "responses": [
         "Erkekler 57 kilo kategorisinde mücadele eden sporcu, 1956 Yaz Olimpiyatları'nda bronz madalya kazanmıştır.",
-        "Mihail Şahov (Rusça: Михаил Афанасьевич Шахов; 20 Kasım 1931, Saratov - 8 Ağustos 2018, Kiev), Sovyetler Birliği adına yarışan Ukraynalı serbest güreşçidir."
+        "Mihail Şahov (Rusça: ; 20 Kasım 1931, Saratov - 8 Ağustos 2018, Kiev), Sovyetler Birliği adına yarışan Ukraynalı serbest güreşçidir."
       ]
     },
     {
@@ -9479,14 +9203,14 @@
       ]
     },
     {
-      "tag": "andrei chindriș",
+      "tag": "andrei chindris",
       "patterns": [
-        "andrei chindriș nedir",
-        "andrei chindriș hakkinda bilgi ver",
-        "andrei chindriș ne demek",
-        "andrei chindriș anlat",
-        "bana andrei chindriș hakkinda bilgi ver",
-        "andrei chindriș hakkinda konus"
+        "andrei chindris nedir",
+        "andrei chindris hakkinda bilgi ver",
+        "andrei chindris ne demek",
+        "andrei chindris anlat",
+        "bana andrei chindris hakkinda bilgi ver",
+        "andrei chindris hakkinda konus"
       ],
       "responses": [
         "Defans mevkiinde görev almaktadır.",
@@ -9495,14 +9219,14 @@
       ]
     },
     {
-      "tag": "dār fertit",
+      "tag": "dar fertit",
       "patterns": [
-        "dār fertit nedir",
-        "dār fertit hakkinda bilgi ver",
-        "dār fertit ne demek",
-        "dār fertit anlat",
-        "bana dār fertit hakkinda bilgi ver",
-        "dār fertit hakkinda konus"
+        "dar fertit nedir",
+        "dar fertit hakkinda bilgi ver",
+        "dar fertit ne demek",
+        "dar fertit anlat",
+        "bana dar fertit hakkinda bilgi ver",
+        "dar fertit hakkinda konus"
       ],
       "responses": [
         "Günümüzde Fertit, Güney Sudan'ın Batı Bahr el Ghazal bölgesinde Dinka, Arap, Luo ve Fur olmayan gruplar ve kabileler için kullanılan genel bir kelimedir.",
@@ -9540,22 +9264,6 @@
         "Cornelis Lambertus Mijnders (28 Eylül 1912 - 1 Nisan 2002), forvet pozisyonunda görev yapmış Hollandalı millî futbolcudur.",
         "Hollanda millî futbol takımı formasını 7 kez giymiştir.",
         "1934 FIFA Dünya Kupası'nda Hollanda millî futbol takımı kadrosunda yer almıştır."
-      ]
-    },
-    {
-      "tag": "krusty yakalaniyor",
-      "patterns": [
-        "krusty yakalaniyor nedir",
-        "krusty yakalaniyor hakkinda bilgi ver",
-        "krusty yakalaniyor ne demek",
-        "krusty yakalaniyor anlat",
-        "bana krusty yakalaniyor hakkinda bilgi ver",
-        "krusty yakalaniyor hakkinda konus"
-      ],
-      "responses": [
-        "Bölüm eleştirmenlerden iyi yorumlar aldı ve yayınlandığı hafta Fox Broadcasting Company kanalının en yüksek izlenme oranını aldı.",
-        "Bart ile Lisa, olayı araştırırlar ve bunun bir komplo olduğunu ortaya çıkarırlar.",
-        "Bölümde ünlü televizyon komedyeni Palyaço Krusty, Kwik-E-Mart'ı soyduğundan ötürü mahkûm edilir."
       ]
     },
     {
@@ -9829,7 +9537,7 @@
       ],
       "responses": [
         "Beyaz Ordu'nun Japonları veya Kazakları, Muravyevo-Amurskaya (günümüzde Lazo) istasyonundaki buhar motorunda yaktığında inanılmaktadır.",
-        "Sergey Georgiyeviç Lazo (Rusça: Серге́й Гео́ргиевич Лазо́, Rumence: Serghei Lazo; 7 Mart 1894 - Nisan-Mayıs 1920) Uzak Doğu Rusyası'nda Rus Devrimi'nin liderliğini yapmış komünist askerdir.",
+        "Sergey Georgiyeviç Lazo (Rusça: ́ ́ ́, Rumence: Serghei Lazo; 7 Mart 1894 - Nisan-Mayıs 1920) Uzak Doğu Rusyası'nda Rus Devrimi'nin liderliğini yapmış komünist askerdir.",
         "Mart-Ağustos 1918'de Zabaykalski (trans- Baykal) Cephesinin komutanlığını yapmış ve Ataman Grigory Semyonov'a karşı savaşmıştır."
       ]
     },
@@ -9892,7 +9600,6 @@
       ],
       "responses": [
         "Ayrıca Katharine Hepburn'ü canlandırdığı Martin Scorsese'nin The Aviator (Göklerin Hakimi) filmiyle En İyi Yardımcı Kadın Oyuncu Akademi Ödülü'nü kazanmıştır.",
-        "Catherine Élise Blanchett (d.",
         "Venedik Film Festivali'nde Volpi Kupasını almıştır."
       ]
     },
@@ -9987,8 +9694,7 @@
       ],
       "responses": [
         "Kariyerinin başlangıcından bugüne, Amerikan Billboard Hot 100 listesinde ilk ona giren beş şarkısı, Billboard 200 listesinde zirveye oturan iki albümü bulunmaktadır.",
-        "Ne-Yo, 2006 yılında, ABD'de bir numara olan hiti \"So Sick\"in de içinde yer aldığı In My Own Words adlı ilk albümünü Def Jam şirketi aracılığıyla piyasaya sundu.",
-        "Shaffer Chimere Smith veya bilinen adıyla Ne-Yo (d."
+        "Ne-Yo, 2006 yılında, ABD'de bir numara olan hiti \"So Sick\"in de içinde yer aldığı In My Own Words adlı ilk albümünü Def Jam şirketi aracılığıyla piyasaya sundu."
       ]
     },
     {
@@ -10103,14 +9809,14 @@
       ]
     },
     {
-      "tag": "jérôme rothen",
+      "tag": "jerome rothen",
       "patterns": [
-        "jérôme rothen nedir",
-        "jérôme rothen hakkinda bilgi ver",
-        "jérôme rothen ne demek",
-        "jérôme rothen anlat",
-        "bana jérôme rothen hakkinda bilgi ver",
-        "jérôme rothen hakkinda konus"
+        "jerome rothen nedir",
+        "jerome rothen hakkinda bilgi ver",
+        "jerome rothen ne demek",
+        "jerome rothen anlat",
+        "bana jerome rothen hakkinda bilgi ver",
+        "jerome rothen hakkinda konus"
       ],
       "responses": [
         "2013 yılında Bastia ile karşılıklı anlaşarak sözleşmesini feshetti.",
@@ -10192,7 +9898,7 @@
         "rudbar cenub sehristani hakkinda konus"
       ],
       "responses": [
-        "Rudbar Cenub şehristanı veya Güney Rudbar şehristanı (Farsça: شهرستان رودبار جنوب ), İran'nde Kirman Eyaleti'nin 18 şehristanından birisidir.",
+        "Rudbar Cenub şehristanı veya Güney Rudbar şehristanı (Farsça: ), İran'nde Kirman Eyaleti'nin 18 şehristanından birisidir.",
         "Şehristanın 2006 yılı toplam nüfusu 86.747, yönetim merkezi Rudbar şehridir."
       ]
     },
@@ -10321,7 +10027,7 @@
         "avec hakkinda konus"
       ],
       "responses": [
-        "Avec (Farsça: آوج, Azerice: Ava, Avəc), İran'ın Kazvin Eyaleti'nde şehir.",
+        "Avec (Farsça: , Azerice: Ava, Avəc), İran'ın Kazvin Eyaleti'nde şehir.",
         "Avec'in, 2002 yılında meydana gelen depremde tahminen yarısı yıkılmıştır.",
         "Eyaletin Avec şehristanı'ndaki, aynı isimli Merkezi bahşı'nın yönetim merkezi olan şehrin 2006 yılı resmi nüfusu 3.695 kişi ve 1.042 hanedir."
       ]
@@ -10583,22 +10289,6 @@
       "responses": [
         "Komünün nüfusu 1.389 kişidir ve nüfus yoğunluğu kilometrekare başına 60 kişidir.",
         "Santa Maria Coghinas (Gaddurosu: Cuzìna) Sardinya'nın Sassari ilinde bir komün ve küçük kasabadır."
-      ]
-    },
-    {
-      "tag": "1994 kis olimpiyatlari'nda meksika",
-      "patterns": [
-        "1994 kis olimpiyatlari'nda meksika nedir",
-        "1994 kis olimpiyatlari'nda meksika hakkinda bilgi ver",
-        "1994 kis olimpiyatlari'nda meksika ne demek",
-        "1994 kis olimpiyatlari'nda meksika anlat",
-        "bana 1994 kis olimpiyatlari'nda meksika hakkinda bilgi ver",
-        "1994 kis olimpiyatlari'nda meksika hakkinda konus"
-      ],
-      "responses": [
-        "Meksika, Norveç'in Lillehammer şehrinde düzenlenen 1994 Kış Olimpiyatları'na, alp disiplininde bir sporcuyla katıldı.",
-        "İlk kez 1928 Kış Olimpiyatları'nda temsil edilen ülke, Kış Olimpiyatları tarihindeki beşinci katılımını gerçekleştirdi.",
-        "Erkekler iniş kategorisinde yarışan Hubertus von Hohenlohe, 1:53.37'lik derecesiyle yarışmayı 48."
       ]
     },
     {
@@ -11092,18 +10782,18 @@
       "responses": [
         "Krallığı sırasında Seleukos, Makedonya ve Bitinya krallıklarıyla savaştı.",
         "Eumenes ölünce vasisi III.",
-        "Pergamon Krallarından olan, Attalos Hanedanının beşinci üyesi Κral I."
+        "Pergamon Krallarından olan, Attalos Hanedanının beşinci üyesi ral I."
       ]
     },
     {
-      "tag": "linda király",
+      "tag": "linda kiraly",
       "patterns": [
-        "linda király nedir",
-        "linda király hakkinda bilgi ver",
-        "linda király ne demek",
-        "linda király anlat",
-        "bana linda király hakkinda bilgi ver",
-        "linda király hakkinda konus"
+        "linda kiraly nedir",
+        "linda kiraly hakkinda bilgi ver",
+        "linda kiraly ne demek",
+        "linda kiraly anlat",
+        "bana linda kiraly hakkinda bilgi ver",
+        "linda kiraly hakkinda konus"
       ],
       "responses": [
         "28 Şubat 1983, New York), Amerikan-Macar şarkıcı ve söz yazarı.",
@@ -11222,14 +10912,14 @@
       ]
     },
     {
-      "tag": "2026 virslīga",
+      "tag": "2026 virsliga",
       "patterns": [
-        "2026 virslīga nedir",
-        "2026 virslīga hakkinda bilgi ver",
-        "2026 virslīga ne demek",
-        "2026 virslīga anlat",
-        "bana 2026 virslīga hakkinda bilgi ver",
-        "2026 virslīga hakkinda konus"
+        "2026 virsliga nedir",
+        "2026 virsliga hakkinda bilgi ver",
+        "2026 virsliga ne demek",
+        "2026 virsliga anlat",
+        "bana 2026 virsliga hakkinda bilgi ver",
+        "2026 virsliga hakkinda konus"
       ],
       "responses": [
         "2026 Virslīga, Letonya'nın en üst düzey futbol ligi olan Virslīga'nın 35.",
@@ -11361,7 +11051,7 @@
       "responses": [
         "Ormon, bölgedeki Rus İmparatorluğu'nun yakın bir müttefikiydi, Hokand Hanlığı'na karşı bir dizi savaş kazandı ve Ruslara isyan eden Kenasarı Han liderliğindeki bir Kazak ordusunu mağlup etti.",
         "Güçlü Sarıbağış kabilesinin bir üyesi, Ormon'un saltanatı, yasal ve adli sistemlerin kurulmasıyla Kırgız kabilelerinin merkezileşmesine tanık oldu.",
-        "Ormon Han (Kırgızca: Ормон хан; c."
+        "Ormon Han (Kırgızca: ; c."
       ]
     },
     {
@@ -11518,7 +11208,7 @@
       ],
       "responses": [
         "Savaştan sonra başlatılan büyük bir yeniden yapılanma programı sırasında 1903-1906 yılları arasında modernize edilmiştir.",
-        "Avnillah (Osmanlı Türkçesi: عؤناللە, Anlamı: İlahi Yardım) 1860'ların sonlarında Osmanlı donanması için inşa edilmiş bir zırhlı savaş gemisidir.",
+        "Avnillah (Osmanlı Türkçesi: , Anlamı: İlahi Yardım) 1860'ların sonlarında Osmanlı donanması için inşa edilmiş bir zırhlı savaş gemisidir.",
         "Avnillah sınıfının öncü gemisi olarak Thames Iron Works tarafından Birleşik Krallık'ta inşa edilmiştir.",
         "Şubat 1912'de Trablusgarp Savaşı sırasında Beyrut Muharebesi'nde İtalyan zırhlı kruvazörü Giuseppe Garibaldi tarafından batırıldı.",
         "Savaştan sonra rezerve alındı ve Haliç'te çürümeye terk edildi; 1897'de Osmanlı-Yunan Savaşı'nın patlak verdiğinde hizmet edemez durumdaydı."
@@ -11541,14 +11231,14 @@
       ]
     },
     {
-      "tag": "saïd makasi",
+      "tag": "said makasi",
       "patterns": [
-        "saïd makasi nedir",
-        "saïd makasi hakkinda bilgi ver",
-        "saïd makasi ne demek",
-        "saïd makasi anlat",
-        "bana saïd makasi hakkinda bilgi ver",
-        "saïd makasi hakkinda konus"
+        "said makasi nedir",
+        "said makasi hakkinda bilgi ver",
+        "said makasi ne demek",
+        "said makasi anlat",
+        "bana said makasi hakkinda bilgi ver",
+        "said makasi hakkinda konus"
       ],
       "responses": [
         "20 Ağustos 1982), forvet pozisyonunda görev yapmış Ruandalı millî futbolcudur.",
@@ -11587,14 +11277,14 @@
       ]
     },
     {
-      "tag": "atakpamé",
+      "tag": "atakpame",
       "patterns": [
-        "atakpamé nedir",
-        "atakpamé hakkinda bilgi ver",
-        "atakpamé ne demek",
-        "atakpamé anlat",
-        "bana atakpamé hakkinda bilgi ver",
-        "atakpamé hakkinda konus"
+        "atakpame nedir",
+        "atakpame hakkinda bilgi ver",
+        "atakpame ne demek",
+        "atakpame anlat",
+        "bana atakpame hakkinda bilgi ver",
+        "atakpame hakkinda konus"
       ],
       "responses": [
         "Atakpamé, Afrika ülkesi Togo'da bulunan bir şehir.",
@@ -11634,17 +11324,17 @@
       ]
     },
     {
-      "tag": "katsudō shashin",
+      "tag": "katsudo shashin",
       "patterns": [
-        "katsudō shashin nedir",
-        "katsudō shashin hakkinda bilgi ver",
-        "katsudō shashin ne demek",
-        "katsudō shashin anlat",
-        "bana katsudō shashin hakkinda bilgi ver",
-        "katsudō shashin hakkinda konus"
+        "katsudo shashin nedir",
+        "katsudo shashin hakkinda bilgi ver",
+        "katsudo shashin ne demek",
+        "katsudo shashin anlat",
+        "bana katsudo shashin hakkinda bilgi ver",
+        "katsudo shashin hakkinda konus"
       ],
       "responses": [
-        "Üç saniyelik film şeridinde; sağdan sola \"活動 写真\" karakterlerini yazmasının ardından şapkasını çıkarıp boyun eğerek selam veren bir çocuk tasvir edilir.",
+        "Üç saniyelik film şeridinde; sağdan sola \" \" karakterlerini yazmasının ardından şapkasını çıkarıp boyun eğerek selam veren bir çocuk tasvir edilir.",
         "Yaratıcısı bilinmemekle birlikte 1907 ile 1912 yılları arasında, Meiji Dönemi'nde yapıldığını gösteren kanıtlar bulunmaktadır.",
         "Çerçeveler, büyülü fener slaytlarının yapımında kullanılan bir cihaz ile kırmızı ve siyah renklerde şablon olarak hazırlanmış ve filmin aralıksız oynatılabilmesi için film şeridi bir döngü hâlinde tutturulmuştur."
       ]
@@ -11676,7 +11366,7 @@
         "muhayyelat hakkinda konus"
       ],
       "responses": [
-        "Muhayyelât, Muhayyelât-ı Ledünni-i İlahi-i Giridî Ali Aziz Efendi ya da Muhayyelât-ı Aziz Efendi (Osmanlıca: مخیلات عزيز افندی), Giritli Ali Aziz Efendi'nin 19.",
+        "Muhayyelât, Muhayyelât-ı Ledünni-i İlahi-i Giridî Ali Aziz Efendi ya da Muhayyelât-ı Aziz Efendi (Osmanlıca: ), Giritli Ali Aziz Efendi'nin 19.",
         "Muhayyelât, bir yandan masalsı diğer yandan da hikâye türüne yakın özellikler barındırır; Binbir Gece Masalları ya da Binbir Gündüz Masalları türündeki masalları benimsemiş bir anlatıma sahiptir.",
         "Eser, Tanzimat edebiyatı yazarları tarafından \"artık terk edilmesi gereken, gerçek dışı anlatı\"ya örnek olarak verilmiş ve alay konusu olmuştur.",
         "Muhayyelât'taki bazı hikâyeler, kadîmü'l eyyâmda terkibiyle başlar ve hayali bir mekânda geçer.",
@@ -11796,30 +11486,14 @@
       ]
     },
     {
-      "tag": "choi jung-won",
+      "tag": "muhomatsu no issho",
       "patterns": [
-        "choi jung-won nedir",
-        "choi jung-won hakkinda bilgi ver",
-        "choi jung-won ne demek",
-        "choi jung-won anlat",
-        "bana choi jung-won hakkinda bilgi ver",
-        "choi jung-won hakkinda konus"
-      ],
-      "responses": [
-        "Choi Jung-won adlı kişiler: Choi Jung-won (d.",
-        "1969), Güney Koreli oyuncu Choi Jung-won (d.",
-        "1981), Güney Koreli oyuncu Choi Jung-won (d."
-      ]
-    },
-    {
-      "tag": "muhōmatsu no isshō",
-      "patterns": [
-        "muhōmatsu no isshō nedir",
-        "muhōmatsu no isshō hakkinda bilgi ver",
-        "muhōmatsu no isshō ne demek",
-        "muhōmatsu no isshō anlat",
-        "bana muhōmatsu no isshō hakkinda bilgi ver",
-        "muhōmatsu no isshō hakkinda konus"
+        "muhomatsu no issho nedir",
+        "muhomatsu no issho hakkinda bilgi ver",
+        "muhomatsu no issho ne demek",
+        "muhomatsu no issho anlat",
+        "bana muhomatsu no issho hakkinda bilgi ver",
+        "muhomatsu no issho hakkinda konus"
       ],
       "responses": [
         "Venedik Uluslararası Film Festivali'nde Altın Aslan ödülünü kazandı.",
@@ -11840,22 +11514,6 @@
         "Bunun yerine sabit gemi ve daha sonra bir kışla gemisi olarak kullanıldı.",
         "Bu noktada tamamen eskimiş olan gemi, çok az görevde bulundu ve savaştan sonra kışla gemisi görevine geri döndü.",
         "Gemi inşasına Fransız Forges et Chantiers de la Gironde tersanesinde 1867'de başlandı, 1868'de denize indirildi ve Mart 1870'te Osmanlı donanmasında hizmete girdi."
-      ]
-    },
-    {
-      "tag": "buyulu bir gece",
-      "patterns": [
-        "buyulu bir gece nedir",
-        "buyulu bir gece hakkinda bilgi ver",
-        "buyulu bir gece ne demek",
-        "buyulu bir gece anlat",
-        "bana buyulu bir gece hakkinda bilgi ver",
-        "buyulu bir gece hakkinda konus"
-      ],
-      "responses": [
-        "Sonrasında Bayan Botz'un sahte bebek bakıcısı olduğu ve büyük çocukları bağlayıp aileyi soyduğu ortaya çıkar.",
-        "Bazı eleştirmenler bölümü sezonun en iyisi olarak değerlendirirken diğerleri en kötü bölüm olduğunu belirttiler.",
-        "Bölümde Bart, Lisa ve Maggie sahte bebek bakıcısı Ms."
       ]
     },
     {
@@ -12172,7 +11830,7 @@
       "responses": [
         "Köy, Nikitari'nin 2 km doğusundayer almaktadır.",
         "Köyün nüfusu 2011 yılı itibarı ile 384'tür.",
-        "Vizakya (Yunanca: Βυζακιά), Kıbrıs Cumhuriyeti'nin Lefkoşa kazasında bulunan bir köydür."
+        "Vizakya (Yunanca: ), Kıbrıs Cumhuriyeti'nin Lefkoşa kazasında bulunan bir köydür."
       ]
     },
     {
@@ -12249,7 +11907,7 @@
         "cecen ickerya cumhuriyeti silahli kuvvetleri hakkinda konus"
       ],
       "responses": [
-        "Çeçen Ulusal Ordusu (Çeçen: Nóxçiyn Respublik Içkeri Qoman Eskar; Rusça: Национальную Армия Чеченской Республики Ичкерия) veya Çeçen Silahlı Kuvvetleri, İçkerya Çeçen Cumhuriyeti'nin birleşik militarize oluşumlarıydı.",
+        "Çeçen Ulusal Ordusu (Çeçen: Nóxçiyn Respublik Içkeri Qoman Eskar; Rusça: ) veya Çeçen Silahlı Kuvvetleri, İçkerya Çeçen Cumhuriyeti'nin birleşik militarize oluşumlarıydı.",
         "İlk saldırıyı 12 Aralık 1994'te gerçekleştirdiler."
       ]
     },
@@ -12334,14 +11992,14 @@
       ]
     },
     {
-      "tag": "odon tomosváry",
+      "tag": "odon tomosvary",
       "patterns": [
-        "odon tomosváry nedir",
-        "odon tomosváry hakkinda bilgi ver",
-        "odon tomosváry ne demek",
-        "odon tomosváry anlat",
-        "bana odon tomosváry hakkinda bilgi ver",
-        "odon tomosváry hakkinda konus"
+        "odon tomosvary nedir",
+        "odon tomosvary hakkinda bilgi ver",
+        "odon tomosvary ne demek",
+        "odon tomosvary anlat",
+        "bana odon tomosvary hakkinda bilgi ver",
+        "odon tomosvary hakkinda konus"
       ],
       "responses": [
         "Columbatch sineği (Simuliidae) üzerinde çalışmak için Aşağı Tuna bölgesine geldiğinde verem hastalığına yakalandı.",
@@ -12376,7 +12034,7 @@
         "gorno kirciste hakkinda konus"
       ],
       "responses": [
-        "Gorno Kırçişte (Arnavutça: Kërçisht i Sipërm; Makedonca: Горно Крчиште), Arnavutluk'un Debre iline bağlı Debre belediyesinde bulunan bir köydür.",
+        "Gorno Kırçişte (Arnavutça: Kërçisht i Sipërm; Makedonca: ), Arnavutluk'un Debre iline bağlı Debre belediyesinde bulunan bir köydür.",
         "Köy Deşat Dağı'nın eteklerinde Makedonya sınırı yakınlarında yer almaktadır."
       ]
     },
@@ -12397,14 +12055,14 @@
       ]
     },
     {
-      "tag": "irena veisaitė",
+      "tag": "irena veisaite",
       "patterns": [
-        "irena veisaitė nedir",
-        "irena veisaitė hakkinda bilgi ver",
-        "irena veisaitė ne demek",
-        "irena veisaitė anlat",
-        "bana irena veisaitė hakkinda bilgi ver",
-        "irena veisaitė hakkinda konus"
+        "irena veisaite nedir",
+        "irena veisaite hakkinda bilgi ver",
+        "irena veisaite ne demek",
+        "irena veisaite anlat",
+        "bana irena veisaite hakkinda bilgi ver",
+        "irena veisaite hakkinda konus"
       ],
       "responses": [
         "Veisaite, 11 Aralık 2020'de koronavirüsten öldü.",
@@ -12492,14 +12150,14 @@
       ]
     },
     {
-      "tag": "beren ve lúthien'in hikayesi",
+      "tag": "beren ve luthien'in hikayesi",
       "patterns": [
-        "beren ve lúthien'in hikayesi nedir",
-        "beren ve lúthien'in hikayesi hakkinda bilgi ver",
-        "beren ve lúthien'in hikayesi ne demek",
-        "beren ve lúthien'in hikayesi anlat",
-        "bana beren ve lúthien'in hikayesi hakkinda bilgi ver",
-        "beren ve lúthien'in hikayesi hakkinda konus"
+        "beren ve luthien'in hikayesi nedir",
+        "beren ve luthien'in hikayesi hakkinda bilgi ver",
+        "beren ve luthien'in hikayesi ne demek",
+        "beren ve luthien'in hikayesi anlat",
+        "bana beren ve luthien'in hikayesi hakkinda bilgi ver",
+        "beren ve luthien'in hikayesi hakkinda konus"
       ],
       "responses": [
         "Tolkien, hikâyenin birçok farklı versiyonunu yazmıştır; son versiyonu Silmarillion'da yer alır ve ayrıca Yüzüklerin Efendisi'nde Elrond'un Divanı'nda bahsedilir.",
@@ -12582,7 +12240,6 @@
         "ian somerhalder hakkinda konus"
       ],
       "responses": [
-        "Ian Joseph Somerhalder (d.",
         "8 Aralık 1978), Amerikalı emekli oyuncu, model ve yapımcı.",
         "Lost dizisindeki Boone Carlyle ve The Vampire Diaries dizisindeki Damon Salvatore karakterleriyle tanınmıştır."
       ]
@@ -12664,22 +12321,6 @@
         "yüzyılın sonlarında Orta İngilizceden 17.",
         "yüzyılın ortalarından sonlarına kadar Modern İngilizceye geçişe kadar aşamasıdır.",
         "Çoğu modern İngilizce okuyucusu, Kral James İncili'ni ve William Shakespeare'in eserleri gibi Erken Modern İngilizcenin geç aşamasında yazılmış metinleri anlayabilir ve bunlar Modern İngilizceyi büyük ölçüde etkilemiştir."
-      ]
-    },
-    {
-      "tag": "keskin nisanci",
-      "patterns": [
-        "keskin nisanci nedir",
-        "keskin nisanci hakkinda bilgi ver",
-        "keskin nisanci ne demek",
-        "keskin nisanci anlat",
-        "bana keskin nisanci hakkinda bilgi ver",
-        "keskin nisanci hakkinda konus"
-      ],
-      "responses": [
-        "Keskin nişancılar hedeflere çok uzaktan isabet kaydetmek ya da çok küçük hedefleri vurmak için keskin nişancı ekipmanlarını kullanırlar.",
-        "Ayrıca, düşman tarafından görülmemeleri için gizlilik ve kamuflaj eğitimi alırlar.",
-        "Ordunun yanı sıra birçok polis departmanı da, özel eğitimli ekiplerinde keskin nişancılara yer verir."
       ]
     },
     {
@@ -12774,7 +12415,7 @@
       ],
       "responses": [
         "Terim, özellikle Akademia gibi felsefe okulları için kullanılmıştır.",
-        "Skholarkhes (Antik Yunanca: σχολάρχης), Antik Yunanistan'daki okullardan birinin başında bulunan kişiydi.",
+        "Skholarkhes (Antik Yunanca: ), Antik Yunanistan'daki okullardan birinin başında bulunan kişiydi.",
         "Daha sonra skholarkhesleri Akademia'nın üyeleri seçti."
       ]
     },
@@ -12807,7 +12448,7 @@
       "responses": [
         "Şehrin nüfusu 2010 yılı itibarı ile 6,434'tür.",
         "Şehir, Voymiga Nehri'nin kıyısında yer almaktadır.",
-        "Gavrilov Posad (Rusça: Гаври́лов Поса́д), Rusya'nın İvanovo Oblastı'na bağlı Gavrilov Posad rayonunun merkezi olan şehirdir."
+        "Gavrilov Posad (Rusça: ́ ́ ), Rusya'nın İvanovo Oblastı'na bağlı Gavrilov Posad rayonunun merkezi olan şehirdir."
       ]
     },
     {
@@ -12854,7 +12495,7 @@
       ],
       "responses": [
         "yüzyıl sonlarında bölünmesi ile ortaya çıkmış Orta Çağ prensliğidir.",
-        "Svaneti Prensliği (Gürcüce : სვანეთის სამთავრო, svanetis samtavro) Gürcistan'ın Svaneti bölgesinde Gürcistan Krallığı'nın 15.",
+        "Svaneti Prensliği (Gürcüce : , svanetis samtavro) Gürcistan'ın Svaneti bölgesinde Gürcistan Krallığı'nın 15.",
         "Gelovani ve Dadeşkeliani Hanedanlıkları tarafından yönetildikten sonra 1858 yılında Çarlık Rusya'sı tarafından işgal edilmiştir."
       ]
     },
@@ -12887,7 +12528,7 @@
       "responses": [
         "Bu göreve, İran-İsrail Savaşı'nda İsrail'in İran'a düzenlediği saldırılar sırasında önceki Genelkurmay Başkanı olan Muhammed Bakıri'nin öldürülmesinin ardından atanmıştır.",
         "2017'den 2025'e kadar İran Ordusu Genelkurmay Başkanı ve Başkomutanı olarak görev yapmıştır.",
-        "Seyyid Abdurrahim Musevi (Farsça: سید عبدالرحیم موسوی; 1960, Kum – 28 Şubat 2026, Tahran), Haziran 2025'ten Şubat 2026'daki suikastına kadar İran Silahlı Kuvvetleri Genelkurmay Başkanı olarak görev yapan İranlı bir subaydı."
+        "Seyyid Abdurrahim Musevi (Farsça: ; 1960, Kum – 28 Şubat 2026, Tahran), Haziran 2025'ten Şubat 2026'daki suikastına kadar İran Silahlı Kuvvetleri Genelkurmay Başkanı olarak görev yapan İranlı bir subaydı."
       ]
     },
     {
@@ -12954,14 +12595,14 @@
       ]
     },
     {
-      "tag": "the singles 1992–2003",
+      "tag": "the singles 1992-2003",
       "patterns": [
-        "the singles 1992–2003 nedir",
-        "the singles 1992–2003 hakkinda bilgi ver",
-        "the singles 1992–2003 ne demek",
-        "the singles 1992–2003 anlat",
-        "bana the singles 1992–2003 hakkinda bilgi ver",
-        "the singles 1992–2003 hakkinda konus"
+        "the singles 1992-2003 nedir",
+        "the singles 1992-2003 hakkinda bilgi ver",
+        "the singles 1992-2003 ne demek",
+        "the singles 1992-2003 anlat",
+        "bana the singles 1992-2003 hakkinda bilgi ver",
+        "the singles 1992-2003 hakkinda konus"
       ],
       "responses": [
         "Albüm iyi satış yaptı ve Amerika Birleşik Devletleri'nde Amerika Kayıt Endüstrisi Birliği, Kanada'da CRIA tarafından 2× platin plak, Avustralya'da Avustralya Kayıt Endüstrisi Birliği tarafından platin plak aldı.",
@@ -12981,7 +12622,7 @@
       ],
       "responses": [
         "Ağır sıklet ve süper ağır sıklet kategorilerinde mücadele eden sporcu, 1966 Dünya Güreş Şampiyonası ve 1969 Dünya Güreş Şampiyonası'nda bronz, 1970 Asya Oyunları'nda da bronz madalya kazanmıştır.",
-        "Ebulfazl Enveri (Farsça: ابوالفضل انوری; 9 Şubat 1938, Save - 14 Şubat 2018, Tahran), İranlı serbest güreşçidir.",
+        "Ebulfazl Enveri (Farsça: ; 9 Şubat 1938, Save - 14 Şubat 2018, Tahran), İranlı serbest güreşçidir.",
         "1968 Yaz Olimpiyatları açılış töreninde İran kafilesinin bayrağını taşıdı."
       ]
     },
@@ -13013,7 +12654,6 @@
       ],
       "responses": [
         "25 Mayıs 2018), İranlı oyuncu ve yönetmen.",
-        "Naser Malek Motiee (Farsça: ناصر ملک‌مطیعی, Türkçe: Nasır Melek (d.",
         "Çok sayıda film ve televizyon şovunda rol aldı."
       ]
     },
@@ -13076,7 +12716,7 @@
       ],
       "responses": [
         "Moğolların Gizli Tarihi'ne göre, fiziksel olarak çok zayıf doğdu ve babası İnanç Bilge Han oğlunun yetişkinliğe kadar hayatta kalacağına inanmıyordu, bu nedenle kendisine Torluq Tayang (Zayıf Tayang) ismi verildi.",
-        "Tayang Han (Moğolca: Таян хан; Farsça: تايانك خان) Naymanlar'ın kağanıydı."
+        "Tayang Han (Moğolca: ; Farsça: ) Naymanlar'ın kağanıydı."
       ]
     },
     {
@@ -13281,7 +12921,6 @@
       ],
       "responses": [
         "Valli, Four Seasons takma adıyla Wonder Who?",
-        "Francesco Stephen Castelluccio (d.",
         "3 Mayıs 1934), daha çok sahne adıyla Frankie Valli, 1960'tan itibaren the Four Seasons'ın solisti olarak bilinen Amerikalı bir şarkıcıdır."
       ]
     },
@@ -13374,7 +13013,7 @@
         "cevdet doger hakkinda konus"
       ],
       "responses": [
-        "Cevdet Döğer (takma adı Abdulla Kurd, Rusça: Абдулла Курд; 20 Nisan 1977, Bingöl - 3 Mayıs 2011, Çeçenistan), Çeçenistan'da savaşmış Türkiye Kürdü militandır.",
+        "Cevdet Döğer (takma adı Abdulla Kurd, Rusça: ; 20 Nisan 1977, Bingöl - 3 Mayıs 2011, Çeçenistan), Çeçenistan'da savaşmış Türkiye Kürdü militandır.",
         "Abdulla Kurd, 3 Mayıs 2011 tarihinde Rus güvenlik güçlerinin Çeçenistan'da Çeberloyevski kırsalında düzenlediği bir operasyon sırasında öldürüldü.",
         "Abdulla Kurd, Suudi Arabistanlı Muhannad'ın yardımcısı olup 21 Nisan 2011 tarihinde öldürülmesinden sonra Çeçenistan'daki yabancı savaşçıların emiri oldu."
       ]
@@ -13407,7 +13046,6 @@
       ],
       "responses": [
         "NBA takımlarından Houston Rockets forması giymektedir.",
-        "Marquese De'Shawn Chriss (d.",
         "2 Temmuz 1997, Sacramento, Kaliforniya), Amerikalı profesyonel basketbolcu."
       ]
     },
