@@ -8,6 +8,7 @@ semasini, RAG corpus'unu ve LSTM (seqgen) gradyan sapini dogrular.
 import json
 import os
 import sys
+import tempfile
 import unittest
 
 # Proje koku import yoluna eklenir (tests/ dizini altindayiz)
@@ -171,6 +172,276 @@ class TestSeqGenLSTM(unittest.TestCase):
         self.assertIsInstance(out, str)
 
 
+class TestTransformer(unittest.TestCase):
+    """Transformer encoder kucuk veriyle ogrenmeli + kayit/yukleme tur tutarli."""
+
+    def test_transformer_learns(self):
+        import numpy as np
+        from transformer import TransformerNN
+        m = TransformerNN(vocab_size=12, num_intents=3, max_seq_len=8,
+                          d_model=32, num_blocks=2, num_heads=2, ff_mult=2,
+                          dropout=0.0, attn_dropout=0.0, seed=1)
+        rng = np.random.RandomState(0)
+        X = rng.randint(0, 12, size=(40, 8))
+        for i in range(X.shape[0]):
+            X[i, rng.randint(4, 8, size=2)] = 12  # PAD
+        y = np.array([i % 3 for i in range(40)])
+        first = last = 0
+        for ep in range(80):
+            probs = m.forward(X, apply_dropout=True)
+            loss = m.compute_loss(probs, y)
+            if ep == 0:
+                first = loss
+            m.backward(y, 0.01)
+            last = loss
+        self.assertLess(last, first, f'kayip dusmedi: {first:.4f} -> {last:.4f}')
+        self.assertGreater(m.evaluate(X, y), 0.8)
+
+    def test_transformer_save_load(self):
+        import os
+        import tempfile
+        from transformer import TransformerNN
+        m1 = TransformerNN(vocab_size=20, num_intents=4, max_seq_len=10,
+                           d_model=32, num_blocks=1, num_heads=2, ff_mult=2,
+                           seed=3)
+        path = os.path.join(tempfile.gettempdir(), 'ng_transformer_test.json')
+        m1.save(path)
+        try:
+            m2 = TransformerNN(vocab_size=1, num_intents=1, max_seq_len=1)
+            m2.load(path)
+            self.assertEqual(m2.vocab_size, 20)
+            self.assertEqual(m2.d_model, 32)
+            import numpy as np
+            for name, val in m1._named_params():
+                self.assertTrue(np.allclose(np.asarray(val), np.asarray(m2.get_state()[name])),
+                                f'parametri farkli: {name}')
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
+    def test_transformer_export_map(self):
+        """Colab'taki PyTorch->NumPy export eslemesinin (anahtar/transpoz)
+        model.json semasiyla birebir yuvarlak donusumu."""
+        import json
+        import os
+        import tempfile
+
+        import numpy as np
+        from transformer import TransformerNN
+
+        V, C, L, D, NB, NH = 160, 8, 6, 48, 2, 2
+        m = TransformerNN(vocab_size=V, num_intents=C, max_seq_len=L,
+                          d_model=D, num_blocks=NB, num_heads=NH, ff_mult=3,
+                          dropout=0.1, attn_dropout=0.05, seed=5)
+
+        # NumPy modelden torch tarzi state_dict uret (export'un tersi)
+        st = {'embed.weight': m.embed}
+        for i, blk in enumerate(m.blocks):
+            def nm(k):
+                return f'blocks.{i}.{k}'
+            for q in ('Wq', 'Wk', 'Wv', 'Wo'):
+                w = getattr(blk['attn'], q)
+                st[nm(f'attn.{q}.weight')] = w.T
+                st[nm(f'attn.{q}.bias')] = getattr(blk['attn'], 'b' + q[1]).reshape(-1)
+            for ln in ('ln1', 'ln2'):
+                st[nm(f'{ln}.weight')] = blk[f'{ln}_g'].reshape(-1)
+                st[nm(f'{ln}.bias')] = blk[f'{ln}_b'].reshape(-1)
+            st[nm('W1.weight')] = blk['W1'].T
+            st[nm('W1.bias')] = blk['b1'].reshape(-1)
+            st[nm('W2.weight')] = blk['W2'].T
+            st[nm('W2.bias')] = blk['b2'].reshape(-1)
+        st['Whead.weight'] = m.Whead.T
+        st['Whead.bias'] = m.bhead.reshape(-1)
+
+        params = {'embed': st['embed.weight']}
+        for i in range(NB):
+            for nm, src in [('Wq', 'attn.Wq.weight'), ('Wk', 'attn.Wk.weight'),
+                            ('Wv', 'attn.Wv.weight'), ('Wo', 'attn.Wo.weight')]:
+                params[f'b{i}_{nm}'] = st[f'blocks.{i}.{src}'].T
+            for nm, src in [('bq', 'attn.Wq.bias'), ('bk', 'attn.Wk.bias'),
+                            ('bv', 'attn.Wv.bias'), ('bo', 'attn.Wo.bias')]:
+                params[f'b{i}_{nm}'] = st[f'blocks.{i}.{src}'][None, :]
+            for nm, src in [('ln1_g', 'ln1.weight'), ('ln1_b', 'ln1.bias'),
+                            ('ln2_g', 'ln2.weight'), ('ln2_b', 'ln2.bias')]:
+                params[f'b{i}_{nm}'] = st[f'blocks.{i}.{src}'][None, :]
+            params[f'b{i}_W1'] = st[f'blocks.{i}.W1.weight'].T
+            params[f'b{i}_b1'] = st[f'blocks.{i}.W1.bias'][None, :]
+            params[f'b{i}_W2'] = st[f'blocks.{i}.W2.weight'].T
+            params[f'b{i}_b2'] = st[f'blocks.{i}.W2.bias'][None, :]
+        params['Whead'] = st['Whead.weight'].T
+        params['bhead'] = st['Whead.bias'][None, :]
+
+        data = {'arch': 'transformer', 'vocab_size': V, 'num_intents': C,
+                'max_seq_len': L, 'd_model': D, 'num_blocks': NB,
+                'num_heads': NH, 'ff_dim': 3 * D, 'dropout': 0.1,
+                'attn_dropout': 0.05, 'weight_decay': 1e-4, 'max_grad_norm': 5.0,
+                'params': {k: v.astype(np.float32).tolist() for k, v in params.items()}}
+        path = os.path.join(tempfile.gettempdir(), 'ng_export_map.json')
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(data, f)
+        try:
+            m2 = TransformerNN(vocab_size=V, num_intents=C, max_seq_len=L,
+                               d_model=D, num_blocks=NB, num_heads=NH, ff_mult=3)
+            m2.load(path)
+            for name, val in m._named_params():
+                np.testing.assert_array_equal(np.asarray(val), np.asarray(m2.get_state()[name]),
+                                              err_msg=f'esleme farki: {name}')
+            rng = np.random.RandomState(0)
+            Xs = rng.randint(0, V, size=(8, L))
+            Xpad = np.where(rng.rand(8, L) < 0.3, V, Xs)
+            self.assertAlmostEqual(float(np.abs(m.predict_proba(Xpad)
+                                                - m2.predict_proba(Xpad)).max()), 0.0,
+                                   places=6)
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
+    def test_lora_learns_new_intent(self):
+        """LoRA: yeni (OOV sözcüklü) intent öğrenilir, eski intent'ler korunur."""
+        import shutil
+        import tempfile
+
+        import numpy as np
+        from transformer import TransformerNN
+
+        ndir = os.path.join(tempfile.gettempdir(), 'ng_lora_test')
+        if os.path.exists(ndir):
+            shutil.rmtree(ndir)
+        os.makedirs(ndir)
+
+        V, C, L, D, NB, NH = 40, 4, 8, 32, 2, 2
+        words = ['merhaba', 'nasilsin', 'adres', 'telefon', 'hava', 'bugun',
+                 'yemek', 'pizza', 'kitap', 'oneri', 'spor', 'kosu']
+        tags = ['selamlasma', 'iletisim', 'gida', 'spor']
+        patterns = {'selamlasma': ['merhaba nasilsin', 'selam ver'],
+                    'iletisim': ['adres telefon', 'telefon numarasi'],
+                    'gida': ['yemek pizza', 'pizza oneri'],
+                    'spor': ['spor kosu', 'kosu oneri']}
+
+        def enc(t):
+            idx = [words.index(w) for w in t.split() if w in words]
+            return idx + [V] * (L - len(idx))
+
+        X = np.array([enc(p) for tg in tags for p in patterns[tg]], dtype=np.int64)
+        y = np.array([tags.index(tg) for tg in tags for _ in patterns[tg]],
+                     dtype=np.int64)
+        m = TransformerNN(vocab_size=V, num_intents=C, max_seq_len=L, d_model=D,
+                          num_blocks=NB, num_heads=NH, ff_mult=3, seed=5)
+        m.train(X, y, epochs=120, learning_rate=1e-3, batch_size=4,
+                warmup_steps=20, verbose=False)
+        self.assertEqual(m.evaluate(X, y), 1.0)
+
+        m.save(os.path.join(ndir, 'model.json'))
+        with open(os.path.join(ndir, 'bot_data.json'), 'w', encoding='utf-8') as f:
+            json.dump({'vocabulary': words, 'intent_tags': tags,
+                       'intents': {t: ['cevap ' + t] for t in tags},
+                       'intent_kws': {t: sorted(patterns[t]) for t in tags}},
+                      f, ensure_ascii=False, indent=2)
+        intents_path = os.path.join(ndir, 'intents.json')
+        with open(intents_path, 'w', encoding='utf-8') as f:
+            json.dump({'intents': [{'tag': t, 'patterns': patterns[t],
+                                    'responses': ['cevap ' + t]} for t in tags]},
+                      f, ensure_ascii=False, indent=2)
+
+        from finetune import finetune_add
+        sumry = finetune_add(ndir, intents_path,
+                             [{'tag': 'astronomi',
+                               'patterns': ['galaksi yildiz nedir',
+                                            'yildiz kuyruklu_yildiz neden parlar'],
+                               'responses': ['Uzay!']}],
+                             epochs=80, verbose=False)
+        self.assertIn('astronomi', sumry['tags_added'])
+        self.assertGreater(sumry['vocab_added'], 0)
+
+        bot = ChatBot()
+        bot.load_model(ndir)
+        self.assertEqual(bot._classify('galaksi yildiz nedir')[0], 'astronomi')
+        self.assertEqual(bot._classify('yildiz kuyruklu_yildiz neden parlar')[0],
+                         'astronomi')
+        for tg, pats in patterns.items():
+            self.assertEqual(bot._classify(pats[0])[0], tg,
+                             f'eski intent kayboldu: {tg}')
+        shutil.rmtree(ndir)
+
+    def test_lora_forget_intent(self):
+        """LoRA /forget: öğretilen intent silinir, diğerleri ve taban korunur."""
+        import shutil
+        import tempfile
+
+        import numpy as np
+        from transformer import TransformerNN
+
+        ndir = os.path.join(tempfile.gettempdir(), 'ng_lora_forget_test')
+        if os.path.exists(ndir):
+            shutil.rmtree(ndir)
+        os.makedirs(ndir)
+
+        V, C, L, D, NB, NH = 40, 4, 8, 32, 2, 2
+        words = ['merhaba', 'nasilsin', 'adres', 'telefon', 'hava', 'bugun',
+                 'yemek', 'pizza', 'kitap', 'oneri', 'spor', 'kosu']
+        tags = ['selamlasma', 'iletisim', 'gida', 'spor']
+        patterns = {'selamlasma': ['merhaba nasilsin', 'selam ver'],
+                    'iletisim': ['adres telefon', 'telefon numarasi'],
+                    'gida': ['yemek pizza', 'pizza oneri'],
+                    'spor': ['spor kosu', 'kosu oneri']}
+
+        def enc(t):
+            idx = [words.index(w) for w in t.split() if w in words]
+            return idx + [V] * (L - len(idx))
+
+        X = np.array([enc(p) for tg in tags for p in patterns[tg]], dtype=np.int64)
+        y = np.array([tags.index(tg) for tg in tags for _ in patterns[tg]],
+                     dtype=np.int64)
+        m = TransformerNN(vocab_size=V, num_intents=C, max_seq_len=L, d_model=D,
+                          num_blocks=NB, num_heads=NH, ff_mult=3, seed=5)
+        m.train(X, y, epochs=120, learning_rate=1e-3, batch_size=4,
+                warmup_steps=20, verbose=False)
+        m.save(os.path.join(ndir, 'model.json'))
+        with open(os.path.join(ndir, 'bot_data.json'), 'w', encoding='utf-8') as f:
+            json.dump({'vocabulary': words, 'intent_tags': tags,
+                       'intents': {t: ['cevap ' + t] for t in tags},
+                       'intent_kws': {t: sorted(patterns[t]) for t in tags}},
+                      f, ensure_ascii=False, indent=2)
+        intents_path = os.path.join(ndir, 'intents.json')
+        with open(intents_path, 'w', encoding='utf-8') as f:
+            json.dump({'intents': [{'tag': t, 'patterns': patterns[t],
+                                    'responses': ['cevap ' + t]} for t in tags]},
+                      f, ensure_ascii=False, indent=2)
+
+        from finetune import finetune_add, forget_intent
+        finetune_add(ndir, intents_path,
+                     [{'tag': 'astronomi',
+                       'patterns': ['galaksi yildiz nedir', 'yildiz kuyruklu'],
+                       'responses': ['Uzay!']},
+                      {'tag': 'plaj_voleybolu',
+                       'patterns': ['plaj vole topu', 'plaj vole oyna'],
+                       'responses': ['Kumda!']}],
+                     epochs=60, verbose=False)
+
+        bot = ChatBot()
+        bot.load_model(ndir)
+        self.assertEqual(bot._classify('galaksi yildiz nedir')[0], 'astronomi')
+        self.assertEqual(bot._classify('plaj vole topu')[0], 'plaj_voleybolu')
+
+        forget_intent(ndir, intents_path, 'astronomi', verbose=False)
+
+        bot = ChatBot()
+        bot.load_model(ndir)
+        self.assertNotIn('astronomi', bot.intent_tags)
+        self.assertNotIn('astronomi', bot.intent_kws)
+        self.assertEqual(bot._classify('plaj vole topu')[0], 'plaj_voleybolu')
+        for tg, pats in patterns.items():
+            self.assertEqual(bot._classify(pats[0])[0], tg,
+                             f'taban intent kayboldu: {tg}')
+        with open(intents_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        self.assertNotIn('astronomi', [i['tag'] for i in data['intents']])
+        with open(os.path.join(ndir, 'lora.json'), 'r', encoding='utf-8') as f:
+            ad = json.load(f)
+        self.assertNotIn('astronomi', ad['new_tags'])
+        shutil.rmtree(ndir)
+
+
 class TestModuleImports(unittest.TestCase):
     """Proje modülleri hicbir yavas runtime'a takilmadan import edilmeli."""
 
@@ -179,12 +450,193 @@ class TestModuleImports(unittest.TestCase):
         import corpus
         import generator
         import seqgen
+        import transformer
         import clean_intents
         import scrape_intents
         import train  # egitici komutlari modül olarak da yuklenir
-        for mod in (brain, corpus, generator, seqgen,
+        for mod in (brain, corpus, generator, seqgen, transformer,
                     clean_intents, scrape_intents, train):
             self.assertIsNotNone(mod)
+
+
+class TestTwoLayerArchitecture(unittest.TestCase):
+    """Iki katmanli mimari: sohbet (siniflandirma) + bilgi (retrieval)."""
+
+    def test_conversational_filter_real_intents(self):
+        """intents.json'daki filtre >6 desenli intentleri sohbet olarak secmeli."""
+        bot = ChatBot()
+        data = bot.load_intents(os.path.join(BASE, 'intents.json'))
+        original_total = len(bot.intent_tags)
+        data = bot.conversational_data(data)
+        self.assertGreater(len(bot.intent_tags), 0)
+        self.assertLess(len(bot.intent_tags), original_total)
+        self.assertGreater(len(bot.knowledge_intents), 0)
+        self.assertEqual(len(bot.intent_tags) + len(bot.knowledge_intents),
+                         original_total)
+
+    def test_conversational_filter_fallback_small_data(self):
+        """Tum intentler <=6 desense filtre uygulanmamali (test uyumlulugu)."""
+        bot = ChatBot()
+        # build small intents
+        intents = [
+            {'tag': 'selam', 'patterns': ['merhaba', 'selam'], 'responses': ['hi']},
+            {'tag': 'nasil', 'patterns': ['nasil', 'iyi'], 'responses': ['ok']},
+        ]
+        data = {'intents': intents}
+        bot.intents = {t['tag']: t['responses'] for t in intents}
+        bot.intent_tags = ['nasil', 'selam']
+        bot.intent_kws = {}
+        for t in intents:
+            ws = set()
+            for p in t['patterns']:
+                ws.update(bot.tokenize(p))
+            bot.intent_kws[t['tag']] = ws
+
+        result = bot.conversational_data(data)
+        # all intents have <=6 patterns -> fallback: intent_tags unchanged
+        self.assertEqual(len(bot.intent_tags), 2)
+        self.assertEqual(len(result['intents']), 2)
+
+    def test_knowledge_intents_property(self):
+        """knowledge_intents: intents.keys() - intent_tags."""
+        bot = ChatBot()
+        data = bot.load_intents(os.path.join(BASE, 'intents.json'))
+        data = bot.conversational_data(data)
+        conv_set = set(bot.intent_tags)
+        kb = bot.knowledge_intents
+        self.assertEqual(len(kb), 753)
+        self.assertTrue(conv_set.isdisjoint(set(kb.keys())))
+
+    def test_knowledge_retrieval_response(self):
+        """Bilgi sorgusu (_select_knowledge) bilgi intent'inden yanit dondurur."""
+        bot = ChatBot()
+        data = bot.load_intents(os.path.join(BASE, 'intents.json'))
+        data = bot.conversational_data(data)
+        # find a knowledge intent with meaningful content keywords
+        from brain import STOPWORDS
+        for tag in bot.knowledge_intents:
+            kws = bot.intent_kws.get(tag, set())
+            content = [w for w in kws if w not in STOPWORDS and len(w) >= 3]
+            if len(content) >= 2:
+                result = bot._select_knowledge(content[:3])
+                self.assertIsNotNone(
+                    result, f'bilgi retrieval basarisiz: tag={tag} kws={content[:3]}')
+                self.assertIn(tag, bot.intents)
+                self.assertIn(result, bot.intents[tag])
+                return
+        self.fail('en az 2 content kelimesi olan bilgi intent bulunamadi')
+
+    def test_knowledge_threshold_rejects_weak(self):
+        """Zayif/bos sorgu knowledge_threshold altinda kalmali ve None dondurmeli."""
+        bot = ChatBot()
+        data = bot.load_intents(os.path.join(BASE, 'intents.json'))
+        data = bot.conversational_data(data)
+        # garbage tokens not in any intent
+        result = bot._select_knowledge(['xyzzy', 'plugh', 'qwerty'])
+        self.assertIsNone(result)
+
+    def test_two_layer_end_to_end(self):
+        """Kucuk model + bilgi intents: siniflandirma sohbet, bilgi retrieval'den gelmeli."""
+        import numpy as np
+        from transformer import TransformerNN
+
+        # 2 conversational intents (3 patterns each >6? no, they have <6. Use custom.)
+        # We make intents that satisfy >6 patterns: create 8+ patterns
+        conv_patterns = {
+            'selamlasma': ['merhaba', 'selam', 'gunaydin', 'iyi gunler',
+                           'hey nasilsin', 'selam dostum', 'merhaba dunya',
+                           'naber'],
+            'veda': ['gule gule', 'hosca kal', 'gule gule dostum', 'iyi gunler',
+                     'bay bay', 'kendine iyi bak', 'gorusuruz', 'hoscakal'],
+        }
+        kb_patterns = {
+            'galaksi': ['galaksi nedir', 'galaksi hakkinda bilgi ver',
+                        'galaksi ne demek', 'galaksi turkce', 'galaksi acilimi',
+                        'galaksi ne ise yarar'],
+        }
+
+        _bot = ChatBot()
+        all_raw = list(conv_patterns['selamlasma']) + list(conv_patterns['veda'])
+        vocab = sorted(set(w for p in all_raw for w in _bot.tokenize(p)))
+        V = len(vocab)
+        C = 2  # 2 conversational intents only
+        L = 8
+
+        def enc(t):
+            idx = [vocab.index(w) for w in _bot.tokenize(t) if w in vocab]
+            return idx + [V] * (L - len(idx))
+
+        X = np.array([enc(p) for tg in ['selamlasma', 'veda']
+                       for p in conv_patterns[tg]], dtype=np.int64)
+        y = np.array([0]*len(conv_patterns['selamlasma']) +
+                     [1]*len(conv_patterns['veda']), dtype=np.int64)
+
+        m = TransformerNN(vocab_size=V, num_intents=C, max_seq_len=L,
+                          d_model=16, num_blocks=1, num_heads=2, ff_mult=2, seed=5)
+        m.train(X, y, epochs=200, learning_rate=1e-3, batch_size=4,
+                warmup_steps=10, verbose=False)
+        self.assertGreaterEqual(m.evaluate(X, y), 0.90)
+
+        # build bot with 2 conversational + 1 knowledge
+        tags = ['selamlasma', 'veda']
+        ndir = os.path.join(tempfile.gettempdir(), 'ng_two_layer_test')
+        if os.path.exists(ndir):
+            import shutil
+            shutil.rmtree(ndir)
+        os.makedirs(ndir)
+        m.save(os.path.join(ndir, 'model.json'))
+        all_kb = {t: ['bilgi yaniti ' + t] for t in kb_patterns}
+        all_conv = {t: ['cevap ' + t] for t in tags}
+
+        def kws_of(pattern_map):
+            out = {}
+            for t, ps in pattern_map.items():
+                ws = set()
+                for p in ps:
+                    ws.update(_bot.tokenize(p))
+                out[t] = sorted(ws)
+            return out
+
+        kb_kws = kws_of(kb_patterns)
+        conv_kws = kws_of(conv_patterns)
+        with open(os.path.join(ndir, 'bot_data.json'), 'w', encoding='utf-8') as f:
+            json.dump({'vocabulary': vocab, 'intent_tags': tags,
+                       'intents': {**all_conv, **all_kb},
+                       'intent_kws': {**conv_kws, **kb_kws}},
+                      f, ensure_ascii=False, indent=2)
+
+        bot = ChatBot()
+        bot.load_model(ndir)
+
+        # verify filter: 2 conv, 1 kb
+        self.assertEqual(len(bot.intent_tags), 2)
+        self.assertEqual(len(bot.knowledge_intents), 1)
+        self.assertIn('galaksi', bot.knowledge_intents)
+
+        # conversational classify works
+        tag, prob, unclear, _ = bot._classify('merhaba')
+        self.assertFalse(unclear)
+        self.assertIn(tag, tags)
+
+        # knowledge retrieval works (kucuk veride IDF agirliklari dusuk:
+        # log(3/2)=0.4 seviyesinde; esik gercek 791 intent verisinde
+        # ~5.98'a ulasir, burada akis dogrulamak icin dusurulur)
+        bot.knowledge_threshold = 0.01
+        kb_result = bot._select_knowledge(_bot.tokenize('galaksi nedir'))
+        self.assertIsNotNone(kb_result)
+        self.assertEqual(kb_result, 'bilgi yaniti galaksi')
+
+        # get_response returns conversational for greetings
+        resp = bot.get_response('merhaba')
+        self.assertNotEqual(resp, 'Model not trained yet! Please run train.py first.')
+
+        # full knowledge intent keyword override should be through _classify
+        # with a decisive keyword match
+        tag, prob, unclear, _ = bot._classify('galaksi nedir')
+        self.assertFalse(unclear)
+
+        import shutil
+        shutil.rmtree(ndir)
 
 
 if __name__ == '__main__':

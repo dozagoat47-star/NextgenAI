@@ -34,6 +34,23 @@ EMB_K = 128          # gizli boyut (latent) sayisi
 EMB_MIN_TERM = 3     # term minimum uzunlugu (Turkce kokler kisa: ked, mar, su)
 EMB_MIN_DF = 5       # en az 5 dokumanda gecen termler (nadir term gurultusunu keser)
 
+# BM25 (lexical) parametreleri
+BM25_K1 = 1.5
+BM25_B = 0.75
+TITLE_BM25_WEIGHT = 2.0    # baslik kelimelerinin BM25 frekans agirligi
+
+# PPMI+SVD kelime vektor boyutu (terim-co-occurrence uzayinda)
+PPMI_K = 100
+PPMI_MIN_DF = 3
+PPMI_MAX_TERMS = 4000   # co-occurrence matrisini (bellek/sure) kontrol eder
+
+# Char-trigram re-rank (yazim hatasi / donusal eslesme bonusu)
+TRI_BONUS = 0.35
+TRI_MIN_LEN = 6    # sorgu uzunlugu en az bu kadarsa trigram yeniden siralamasi aktif
+TRI_CONTAIN = 0.45 # bu icerme oraninin uzerindeki dokumanlara ciddi bonus
+
+EMB_CACHE_V = 2    # onbellegin surum anahtari (yeni vektor turleri eklenince arttir)
+
 
 class Corpus:
     """JSONL tabanli, bellek ici IDF+cosine vektör deposu (RAG-lite)."""
@@ -52,12 +69,31 @@ class Corpus:
         self.emb = None          # {'docvecs': (d x k) float32, 'V': (k x v), ...}
         self.emb_terms = None    # {term: terim_indeksi}
         self.emb_idf = None      # {term: idf}
+        # BM25 lexical altyapisi
+        self._doc_tf = []        # her dokumanin term->ham frekans sozlugu
+        self._doc_len = []       # her dokumanin frekans toplami (baslik 2x)
+        self._doc_len_arr = None # numpy float32 (dokuman basina uzunluk)
+        self._lex_tf = {}        # term -> (doc_idx[], tf[]) inverted index
+        self._bm25_idf = {}      # term -> BM25 idf
+        self._avgdl = 1.0
+        # PPMI+SVD kelime vektor deposu
+        self.ppmi = None         # {'docvecs', 'W', 'terms', 'idf'}
+        # Char-trigram indexi (yazim hatasi / takilma eslemesi)
+        self._doc_tri = []       # her dokumanin ascii-normalize trigram kumesi
 
     def _slug(self, title):
         return self.tokenizer.ascii_normalize(title.strip().lower()).replace(' ', '_')
 
     def _tokens(self, text):
         return [t for t in self.tokenizer.tokenize(text) if t not in STOPWORDS]
+
+    def _trigrams(self, text):
+        """Ascii-normalize metnin bosluksuz 3-gram kumesi (yazim hatasi toleransi)."""
+        s = self.tokenizer.ascii_normalize(text.lower())
+        s = re.sub(r'[^a-z0-9]', '', s)
+        if len(s) < 3:
+            return frozenset()
+        return frozenset(s[i:i + 3] for i in range(len(s) - 2))
 
     def load(self):
         """corpus.jsonl dosyasini yukler ve vektörleri insa eder."""
@@ -86,6 +122,31 @@ class Corpus:
 
         n = len(self.chunks)
         self.idf = {w: math.log(n / (1.0 + cnt)) for w, cnt in df.items()}
+        self._bm25_idf = {w: math.log(1.0 + (n - cnt + 0.5) / (cnt + 0.5))
+                          for w, cnt in df.items()}
+
+        # BM25 frekans sayaclari (baslik kelimeleri 2x agirlikli)
+        self._doc_tf = []
+        self._doc_len = []
+        self._lex_tf = {}
+        tf_pairs = {}
+        for i in range(n):
+            counts = {}
+            for w in title_tokens[i]:
+                counts[w] = counts.get(w, 0) + TITLE_BM25_WEIGHT
+            for w in text_tokens[i]:
+                counts[w] = counts.get(w, 0) + 1.0
+            doc_i = sum(counts.values()) or 1.0
+            self._doc_tf.append(counts)
+            self._doc_len.append(doc_i)
+            for w, cnt in counts.items():
+                tf_pairs.setdefault(w, []).append((i, cnt))
+        for w, pairs in tf_pairs.items():
+            idx = np.array([p[0] for p in pairs], np.int64)
+            tf = np.array([p[1] for p in pairs], np.float32)
+            self._lex_tf[w] = (idx, tf)
+        self._doc_len_arr = np.array(self._doc_len, np.float32)
+        self._avgdl = max(1.0, float(np.mean(self._doc_len_arr))) if n else 1.0
 
         self._doc_counts = []
         self._slugs = []
@@ -113,6 +174,14 @@ class Corpus:
             idx = np.array([p[0] for p in pairs], np.int64)
             vals = np.array([p[1] for p in pairs], np.float32)
             self._lex_cols[w] = (idx, vals)
+
+        # Char-trigram kumeleri (normalize metin uzerinden, bosluksuz)
+        self._doc_tri = []
+        for c in self.chunks:
+            raw = (c.get('title', '') + ' ' + c.get('text', '')
+                   + ' ' + c.get('patterns', ''))
+            self._doc_tri.append(self._trigrams(raw))
+
         self.loaded = True
         self._ensure_embeddings()
         print(f"[CORPUS] {len(self.chunks)} bilgi parcasi yuklendi ({len(self.idf)} kelime).")
@@ -140,24 +209,30 @@ class Corpus:
             try:
                 with open(EMB_META, 'r', encoding='utf-8') as f:
                     meta = json.load(f)
-                if meta.get('mtime') == mtime and meta.get('k') == EMB_K:
+                if (meta.get('mtime') == mtime and meta.get('k') == EMB_K
+                        and meta.get('v') == EMB_CACHE_V):
                     cached = True
             except (json.JSONDecodeError, OSError):
                 cached = False
         if cached:
             try:
                 data = np.load(EMB_FILE)
-                self.emb = {
-                    'docvecs': data['docvecs'],
-                    'V': data['V'],
-                }
+                self.emb = {'docvecs': data['docvecs'], 'V': data['V']}
                 with open(EMB_META, 'r', encoding='utf-8') as f:
                     meta = json.load(f)
                 self.emb_terms = meta.get('terms', {})
                 self.emb_idf = meta.get('idf', {})
+                self.ppmi = {
+                    'docvecs': data['ppmi_docvecs'],
+                    'W': data['ppmi_W'],
+                    'terms': meta.get('ppmi_terms', {}),
+                    'idf': meta.get('ppmi_idf', {}),
+                    'k': int(data['ppmi_W'].shape[1]),
+                }
                 return
             except Exception:
                 self.emb = None
+                self.ppmi = None
         self._build_embeddings(mtime)
 
     def _build_embeddings(self, mtime):
@@ -233,13 +308,99 @@ class Corpus:
         self.emb_terms = t2i
         self.emb_idf = vidf
 
+        self._build_ppmi(terms, df, n)
+
         try:
-            np.savez_compressed(EMB_FILE, docvecs=docvecs, V=VB.astype(np.float32))
+            np.savez_compressed(EMB_FILE, docvecs=docvecs, V=VB.astype(np.float32),
+                                ppmi_docvecs=self.ppmi['docvecs'],
+                                ppmi_W=self.ppmi['W'])
             with open(EMB_META, 'w', encoding='utf-8') as f:
-                json.dump({'mtime': mtime, 'k': k, 'terms': t2i, 'idf': vidf}, f)
+                json.dump({'mtime': mtime, 'k': k, 'v': EMB_CACHE_V,
+                           'terms': t2i, 'idf': vidf,
+                           'ppmi_terms': self.ppmi['terms'],
+                           'ppmi_idf': self.ppmi['idf']}, f)
         except OSError:
             pass
         print(f"[EMB] {n} parca -> {k} boyutlu vektor deposu insa edildi ({vocab_n} term).")
+
+    def _build_ppmi(self, terms, df, n):
+        """PPMI+SVD kelime vektorleri (co-occurrence uzerinden, word2vec benzeri).
+
+        Term co-occurrence matrisi : C[i,j] = dokuman sayisi (i ve j birlikte),
+        pozitif PMI ile agirliklanir, SVD ile k -boyutlu kelime vektorlerine
+        indirgenir. Dokuman vektoru = idf-agirlikli kelime vektor toplami.
+        Boylece ayni anlami tasiyan farkli kelimelerle yapilan sorular
+        (ornek: "iklim isinması" ~ "kuresel isinma") semantik olarak tutar.
+
+        Bellek disiplini: co-occurrence matrisi float32 ve en sik gecen
+        PPMI_MAX_TERMS termiyle sinirli tutulur (SVD bellek/sure acisindan
+        makul kalsin diye).
+        """
+        import numpy as np
+        if n < 2:
+            self.ppmi = None
+            return
+
+        cand = [w for w, c in df.items() if c >= PPMI_MIN_DF and len(w) >= EMB_MIN_TERM]
+        cand.sort(key=lambda w: -df[w])
+        cand = cand[:PPMI_MAX_TERMS]
+        pt2i = {w: i for i, w in enumerate(cand)}
+        v = len(pt2i)
+        if v == 0:
+            self.ppmi = None
+            return
+        kidx = min(PPMI_K, v, n)
+
+        # Co-occurrence sayaci (float32, sadece farkli term kombinasyonlari)
+        cnt = np.zeros(v, np.float32)
+        C = np.zeros((v, v), np.float32)
+        for counts in self._doc_counts:
+            inds = np.array(sorted({
+                pt2i[w] for w in counts if w in pt2i
+            }), np.int64)
+            if inds.size == 0:
+                continue
+            cnt[inds] += 1.0
+            C[np.ix_(inds, inds)] += 1.0
+        # Diyagonal (oz-co-occurrence) PMI hesabini sasirtiyor -> sifirla
+        np.fill_diagonal(C, 0.0)
+
+        # PPMI: max(0, log( C[i,j] * n / (cnt[i]*cnt[j]) ))   (float32)
+        outer = np.outer(cnt, cnt)
+        div = np.zeros_like(outer)
+        safe = outer > 0
+        with np.errstate(divide='ignore'):
+            div[safe] = n / outer[safe]
+        P = C * div
+        P[safe] = np.maximum(P[safe], 0.0)
+        np.log(P, out=P, where=P > 0)
+        P[P < 0] = 0.0
+
+        # SVD -> kelime vektorleri (W^{T} W ~ PPMI matrisi)
+        # Bellek duzeyinde tutarli: full_matrices=False ve float32 bu boyutta
+        # okulur; gorsel olarak kucuk k boyutlu W zaten dokumanda kullanilir.
+        U, S, _ = np.linalg.svd(P, full_matrices=False)
+        W = (U[:, :kidx] * S[:kidx]).astype(np.float32)
+
+        # Dokuman vektorleri: term vektorlerinin idf agirlikli toplami
+        pn = float(n)
+        vidf = {w: math.log(pn / (1.0 + df[w])) for w in cand}
+        docvecs = np.zeros((n, kidx), np.float32)
+        for i, counts in enumerate(self._doc_counts):
+            acc = np.zeros(kidx, np.float32)
+            for w, raw in counts.items():
+                j = pt2i.get(w)
+                if j is None:
+                    continue
+                acc += W[j] * (0.5 + raw) * vidf.get(w, 0.0)
+            docvecs[i] = acc
+        norms = np.sqrt(np.sum(docvecs * docvecs, axis=1, keepdims=True))
+        norms[norms < 1e-9] = 1.0
+        docvecs = docvecs / norms
+
+        self.ppmi = {'docvecs': docvecs, 'W': W,
+                     'terms': pt2i, 'idf': vidf, 'k': kidx}
+        print(f"[PPMI] {v} term -> {kidx} boyutlu kelime vektoru ({n} parca).")
 
     def _query_embedding(self, qtoks):
         """Soru kelimelerini ayni kuzey uzayinda bir vektore izdusurur."""
@@ -274,6 +435,76 @@ class Corpus:
         idx = np.argpartition(dots, -n)[-n:]
         idx = idx[np.argsort(dots[idx])[::-1]]
         return [(int(i), float(dots[i])) for i in idx if dots[i] > 0.0]
+
+    def _bm25_scores(self, qcounts):
+        """Vektorize BM25 skorlari (tum dokumanlar). [0,1]'e normalize."""
+        import numpy as np
+        n = len(self.chunks)
+        lex = np.zeros(n, np.float32)
+        for w, qcnt in qcounts.items():
+            row = self._lex_tf.get(w)
+            if row is None:
+                continue
+            idx, tf = row
+            idf = self._bm25_idf.get(w, 0.0)
+            denom = tf + BM25_K1 * (1.0 - BM25_B
+                                    + BM25_B * self._doc_len_arr[idx] / self._avgdl)
+            scores = idf * (tf * (BM25_K1 + 1.0)) / denom
+            lex[idx] += qcnt * scores
+        nz = float(lex.max()) if lex.size else 0.0
+        if nz > 0:
+            lex /= nz
+        return lex
+
+    def _ppmi_expand(self, qtoks, top=2, min_sim=0.55):
+        """PPMI kelime vektorleri ile sorgu genisletme.
+
+        Sorgu teriminin vektor uzayinda en yakin 1-2 PPMI komsusunu bulur ve
+        benzerlik gucunde geri verir. Boylece ayni konudaki farkli kelimeler
+        ("iklim isinmasi" sorulunca "kuresel isinma") arama terimi olur.
+        Dusuk benzerlikli komsular (cok anlamli kelimelerin gurultusu) min_sim
+        esigini gecmez. Unut cagirmak icin degil, HASIL terim dagarciginda
+        sinyali genisletmek icin kullanilir.
+        """
+        if not self.ppmi:
+            return {}
+        W = self.ppmi['W']                       # (v,k)
+        terms = self.ppmi['terms']
+        inv = self.ppmi.get('_inv')
+        if inv is None:
+            inv = {j: w for w, j in terms.items()}
+            self.ppmi['_inv'] = inv
+        norms = np.sqrt(np.sum(W * W, axis=1)) + 1e-9
+        Wn = W / norms[:, None]
+        out = {}
+        for w in qtoks:
+            j = terms.get(w)
+            if j is None:
+                continue
+            sims = Wn @ Wn[j]
+            sims[j] = -1.0
+            topn = min(top, len(sims))
+            inds = np.argpartition(sims, -topn)[-topn:]
+            inds = inds[np.argsort(sims[inds])[::-1]]
+            for t in inds.tolist():
+                s = float(sims[t])
+                if s < min_sim:
+                    continue
+                tw = inv.get(t)
+                if tw and tw != w:
+                    out[tw] = max(out.get(tw, 0.0), s)
+        return out
+
+    def _trigram_containment(self, qtri):
+        """Sorgu 3-gramlarinin dokumanlarca karsilanma orani (0..1)."""
+        if not qtri:
+            return None
+        out = np.zeros(len(self.chunks), np.float32)
+        ql = len(qtri)
+        for i, dt in enumerate(self._doc_tri):
+            if dt:
+                out[i] = len(dt & qtri) / ql
+        return out
 
     def search(self, query, k=2, min_score=CORPUS_MIN_SCORE):
         """Soru icin en alakali bilgi parcasini dondurur yoksa None.
@@ -310,27 +541,26 @@ class Corpus:
         qcounts = {}
         for w in qtoks:
             qcounts[w] = qcounts.get(w, 0) + 1.0
+
+        # 2) PPMI SORGU GENISLETME: kelime vektoru komsulari da lex'te aransin
+        #    ("iklim isinmasi" -> "kuresel isinma" da eslenir). Cok anlamli
+        #    kelimelerde yanlis genisletmeyi min_sim esigi keser.
+        for tw, sim in self._ppmi_expand(qtoks).items():
+            qcounts[tw] = qcounts.get(tw, 0.0) + sim
+
+        # 3) LEXIC SKOR (idf-agirlikli cosine, per-doc normalize):
+        #    Mutlak idf agirligi nadir/kesin terimi ('klorofil') onde tutar.
         qvec = {w: (0.5 + cnt) * self.idf.get(w, 0.0) for w, cnt in qcounts.items()}
         qnorm_v = math.sqrt(sum(v * v for v in qvec.values()))
         if qnorm_v <= 0:
             return None
         qvec = {w: v / qnorm_v for w, v in qvec.items()}
 
-        # 2) TAM-CORPUS LEXIC SKOR (vektorize): inverted index üzerinden tüm
-        #    parcalara mutlak idf-agirlikli benzerlik verilir. Nadir/kesin term
-        #    ('klorofil') embedding vocab'ina girmese bile burada kurtarilir.
         lex = np.zeros(len(self.chunks), np.float32)
         for w, val in qvec.items():
             col = self._lex_cols.get(w)
             if col:
                 lex[col[0]] += val * col[1]
-
-        # 3) EMBEDDING SKOR: semantik yakinlik (cosine) - mevcut ise
-        dots = None
-        if self.emb:
-            qemb = self._query_embedding(qtoks)
-            if qemb is not None:
-                dots = (self.emb['docvecs'] @ qemb).astype(np.float32)
 
         # Baslik bonusu yalnizca gercek kelimeyse (kelime sinirinda eslesme).
         # Hiz: once ucuz set/atlik aramasi, regex yalnizca atlik eslestiginde.
@@ -343,14 +573,37 @@ class Corpus:
                     r'(?<![a-z0-9])' + re.escape(tslug) + r'(?![a-z0-9])', qnorm):
                 lex[i] += 0.30
 
-        # 4) BIRLESTIRME: semantik + mutlak lexic onayi (nadir term kurtarmasi)
-        if dots is not None:
-            if len(dots) != len(lex):
-                dots = None
-        if dots is not None:
+        # 4) SEMANTIK SKOR (LSA dokuman vektoru)
+        dots = None
+        if self.emb:
+            qemb = self._query_embedding(qtoks)
+            if qemb is not None:
+                dots = (self.emb['docvecs'] @ qemb).astype(np.float32)
+
+        # 5) BIRLESTIRME: kanitlanmis formul = semantic + sinirli lexic
+        if dots is not None and len(dots) == len(lex):
             final = dots + 1.5 * np.minimum(lex, 0.6)
         else:
             final = lex
+
+        # 6) CHAR-TRIGRAM YENIDEN SIRALAMA: yazim hatasi / donusal eslesme.
+        #    Yalnizca taban skoru > 0 olan adaylari gueclendirir; sogum taban
+        #    skorsuz (ilgisiz) dokumanlarin trigrama dayanip on plana cikmasi
+        #    engellenir ("akropol nerede" -> alakasiz makale hatali donmesin).
+        if len(qnorm) >= TRI_MIN_LEN:
+            tri = self._trigram_containment(self._trigrams(query))
+            if tri is not None and len(tri) == len(final):
+                boost = tri * TRI_BONUS
+                boost[final <= 0.0] = 0.0
+                final = final + boost
+
+        # 7) BM25 NADIR-TERIM KURTARMA: semantik/lex sicakligi dusukse ve BM25
+        #    tek bir dokumanda net once cikiyorsa onu onde tut (kesin terimli
+        #    ve embedding vocab'ina girmemis sorular icin emniyet kemeri).
+        if float(np.max(final)) < 0.8:
+            bm = self._bm25_scores({w: 1.0 for w in qtoks})
+            if bm is not None and bm.size and float(bm.max()) >= 0.6:
+                final = final + 0.6 * bm
 
         i = int(np.argmax(final))
         score = float(final[i])

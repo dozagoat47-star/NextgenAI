@@ -373,6 +373,77 @@ def predict():
         return jsonify({'suggestions': []})
 
 
+@app.route('/learn', methods=['POST', 'OPTIONS'])
+def learn():
+    """Yeni intent öğretir: LoRA adaptörü + intents.json/bot_data.json güncelleme."""
+    global bot, model_loaded, all_patterns
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        entries = data.get('entries')
+        if entries is None:
+            entries = [data] if data.get('tag') else None
+        if not entries:
+            return jsonify({'error': '"entries" gerekli: '
+                                    '[{"tag","patterns","responses"}]'}), 400
+
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        model_dir = os.path.join(script_dir, 'model')
+        intents_file = os.path.join(script_dir, 'intents.json')
+
+        from finetune import finetune_add
+        summary = finetune_add(model_dir, intents_file, entries)
+        print(f"[LEARN] ok: {summary}")
+
+        bot.load_model(model_dir)
+        with open(intents_file, 'r', encoding='utf-8') as f:
+            intents_data = json.load(f)
+        all_patterns = []
+        for intent in intents_data['intents']:
+            for p in intent['patterns']:
+                all_patterns.append(bot.ascii_normalize(p.lower()))
+        model_loaded = True
+        return jsonify({'ok': True, **summary})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/forget', methods=['POST', 'OPTIONS'])
+def forget():
+    """Öğretilmiş bir LoRA intent'ini geri alır (taban intent'ler etkilenmez)."""
+    global bot, model_loaded, all_patterns
+    if request.method == 'OPTIONS':
+        return '', 204
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        tag = (data.get('tag') or '').strip()
+        if not tag:
+            return jsonify({'error': '"tag" gerekli'}), 400
+
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        model_dir = os.path.join(script_dir, 'model')
+        intents_file = os.path.join(script_dir, 'intents.json')
+
+        from finetune import forget_intent
+        summary = forget_intent(model_dir, intents_file, tag)
+        print(f"[FORGET] ok: {summary}")
+
+        bot.load_model(model_dir)
+        with open(intents_file, 'r', encoding='utf-8') as f:
+            intents_data = json.load(f)
+        all_patterns = []
+        for intent in intents_data['intents']:
+            for p in intent['patterns']:
+                all_patterns.append(bot.ascii_normalize(p.lower()))
+        model_loaded = True
+        return jsonify({'ok': True, **summary})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/status')
 def status():
     return jsonify({

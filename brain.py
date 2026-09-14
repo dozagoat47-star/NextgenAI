@@ -12,6 +12,8 @@ import os
 import re
 import unicodedata
 
+from transformer import TransformerNN
+
 
 # Latin (Turkce dahil) ozel harflerin ASCII karsiliklari. Aksanli harflerin
 # cogu NFD decompose ile cikar, ama ayristirilamayan harfler (eszett, ligatur
@@ -66,7 +68,7 @@ STOPWORDS = {
 # Sozcukler (olumsuz isaret): degil, yok, hayir, asla, hic(?), nefret vs.
 NEGATION_SIGNALS = {
     'degil', 'degilim', 'değil', 'hayir', 'hayır', 'asla', 'hic', 'yok',
-    'yoktur', 'nefret', 'nefret', 'olmaz', 'yapma', 'etme', 'gitme',
+    'yoktur', 'nefret', 'olmaz', 'yapma', 'etme', 'gitme',
     'gelme', 'isteme', 'sevme', 'verme', 'alma', 'durma', 'konusma',
     'soyleme', 'calisma', 'izleme',
 }
@@ -100,7 +102,7 @@ NEGATION_SUPPORT_TOPIC = [
 # Cumleyi parcalara ayirmak icin: noktalama ve baglaclar.
 # Boylece coklu anahtar kelime iceren cumlelerde her parcaya ayri bakilir.
 SEGMENT_PATTERN = re.compile(
-    r"[.,!?;:•]\s*|\b(?:ve|veya|ya da|yoksa|ama|fakat|ancak|lakin|fakat|"
+    r"[.,!?;:•]\s*|\b(?:ve|veya|ya da|yoksa|ama|fakat|ancak|lakin|"
     r"sonra|ardindan|bundan sonra)\b",
     re.IGNORECASE)
 
@@ -666,7 +668,21 @@ class ChatBot:
         self.stem_cache = {}
         self._neg_suffixes = NEGATION_SUFFIXES
         self.seq = None  # SeqGen LSTM ureteci (model dosyasi varsa lazy yuklenir)
-        self.seq_enabled = False  # uretici varyantlari OP-IN (latency icin)
+        # None = henuz yoklanmadi; ilk get_response'da seq_model.json var mi diye
+        # bakilir, varsa True olur (latency: sadece bir kez import/load).
+        self.seq_enabled = None
+        # Transformer girdisi icin token -> indeks eslemesi
+        self.vocab_to_idx = {}
+        self.pad_idx = 0
+        self.max_seq_len = 24
+        # Iki katmanli mimari esikleri:
+        #  confidence_threshold : sohbet sinif seciminin guven esigi. Altinda
+        #    kalan secimler once bilgi intelletimine (knowledge retrieval)
+        #    sorulur; bilgi bulunamazsa kullaniciya yeniden sorulur.
+        #  knowledge_threshold  : bilgi intent'ine ait anahtar kelime dikkatinin
+        #    ayirt edici sayilmasi icin gereken min IDF agirlikli skor.
+        self.confidence_threshold = 0.40
+        self.knowledge_threshold = 1.5
 
     def is_negation_word(self, word, stem=None):
         """Tek bir sozcugun olumsuzluk tasiyip tasimadigini dondurur.
@@ -793,6 +809,24 @@ class ChatBot:
                 bag[self.vocabulary.index(w)] = 1
         return bag
 
+    def text_to_indices(self, text, max_seq_len=None):
+        """Metni transformer girdisine (vasatılmis token indeks dizisi) cevirir.
+
+        Tokenler vocab_to_idx üzerinden indekslenir; taninmayanlar atlanir;
+        dizi max_seq_len'a PAD ile hizalanir (PAD = vocab boyutu).
+        """
+        if max_seq_len is None:
+            max_seq_len = self.max_seq_len
+        seq = []
+        for w in self.tokenize(text):
+            if w in self.vocab_to_idx:
+                seq.append(self.vocab_to_idx[w])
+            if len(seq) >= max_seq_len:
+                break
+        if len(seq) < max_seq_len:
+            seq = seq + [self.pad_idx] * (max_seq_len - len(seq))
+        return seq
+
     def load_intents(self, filepath):
         """Niyet dosyasını yükler"""
         with open(filepath, 'r', encoding='utf-8') as f:
@@ -820,6 +854,8 @@ class ChatBot:
         # Benzersiz kelimeleri sırala
         self.vocabulary = sorted(list(set(all_words)))
         self.intent_tags = sorted(tags)
+        self.vocab_to_idx = {w: i for i, w in enumerate(self.vocabulary)}
+        self.pad_idx = len(self.vocabulary)
 
         # Her niyet icin normalizasyonlu anahtar kelime kumesi
         # (sohbet esnasinda niyet secimine yardimci olur)
@@ -837,22 +873,62 @@ class ChatBot:
         self._build_keyword_weights()
         return data
 
+    def conversational_data(self, data):
+        """Veriden sohbet intent'lerini ayirir ve intent_tags'i bunlara indirir.
+
+        Bilgi intent'leri Wikipedia sablonundan uretilmis 6 desenli
+        ("{konu} nedir", "{konu} hakkinda bilgi" gibi); sohbet intent'leri ise
+        daha zengin (8-34 desen). Bu yuzden desen sayisi >6 olanlar sohbet
+        intentidir, geri kalanlar bilgi intenti olarak taranmaya devam eder.
+
+        Kucuk veri kumeleri (test/itibari dosyalar) filtreden tamamen
+        elenirse orijinal veri aynen dondurulur (bozulma yok).
+        """
+        conv = [it for it in data['intents'] if len(it['patterns']) > 6]
+        if not conv:
+            return data
+        self.intent_tags = sorted(it['tag'] for it in conv)
+        return {'intents': conv}
+
+    @property
+    def knowledge_intents(self):
+        """Sohbet siniflarina (intent_tags) dahil olmayan bilgi intentleri.
+
+        Anahtar kelime retrieval'i bu kume uzerinde calisir; yeni bot_data
+        'intent_tags' (sohbet siniflari, sayi veriden gudumludur) + 'intents'
+        (tam kume) tutar, boylece bilgi kumesi fark olarak turetilir (sema
+        degismez).
+        """
+        excl = set(self.intent_tags)
+        return {t: r for t, r in self.intents.items() if t not in excl}
+
     def _build_keyword_weights(self):
         """Anahtar kelime dikkati icin IDF agirliklarini hesaplar.
 
         Seyrek gecen kelime yuksek agirlik (ayirt edici), her intent'te
         gecen ortak kelimeler dusuk agirlik alir.
         """
-        n_intents = len(self.intent_tags) or 1
+        n_intents = len(self.intent_kws) or 1
         doc_count = {}
-        for tag in self.intent_tags:
+        for tag in self.intent_kws:
             for stem in self.intent_kws.get(tag, ()):
                 doc_count[stem] = doc_count.get(stem, 0) + 1
         weights = {}
         for stem, count in doc_count.items():
-            w = math.log(n_intents / (1.0 + count))
-            weights[stem] = 0.0 if stem in STOPWORDS else w
+            w = 0.0 if stem in STOPWORDS else math.log(n_intents / (1.0 + count))
+            weights[stem] = w
         self.keyword_weights = weights
+
+        # Ters dizin (stem -> {tag: agirlik}) : sorgu basina intent taramak
+        # yerine giris kelimeleri kadar is yapilur. O(791 intent) yerine
+        # O(kelime sayisi x intent-basina-ortak-kelime) -> etkilesim icin yeterli.
+        inv = {}
+        for tag in self.intent_kws:
+            for stem in self.intent_kws[tag]:
+                w = weights.get(stem, 0.0)
+                if w > 0.0:
+                    inv.setdefault(stem, {})[tag] = w
+        self._inv_kws = inv
 
     def split_segments(self, text):
         """Cumleyi noktalama ve baglaclarla parcalara boler.
@@ -872,71 +948,114 @@ class ChatBot:
         input_set = set(words)
         if exclude:
             input_set = input_set - set(exclude)
+        inv = getattr(self, '_inv_kws', None)
+        if not inv:
+            self._build_keyword_weights()
+            inv = self._inv_kws
         attn = {}
-        for tag in self.intent_tags:
-            inter = input_set & self.intent_kws.get(tag, set())
-            s = sum(self.keyword_weights.get(w, 0.0) for w in inter)
-            if s > 0:
-                attn[tag] = s
+        for w in input_set:
+            for tag, wgt in inv.get(w, {}).items():
+                attn[tag] = attn.get(tag, 0.0) + wgt
         return attn
 
+    def _tag_rank(self, tag):
+        """Tie-break sirasi: sohbet intent'leri kendi sirasinda, bilgi
+        intent'leri en sonda (sohbet eslesmesi oncelikli olsun).
+        """
+        try:
+            return self.intent_tags.index(tag)
+        except ValueError:
+            return len(self.intent_tags)
+
     def prepare_training_data(self, intents_data):
-        """Eğitim verilerini hazırlar"""
+        """Eğitim verilerini hazırlar.
+
+        Transformer mimarisi icin girdi, PAD-hizalanmis token indeks
+        dizileridir (BoW degil). Donus: (X_seq, y) ; y = intent indeksleri.
+        """
         X = []
         y = []
+        max_len = 0
 
         for intent in intents_data['intents']:
             tag = intent['tag']
             tag_index = self.intent_tags.index(tag)
 
             for pattern in intent['patterns']:
-                words = self.tokenize(pattern)
-                bag = self.bag_of_words(words)
-                X.append(bag)
+                seq = self.text_to_indices(pattern)
+                X.append(seq)
                 y.append(tag_index)
+                ln = len(self.tokenize(pattern))
+                if ln > max_len:
+                    max_len = ln
 
+        self.max_seq_len = max(1, min(32, max_len))
+        # Sekanslari yeni max_seq_len'a hizala (kisa olanlar PAD ile dolar)
+        X = [seq[:self.max_seq_len] + [self.pad_idx] *
+             max(0, self.max_seq_len - len(seq)) for seq in X]
         return np.array(X), np.array(y)
 
-    def train_model(self, intents_filepath, epochs=1000, learning_rate=0.01):
-        """Train the model"""
+    def train_model(self, intents_filepath, epochs=500, learning_rate=0.001,
+                    val_ratio=0.1, conversational_only=True):
+        """Transformeri egitir (tok-girdi, multi-head self-attention).
+
+        Egitim setinin son %val_ratio'luk kismi sabit seed ile DOGRULAMA
+        setine ayrilir; erken durdurma ve raporlanan dogruluk val setinde
+        olculur (egitim-seti dogrulugu ezberi yansitir, yanilticidir).
+
+        conversational_only=True iken yalnizca sohbet intent'leri (deseni >6)
+        siniflandirciya ogretilir; bilgi intent'leri (791'lik gercek veride
+        753 adet, Wikipedia sablonlu) anahtar kelime retrieval ile cevaplanir.
+        """
         print("Loading intents file...")
         data = self.load_intents(intents_filepath)
+
+        if conversational_only:
+            data = self.conversational_data(data)
+            print(f"Conversational-only: {len(self.intent_tags)} sohbet intent'i "
+                  f"+ {len(self.knowledge_intents)} bilgi intent'i (retrieval).")
 
         print("Preparing training data...")
         X, y = self.prepare_training_data(data)
 
+        # Sabit tohumla tekrarlanabilir train/val ayrimi
+        rng = np.random.RandomState(42)
+        perm = rng.permutation(len(X))
+        n_val = max(1, int(len(X) * val_ratio))
+        val_idx, train_idx = perm[:n_val], perm[n_val:]
+        X_val, y_val = X[val_idx], y[val_idx]
+        X, y = X[train_idx], y[train_idx]
+
         input_size = len(self.vocabulary)
         output_size = len(self.intent_tags)
-        hidden1 = min(128, max(48, input_size // 2))
-        hidden2 = min(64, max(24, input_size // 4))
-        hidden3 = min(48, max(12, output_size * 2))
 
-        print(f"\nModel Architecture:")
-        print(f"  Input layer:  {input_size} neurons (vocabulary size)")
-        print(f"  Hidden1:      {hidden1} neurons")
-        print(f"  Hidden2:      {hidden2} neurons")
-        print(f"  Hidden3:      {hidden3} neurons")
-        print(f"  Output layer: {output_size} neurons (intent count)")
-        total = (input_size*hidden1 + hidden1 + hidden1*hidden2 + hidden2
-                 + hidden2*hidden3 + hidden3 + hidden3*output_size + output_size)
-        print(f"  Total params: {total}")
-        print(f"\nTraining samples: {len(X)}")
-        print(f"Total words: {input_size}")
-        print(f"Total intents: {output_size}")
-        print(f"Optimizer: Adam | Dropout: 0.2 | BatchNorm: açık | L2: 1e-4")
+        print(f"\nTransformer Architecture:")
+        print(f"  Vocab size:   {input_size}")
+        print(f"  Max seq len:  {self.max_seq_len}")
+        print(f"  Embed dim:    96 (3 kafa, 3 blok)")
+        print(f"  Output:       {output_size} intents")
+        print(f"\nTraining samples: {len(X)} (val: {len(X_val)})")
+        print(f"Optimizer: AdamW | GELU | Pre-LN | Dropout 0.10 | L2: 1e-4")
         print()
 
-        self.model = NeuralNetwork(
-            [input_size, hidden1, hidden2, hidden3, output_size],
-            dropout=0.2, use_batchnorm=True, weight_decay=1e-4, seed=42,
-            use_attention=True, attn_hidden=24)
+        self.model = TransformerNN(
+            vocab_size=input_size,
+            num_intents=output_size,
+            max_seq_len=self.max_seq_len,
+            d_model=96, num_blocks=3, num_heads=3, ff_mult=3,
+            dropout=0.1, attn_dropout=0.05, weight_decay=1e-4,
+            seed=42)
 
         print("Training started...")
         losses = self.model.train(X, y, epochs=epochs, learning_rate=learning_rate,
-                                  batch_size=32, early_stop=True, patience=30)
+                                  batch_size=32, early_stop=True, patience=30,
+                                  X_val=X_val, y_val=y_val)
 
-        final_accuracy = self.model.evaluate(X, y)
-        print(f"\nTraining completed! Accuracy: {final_accuracy:.2%}")
+        train_accuracy = self.model.evaluate(X, y)
+        val_accuracy = self.model.evaluate(X_val, y_val)
+        print(f"\nTraining completed!")
+        print(f"  Egitim dogrulugu: {train_accuracy:.2%}")
+        print(f"  Dogrulama dogrulugu: {val_accuracy:.2%}")
 
         return losses
 
@@ -944,9 +1063,7 @@ class ChatBot:
         """User input icin en guclu intent tahminini ve olasiligini dondurur."""
         if self.model is None or not self.vocabulary:
             return None, 0.0
-        words = self.tokenize(user_input)
-        bag = self.bag_of_words(words)
-        X = np.array([bag])
+        X = np.array([self.text_to_indices(user_input)])
         probabilities = self.model.predict_proba(X)[0]
         best_index = int(np.argmax(probabilities))
         return self.intent_tags[best_index], float(probabilities[best_index])
@@ -959,8 +1076,7 @@ class ChatBot:
         cikarilir ("futbol sevmiyorum" -> 'spor' onaylamaci secilmesin).
         """
         words = self.tokenize(user_input)
-        bag = self.bag_of_words(words)
-        X = np.array([bag])
+        X = np.array([self.text_to_indices(user_input)])
 
         probabilities = self.model.predict_proba(X)[0]
         best_index = np.argmax(probabilities)
@@ -994,7 +1110,7 @@ class ChatBot:
                 seg_attn = self._attn_of(seg_words, exclude=exclude)
                 if not seg_attn:
                     continue
-                seg_top = max(seg_attn, key=lambda t: (seg_attn[t], self.intent_tags.index(t)))
+                seg_top = max(seg_attn, key=lambda t: (seg_attn[t], self._tag_rank(t)))
                 if seg_attn[seg_top] > best_any:
                     best_any = seg_attn[seg_top]
                     attn = seg_attn
@@ -1002,7 +1118,7 @@ class ChatBot:
 
         chosen_tag = best_tag
         if attn:
-            top_attn_tag = max(attn, key=lambda t: (attn[t], self.intent_tags.index(t)))
+            top_attn_tag = max(attn, key=lambda t: (attn[t], self._tag_rank(t)))
             top_attn = attn[top_attn_tag]
             # Ayirt edici anahtar kelime eslesmesi (>=1.5) siniflandiriciyi asar;
             # siniflandirici emin degilse (<0.85) daha zayif eslesme de yeter.
@@ -1035,13 +1151,15 @@ class ChatBot:
         if not words:
             return 0.0
         input_set = set(words)
-        best = 0.0
-        for tag in self.intent_tags:
-            s = sum(self.keyword_weights.get(w, 0.0)
-                    for w in (input_set & self.intent_kws.get(tag, set())))
-            if s > best:
-                best = s
-        return best
+        inv = getattr(self, '_inv_kws', None)
+        if not inv:
+            self._build_keyword_weights()
+            inv = self._inv_kws
+        tag_scores = {}
+        for w in input_set:
+            for tag, wgt in inv.get(w, {}).items():
+                tag_scores[tag] = tag_scores.get(tag, 0.0) + wgt
+        return max(tag_scores.values()) if tag_scores else 0.0
 
     def can_answer(self, user_input):
         """Veri kumesinden cevap vermeye guvenilir mi?
@@ -1116,41 +1234,24 @@ class ChatBot:
             return random.choice(NEGATION_SUPPORT)
         return random.choice(NEGATION_SUPPORT_TOPIC).format(topic=topic)
 
-    def get_response(self, user_input):
-        """Generate response for user input"""
-        if self.model is None:
-            return "Model not trained yet! Please run train.py first."
+    def _select_response(self, tag, resp_words):
+        """Bir intent'in yanitlari arasindan girisle en cok ortusenini secer.
 
-        negated, neg_content = self.detect_negation(user_input)
-
-        chosen_tag, _, unclear, resp_words = self._classify(
-            user_input, negated_content=neg_content if negated else None)
-
-        if unclear:
-            if negated:
-                return self._negation_reply(neg_content)
-            return "Anlayamadim, baska sekilde soyler misin?"
-
-        # OLUMSUZ ICERIK: "Futbol sevmiyorum" -> onaylamaci sport yaniti yerine
-        # destekleyici yanit verilmeli.
-        if negated and neg_content:
-            return self._negation_reply(neg_content)
-
-        responses = self.intents.get(chosen_tag, ["Bir hata olustu."])
+        Stop-word'ler ('yap','miy' gibi) skoru sulandirmasin; yoksa
+        'stres icin yuruYUS YAP' 'Kilo... diyet' ile esit puana ulasir ve
+        rastgele secim yanlis yanit verir. SeqGen cagrisi arayan taraftadir.
+        """
+        responses = self.intents.get(tag, ["Bir hata olustu."])
 
         if len(responses) == 1:
             return responses[0]
 
-        # Cevabi sec: en guclu parcanin kelimeleriyle (normalizasyonlu)
-        # en cok oyusan yaniti sec. Stop-word'ler ('yap','miy' gibi) skoru
-        # sulandirmasin; yoksa 'stres icin yuruYUS YAP' 'Kilo... diyet' ile
-        # esit puana ulasir ve rastgele secim yanlis yanit verir.
         input_words = {w for w in resp_words if w not in STOPWORDS and len(w) >= 3}
         best_responses = []
         best_score = -1
         for resp in responses:
-            resp_words = set(self.tokenize(resp))
-            score = len(input_words & resp_words)
+            resp_set = set(self.tokenize(resp))
+            score = len(input_words & resp_set)
             resp_flat = self.ascii_normalize(resp).lower()
             for w in input_words:
                 if len(w) >= 3 and w in resp_flat:
@@ -1164,29 +1265,99 @@ class ChatBot:
         if best_score <= 0:
             return random.choice(responses)
 
+        return random.choice(best_responses)
+
+    def _select_knowledge(self, words, exclude=None):
+        """Bilgi intent'leri arasinda en guclu IDF eslesmesini arar.
+
+        Sohbet siniflandiricisi bilgi sorularina (wayne rooney kimdir) guven
+        vermez; bu metot bilgi intent'lerinin anahtar kelime dikkatini tarar
+        ve yeterince ayirt edici (> knowledge_threshold) bir eslesme varsa
+        o bilgi intent'inin en iyi yanitini dondurur, yoksa None.
+        Ters dizin kullanildigi icin maliyet giris kelimesi kadardir.
+        """
+        if not self.knowledge_intents:
+            return None
+        input_set = set(words)
+        if exclude:
+            input_set = input_set - set(exclude)
+        inv = getattr(self, '_inv_kws', None)
+        if not inv:
+            self._build_keyword_weights()
+            inv = self._inv_kws
+        kb = self.knowledge_intents
+        scores = {}
+        for w in input_set:
+            for tag, wgt in inv.get(w, {}).items():
+                if tag in kb:
+                    scores[tag] = scores.get(tag, 0.0) + wgt
+        if not scores:
+            return None
+        top_tag = max(scores, key=lambda t: (scores[t], self._tag_rank(t)))
+        if scores[top_tag] < self.knowledge_threshold:
+            return None
+        return self._select_response(top_tag, words)
+
+    def get_response(self, user_input):
+        """Generate response for user input"""
+        if self.model is None:
+            return "Model not trained yet! Please run train.py first."
+
+        negated, neg_content = self.detect_negation(user_input)
+
+        chosen_tag, probability, unclear, resp_words = self._classify(
+            user_input, negated_content=neg_content if negated else None)
+
+        # OLUMSUZ ICERIK: "Futbol sevmiyorum" -> onaylamaci sport yaniti yerine
+        # destekleyici yanit verilmeli.
+        if negated and neg_content:
+            return self._negation_reply(neg_content)
+
+        # ANAHTAR KELIME OVERRIDE bilgi intentine ulasti: canned bilgi yaniti.
+        if chosen_tag not in self.intent_tags:
+            return self._select_response(chosen_tag, resp_words)
+
+        # GUVENSIZ SECIM: sohbet siniflarina guvenilmiyorsa once bilgi
+        # intentlerine sor; eslesme varsa bilgi yaniti, yoksa kullanicidan
+        # netlestirme iste.
+        if unclear or probability < self.confidence_threshold:
+            kb = self._select_knowledge(
+                resp_words, exclude=neg_content if negated else None)
+            if kb:
+                return kb
+            if unclear:
+                return "Anlayamadim, baska sekilde soyler misin?"
+
+        responses = self.intents.get(chosen_tag, ["Bir hata olustu."])
+        best = self._select_response(chosen_tag, resp_words)
+
         # SeqGen LSTM ureteciyle taze varyant (kalite kapisi gecmezse canned).
-        gen = self._try_seq_rephrase(chosen_tag)
+        gen = self._try_seq_rephrase(chosen_tag, user_input)
         if gen:
             return gen
 
-        return random.choice(best_responses)
+        return best
 
-    def _try_seq_rephrase(self, tag):
-        """SeqGen LSTM ureteciyle tag'e gore taze bir varyant uretir.
+    def _try_seq_rephrase(self, tag, query=None):
+        """SeqGen LSTM ureteciyle kullanici sorusuna kayitli tag'e gore
+        taze bir varyant uretir.
 
+        Ornekleme kosulu: asil query (varsa), yoksa tag. LSTM bu kosula
+        egitilmis olmalidir (colab'daki seqgen notebook sorgu-kosullu egitiyor).
         Kalite sapagi: cok kisa/tekrariest/sozcuk dagina dokunmayan ciktilari
         reddeder (None dondurur) -> get_response guvenli sekilde canned'e donebilir.
         Model dosyasi yoksa da None (sessiz devre disi).
         """
         try:
-            if not getattr(self, 'seq_enabled', False):
-                return None
-            if self.seq is None:
+            if self.seq_enabled is None:
+                self.seq_enabled = False
                 from seqgen import load_seq
                 self.seq = load_seq()
-                if self.seq is None:
-                    return None
-            gen = self.seq.sample(tag, temperature=0.9, top_k=14)
+                self.seq_enabled = self.seq is not None
+            if not self.seq_enabled:
+                return None
+            ctx = query or tag
+            gen = self.seq.sample(ctx, temperature=0.9, top_k=14)
             if not gen or len(gen) < 12 or len(gen) > 260:
                 return None
             letters = [c for c in gen.lower() if c.isalpha()]
@@ -1222,9 +1393,27 @@ class ChatBot:
         print(f"Bot data saved: {model_dir}")
 
     def load_model(self, model_dir):
-        """Load model and bot data"""
-        self.model = NeuralNetwork([1])  # Temporary size
-        self.model.load(os.path.join(model_dir, 'model.json'))
+        """Load model and bot data (transformer / eski feedforward otomatik tepk)."""
+        model_path = os.path.join(model_dir, 'model.json')
+        with open(model_path, 'r', encoding='utf-8') as f:
+            head = json.load(f)
+
+        if head.get('arch') == 'transformer':
+            self.model = TransformerNN(vocab_size=1, num_intents=1, max_seq_len=1)
+            self.model.load(model_path)
+            # LoRA adaptörü varsa taban ağırlıkların üzerine uygula (kolonları
+            # yeni sözcük/sınıf eklemeden model.json'a dokunulmaz)
+            lora_path = os.path.join(model_dir, 'lora.json')
+            if os.path.exists(lora_path):
+                with open(lora_path, 'r', encoding='utf-8') as f:
+                    lora = json.load(f)
+                self.model.apply_lora(lora)
+                print(f"LoRA adaptor yuklendi: {lora_path} "
+                      f"(+{lora.get('vocab_added', 0)} vocab, "
+                      f"+{lora.get('head_added', 0)} intent)")
+        else:
+            self.model = NeuralNetwork([1])  # Eski feedforward uyumlulugu
+            self.model.load(model_path)
 
         with open(os.path.join(model_dir, 'bot_data.json'), 'r', encoding='utf-8') as f:
             bot_data = json.load(f)
@@ -1238,6 +1427,13 @@ class ChatBot:
                 self.intent_kws[tag] = set()
         self._build_keyword_weights()
 
+        # Transformer girdi eslemesi (farkli dille yeniden kurulur)
+        self.vocab_to_idx = {w: i for i, w in enumerate(self.vocabulary)}
+        self.pad_idx = len(self.vocabulary)
+        if hasattr(self.model, 'max_seq_len') and self.model.max_seq_len:
+            self.max_seq_len = self.model.max_seq_len
+
         print(f"Bot data loaded: {model_dir}")
         print(f"  Vocabulary size: {len(self.vocabulary)}")
         print(f"  Intent count: {len(self.intent_tags)}")
+        print(f"  Knowledge intents (retrieval): {len(self.knowledge_intents)}")

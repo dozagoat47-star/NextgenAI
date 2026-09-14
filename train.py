@@ -8,16 +8,27 @@ import sys
 import io
 import argparse
 
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+# Log yönlendirmeli çalışırken bile canlı (satır tamponlu) çıktı
+if sys.stdout is not None:
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', line_buffering=True)
+    except Exception:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8',
+                                      line_buffering=True)
 
 from brain import ChatBot
 
 def main():
     parser = argparse.ArgumentParser(description='Nextgen AI model egitimi')
-    parser.add_argument('--epochs', type=int, default=3000,
-                        help='epoch sayisi (varsayilan 3000)')
+    parser.add_argument('--epochs', type=int, default=500,
+                        help='epoch sayisi (varsayilan 500)')
+    parser.add_argument('--learning-rate', '--lr', dest='learning_rate', type=float,
+                        default=0.001, help='baslangic ogrenme hizi (varsayilan 0.001)')
     parser.add_argument('--no-demo', action='store_true',
                         help='egitim sonrasi test sohbetini atla (hizli CI icin)')
+    parser.add_argument('--all-intents', action='store_true',
+                        help='tum intentleri siniflandiriciya ogret (varsayilan: '
+                             'yalnizca sohbet intentleri; bilgiler retrieval ile)')
     args = parser.parse_args()
 
     print("=" * 50)
@@ -38,9 +49,11 @@ def main():
 
     print("Training parameters:")
     print(f"  - Epochs: {args.epochs}")
-    print("  - Learning Rate: 0.01")
+    print(f"  - Learning Rate: {args.learning_rate}")
     print()
-    losses = bot.train_model(intents_file, epochs=args.epochs, learning_rate=0.01)
+    losses = bot.train_model(intents_file, epochs=args.epochs,
+                             learning_rate=args.learning_rate,
+                             conversational_only=not args.all_intents)
 
     print()
     print("=" * 50)

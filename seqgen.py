@@ -220,7 +220,7 @@ class SeqModel:
             self.params()[k] -= lr * mhat / (np.sqrt(vhat) + 1e-8)
 
     # ---------------------------------------------------------- URETIM
-    def sample(self, context, temperature=1.0, top_k=14, max_len=150):
+    def sample(self, context, temperature=1.0, top_k=14, max_len=90):
         """Sorgu ver; karakter karakter taze yanit uret."""
         ctx = clean_chars(context, 40)
         chars = [self.c2i[ch] for ch in ctx if ch in self.c2i]
@@ -243,13 +243,15 @@ class SeqModel:
                 probs = probs ** (1.0 / temperature)
                 probs = probs / probs.sum()
             ids = np.argsort(probs)[::-1]
-            pool = [int(i) for i in ids if int(i) not in banned and int(i) != EOS]
+            pool = [int(i) for i in ids if int(i) not in banned]
             if not pool:
                 break
             pool = pool[:top_k]
             p = probs[pool]
             p = p / p.sum()
             idx = int(np.random.choice(pool, p=p))
+            if idx == EOS:
+                break
             out_chars.append(idx)
             x = self._onehot([idx])
 
@@ -302,12 +304,15 @@ def save_seq(model, path=MODEL_PATH):
 
 
 # ---------------------------------------------------------------- EGITIM
-def load_pairs(intents_path, max_pairs=5000, max_per_intent=26):
-    """(context, response) ciftleri: context=INTENT TAG'i (dusuk varyans).
+def load_pairs(intents_path, max_pairs=20000, max_per_intent=40,
+               use_query=True, ctx_len=40):
+    """(context, response) ciftleri.
 
-    Tag yaniti belirgin sekilde ayirt eder; sorgu karakterleri eklemek
-    varyansi artirip ogrenmeyi yavaslatiyordu. Cagri aninda klasifikatorun
-    verdigi tag gercek kullanimda da biliniyor.
+    use_query=True (varsayilan): context = kullanicinin SORGU kalibi.
+    Gercek kullanimda klasifikatorun tag'i yerine kullanici cumlesi verilir
+    (brain._try_seq_rephrase artik query ile ornekliyor); buna koullu egitim
+    cok daha tutarli/konuya uygun yanit uretir. use_query=False eski davranis:
+    context = intent tag'i (dusuk varyans ama kalite dusuk).
     """
     pairs = []
     if intents_path and os.path.exists(intents_path):
@@ -318,12 +323,19 @@ def load_pairs(intents_path, max_pairs=5000, max_per_intent=26):
             resps = [r for r in resps if len(r) >= 6]
             if not tag or not resps:
                 continue
-            cnt = 0
-            for r in resps:
-                pairs.append((tag, r))
-                cnt += 1
-                if cnt >= max_per_intent:
-                    break
+            if use_query:
+                pats = [clean_chars(p, ctx_len) for p in it.get('patterns', [])]
+                pats = [p for p in pats if len(p) >= 6] or [tag]
+                for p in pats[:max_per_intent]:
+                    for r in resps[:max_per_intent]:
+                        pairs.append((p, r))
+            else:
+                cnt = 0
+                for r in resps:
+                    pairs.append((tag, r))
+                    cnt += 1
+                    if cnt >= max_per_intent:
+                        break
     rng = random.Random(3)
     rng.shuffle(pairs)
     return pairs[:max_pairs]
@@ -336,7 +348,7 @@ def encode_pair(m, ctx, resp):
         ci = [m.c2i.get(' ', PAD)]
     if not ri:
         ri = [m.c2i.get('.', PAD)]
-    seq = ci + [m.c2i['<BOS>']] + ri
+    seq = ci + [m.c2i['<BOS>']] + ri + [m.c2i['<EOS>']]
     start = len(ci)  # ilk tahmin pozisyonu (BOS'tan itibaren)
     return seq, start
 
@@ -364,7 +376,7 @@ def make_batches(m, pairs, B):
 
 
 def train(path_model=MODEL_PATH, epochs=26, hidden=128, lr=0.004, batch=64,
-          data_limit=5000, val_split=0.1):
+          data_limit=20000, val_split=0.1):
     utf8_stdout()
     base = os.path.dirname(os.path.abspath(__file__))
     pairs = load_pairs(os.path.join(base, 'intents.json'),
