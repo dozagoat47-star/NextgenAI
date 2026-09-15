@@ -10,26 +10,9 @@ import random
 import string
 import os
 import re
-import unicodedata
 
+from normalize import ascii_normalize as _normalize
 from transformer import TransformerNN
-
-
-# Latin (Turkce dahil) ozel harflerin ASCII karsiliklari. Aksanli harflerin
-# cogu NFD decompose ile cikar, ama ayristirilamayan harfler (eszett, ligatur
-# vb.) dogrudan eslenir. Boylesi 'jacques prevert' / 'jacques prévert' gibi
-# yabanci adlari da ayni torbaya dusurur (autogrow onlari ham ekliyor).
-_LATIN_TO_ASCII = {
-    'ç': 'c', 'ğ': 'g', 'ı': 'i', 'ö': 'o', 'ş': 's', 'ü': 'u',
-    'â': 'a', 'î': 'i', 'û': 'u', 'i': 'i', 'o': 'o', 'u': 'u',
-    'Ç': 'c', 'Ğ': 'g', 'İ': 'i', 'I': 'i', 'Ö': 'o', 'Ş': 's', 'Ü': 'u',
-    'Â': 'a', 'Î': 'i', 'Û': 'u',
-    'ß': 'ss', 'æ': 'ae', 'Æ': 'AE', 'œ': 'oe', 'Œ': 'OE',
-    'ð': 'd', 'Ð': 'D', 'ø': 'o', 'Ø': 'O', 'ł': 'l', 'Ł': 'L',
-    'þ': 'th', 'Þ': 'TH',
-    '\u0307': '',  # Python'in 'İ'.lower() ciktisindaki kombinasyon noktasi
-}
-_LATIN_TRANSLATE = str.maketrans(_LATIN_TO_ASCII)
 
 
 # Turkce islev/durak kelimeleri: anahtar kelime dikkatinde agirligi sifir.
@@ -671,6 +654,9 @@ class ChatBot:
         # None = henuz yoklanmadi; ilk get_response'da seq_model.json var mi diye
         # bakilir, varsa True olur (latency: sadece bir kez import/load).
         self.seq_enabled = None
+        # Seq2Seq encoder-decoder ureteci (model/seq2seq_model.json). None ise
+        # dosya yok demektir; seq2seq.sample -> quality gate -> LSTM fallback.
+        self.seq2 = None
         # Transformer girdisi icin token -> indeks eslemesi
         self.vocab_to_idx = {}
         self.pad_idx = 0
@@ -726,11 +712,7 @@ class ChatBot:
         Boylece 'ogle' / 'öğle' / 'OĞLE' hepsi ayni kelimeye donusur.
         Ek olarak yabanci aksanlar da sokulur: 'prevert' / 'prévert' ayni olur.
         """
-        t = text.translate(_LATIN_TRANSLATE)
-        if any(ord(c) > 127 for c in t):
-            t = ''.join(c for c in unicodedata.normalize('NFD', t)
-                        if not unicodedata.combining(c))
-        return t
+        return _normalize(text)
 
     def simple_stem(self, word):
         """Basit Turkce kelime koku bulma (stemming)"""
@@ -1179,8 +1161,10 @@ class ChatBot:
             return False
 
         strength = self.keyword_strength(user_input)
-        if strength < 0.5:
+        if strength < 0.5 and probability < 0.95:
             # Soru hicbir intent ile anlamli kelime paylasmiyor: secim guvenilmez.
+            # Cok yuksek guven (>=0.95, ornek 'ne yapabilirsin') stem
+            # boslugunu asar; yoksa fallback'e birak.
             return False
 
         if probability < 0.30 and strength < 1.5:
@@ -1189,16 +1173,21 @@ class ChatBot:
         # Kural 2b: Soru icinde modelin HICBIR intentinde gecmeyen bilgilendirici
         # bir kelime varsa (ozel isim/terim gibi: paris, akropol) ve secim zayif
         # bir eslesmeye dayaniyorsa dataset cevabi suphelidir -> fallback.
-        if self.has_unknown_subject(user_input) and strength < 1.5:
+        if self.has_unknown_subject(user_input) and strength < 1.5 and probability < 0.95:
             return False
 
         query_kws = {w for w in self.tokenize(user_input) if w not in STOPWORDS}
         if not query_kws:
             return probability >= 0.30 or strength >= 1.5
         overlap = query_kws & self.intent_kws.get(tag, set())
-        if not overlap and strength < 1.5:
-            # Secilen intent sorunun HICBIR anahtar kelimesini icermiyor.
-            return False
+        if len(overlap) == 1:
+            # Tek stem eslesmesi cok kisa ise (bak/don gibi) konular arasi
+            # karisim olabilir; yuuksek guven bile olsa fallback'e birak.
+            (only,) = overlap
+            if len(only) <= 3:
+                return False
+        if not overlap:
+            return probability >= 0.95 or strength >= 1.5
 
         return True
 
@@ -1339,16 +1328,25 @@ class ChatBot:
         return best
 
     def _try_seq_rephrase(self, tag, query=None):
-        """SeqGen LSTM ureteciyle kullanici sorusuna kayitli tag'e gore
-        taze bir varyant uretir.
+        """Once Seq2Seq encoder-decoder (char), yoksa SeqGen LSTM ile taze bir
+        varyant uretir.
 
-        Ornekleme kosulu: asil query (varsa), yoksa tag. LSTM bu kosula
-        egitilmis olmalidir (colab'daki seqgen notebook sorgu-kosullu egitiyor).
+        Ornekleme kosulu: asil query (varsa), yoksa tag. Seklendirme modelleri
+        bu kosula egitilmis olmalidir (colab notebook'lari sorgu-kosullu egitiyor).
         Kalite sapagi: cok kisa/tekrariest/sozcuk dagina dokunmayan ciktilari
         reddeder (None dondurur) -> get_response guvenli sekilde canned'e donebilir.
-        Model dosyasi yoksa da None (sessiz devre disi).
+        Model dosyalari yoksa da None (sessiz devre disi). Hangi uretec olursa
+        olsun ayni kalite kapisindan gecer: seq2seq -> seqgen LSTM fallbacki.
         """
         try:
+            ctx = query or tag
+            if self.seq2 is None:
+                from seq2seq import load_seq2seq
+                self.seq2 = load_seq2seq()
+            if self.seq2 is not None:
+                gen = self.seq2.sample(ctx, temperature=0.6, top_k=6)
+                if self._accept_generated(gen, tag):
+                    return gen
             if self.seq_enabled is None:
                 self.seq_enabled = False
                 from seqgen import load_seq
@@ -1356,24 +1354,48 @@ class ChatBot:
                 self.seq_enabled = self.seq is not None
             if not self.seq_enabled:
                 return None
-            ctx = query or tag
-            gen = self.seq.sample(ctx, temperature=0.9, top_k=14)
-            if not gen or len(gen) < 12 or len(gen) > 260:
-                return None
-            letters = [c for c in gen.lower() if c.isalpha()]
-            if len(letters) < 6 or len(set(letters)) < int(len(letters) * 0.30):
-                return None
-            union = set()
-            for r in (self.intents.get(tag) or []):
-                union |= set(self.tokenize(r))
-            kws = self.intent_kws.get(tag) or set()
-            gen_toks = set(self.tokenize(gen))
-            if not gen_toks:
-                return None
-            overlap = len(gen_toks & (union | kws))
-            return gen if overlap / float(len(gen_toks)) >= 0.30 else None
+            gen = self.seq.sample(ctx, temperature=0.7, top_k=10)
+            return gen if self._accept_generated(gen, tag) else None
         except Exception:
             return None
+
+    def _accept_generated(self, gen, tag):
+        """Uretilen varyanti kalite kapisindan gecirir.
+
+        Kisa/tekrar testi + intent sozcuk dagiyla ortu testi tek basina
+        yetmez (rastgele kelime salatinin ortu orani yuksek cikabilir);
+        ek olarak uretilen cumlenin EN AZ BIR bigram'i kayitli yanitlarda
+        GECMELI (frase devamliligi). Bu, kelime salati/yoldan cikmis ciktilari
+        eler -> guvenli canned fallback.
+        """
+        if not gen or len(gen) < 12 or len(gen) > 260:
+            return False
+        letters = [c for c in gen.lower() if c.isalpha()]
+        if len(letters) < 6 or len(set(letters)) < int(len(letters) * 0.30):
+            return False
+        union = set()
+        canned_toks = []
+        for r in (self.intents.get(tag) or []):
+            rt = self.tokenize(r)
+            union |= set(rt)
+            canned_toks.append(rt)
+        kws = self.intent_kws.get(tag) or set()
+        gen_toks = set(self.tokenize(gen))
+        if not gen_toks:
+            return False
+        overlap = len(gen_toks & (union | kws))
+        if overlap / float(len(gen_toks)) < 0.30:
+            return False
+        # frase devamliligi: uretilen en az bir bigram kayitli bir yanitta gecmeli
+        cand = self.tokenize(gen)
+        gen_bigrams = set(zip(cand, cand[1:]))
+        if not gen_bigrams:
+            return False
+        for rt in canned_toks:
+            cb = set(zip(rt, rt[1:]))
+            if gen_bigrams & cb:
+                return True
+        return False
 
     def save_model(self, model_dir):
         """Save model and bot data"""

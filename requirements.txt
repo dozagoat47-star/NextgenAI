@@ -1,0 +1,4 @@
+numpy>=1.24
+flask>=2.3
+requests>=2.31
+openpyxl>=3.1

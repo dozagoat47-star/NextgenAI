@@ -28,6 +28,8 @@ import sys
 
 import numpy as np
 
+from normalize import ascii_normalize
+
 MODEL_PATH = os.path.join(os.path.dirname(__file__), 'model', 'seq_model.json')
 
 PAD, BOS, EOS = 0, 1, 2
@@ -37,18 +39,6 @@ ALLOWED_EXTRAS = set(".,;:!?…()%’'\"-–/") | set(string.digits)
 def utf8_stdout():
     if sys.stdout and sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-
-
-def ascii_normalize(text):
-    """Turkce ozel karakterleri ASCII karsiliklarina cevirir (brain ile ayni tablo)."""
-    table = {
-        'ç': 'c', 'ğ': 'g', 'ı': 'i', 'ö': 'o', 'ş': 's', 'ü': 'u',
-        'â': 'a', 'î': 'i', 'û': 'u', 'i': 'i', 'o': 'o', 'u': 'u',
-        'Ç': 'C', 'Ğ': 'G', 'İ': 'I', 'I': 'I', 'Ö': 'O', 'Ş': 'S', 'Ü': 'U',
-        'Â': 'A', 'Î': 'I', 'Û': 'U',
-        '\u0307': '',
-    }
-    return text.translate(str.maketrans(table))
 
 
 def clean_chars(text, max_len):

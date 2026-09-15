@@ -28,18 +28,7 @@ import re
 from collections import defaultdict
 
 from brain import STOPWORDS
-
-
-def ascii_normalize(text):
-    """Turkce ozel karakterler ASCII karsiligina cevrilir (brain ile ayni tablo)."""
-    table = {
-        'ç': 'c', 'ğ': 'g', 'ı': 'i', 'ö': 'o', 'ş': 's', 'ü': 'u',
-        'â': 'a', 'î': 'i', 'û': 'u', 'i': 'i', 'o': 'o', 'u': 'u',
-        'Ç': 'C', 'Ğ': 'G', 'İ': 'I', 'I': 'I', 'Ö': 'O', 'Ş': 'S', 'Ü': 'U',
-        'Â': 'A', 'Î': 'I', 'Û': 'U',
-        '\u0307': '',
-    }
-    return text.translate(str.maketrans(table))
+from normalize import ascii_normalize
 
 
 # Soz dizimi baglayicilari; uretimde ara bosluklari doldurmak icin olasilikla

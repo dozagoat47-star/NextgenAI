@@ -26,24 +26,8 @@ import sys
 import json
 import argparse
 import datetime
-import unicodedata
 
-
-# Latin (Turkce dahil) ozel harflerin ASCII karsiliklari. Ayristirilamayan
-# harfler (eszett, ligatur vb.) dogrudan eslenir; kalan aksanlar NFD ile
-# sokulur. Boylesi autogrow'un ekledigi yabanci adlar ('prevert') da ASCII
-# olur ve 'prévert' yazilsa dahi eslesir.
-_LATIN_TO_ASCII = {
-    'ç': 'c', 'ğ': 'g', 'ı': 'i', 'ö': 'o', 'ş': 's', 'ü': 'u',
-    'â': 'a', 'î': 'i', 'û': 'u', 'i': 'i', 'o': 'o', 'u': 'u',
-    'Ç': 'c', 'Ğ': 'g', 'İ': 'i', 'I': 'i', 'Ö': 'o', 'Ş': 's', 'Ü': 'u',
-    'Â': 'a', 'Î': 'i', 'Û': 'u',
-    'ß': 'ss', 'æ': 'ae', 'Æ': 'AE', 'œ': 'oe', 'Œ': 'OE',
-    'ð': 'd', 'Ð': 'D', 'ø': 'o', 'Ø': 'O', 'ł': 'l', 'Ł': 'L',
-    'þ': 'th', 'Þ': 'TH',
-    '\u0307': '',
-}
-_LATIN_TRANSLATE = str.maketrans(_LATIN_TO_ASCII)
+from normalize import ascii_normalize
 
 if sys.stdout.encoding.lower() not in ('utf-8', 'utf8'):
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
@@ -70,16 +54,6 @@ HARMFUL_TAG = [
 ]
 
 MIN_TOKENS = 3
-
-
-def ascii_normalize(text):
-    """Turkce ozel karakterler ve birlesik nokta ASCII'ye cevrilir; ayrica
-    yabanci aksanlar (e-acute, o-macron, eszett...) da sokulur."""
-    t = text.translate(_LATIN_TRANSLATE)
-    if any(ord(c) > 127 for c in t):
-        t = ''.join(c for c in unicodedata.normalize('NFD', t)
-                    if not unicodedata.combining(c))
-    return t
 
 
 def strip_foreign_scripts(text):

@@ -116,3 +116,90 @@ GRAD_CLIP=5.0, PATIENCE=15, MAX_PAIRS=20000, DROPOUT=0.15
   `break` eder; `max_len=90` ile sınırlı güvenlik calibi vardır.
 - Dropout yalnızca PyTorch **eğitiminde** uygulanır; `eval()`/export'ta kapalı
   olduğundan NumPy parity bozulmaz.
+
+---
+
+## Seq2Seq Encoder-Decoder Eğitimi (sorgu-koullu, PyTorch+GPU)
+
+### Nedir?
+
+SeqGen LSTM'nin daha güçlü evrimi: **(kullanıcı sorgusu) -> (doğal Türkçe
+yanıt)** ilişkisini öğrenen, numaralandırılabilir karakter-seviyesi transformer
+**encoder-decoder**. LSTM'e kıyasla uzun bağımlılıkları, konu bağlamını ve
+yanıt yapısını çok daha iyi modeller (copy-paste sorununa asıl çözüm budur).
+
+### Dosyalar
+
+| Dosya | Açıklama |
+|---|---|
+| `nextgen_seq2seq_colab.ipynb` | Seq2Seq eğitim notebook'u (PyTorch + GPU) |
+| `../seq2seq.py` | NumPy inference modülü (ileri geçiş + örnekleme) |
+| `../tests/test_core.py::TestSeq2Seq` | Kayıt/yükleme + örnekleme regresyonu |
+
+### Nasıl çalışır?
+
+1. Veri `seqgen.load_pairs(..., use_query=True)` ile (pattern, response)
+   çiftleridir; `build_vocab` karakter sözlüğünü kurar (PAD/BOS/EOS = 0/1/2).
+2. Torch modeli `seq2seq.Seq2Seq` ile **birebir aynı cebir**: paylaşılan
+   embedding, sinusoidal konum (×1/sqrt(d)), N encoder + N decoder bloğu
+   (Pre-LN, GELU, causal + cross-attn), final LN + lineer kafa. Parametre
+   adları (örn. `b0_Wq`, `db0_Wqc`, `head`) düz attribute olarak tutulur →
+   `named_parameters` doğrudan NumPy `params` anahtarlarına eşlenir.
+3. Teacher-forcing CE kaybı yalnızca yanıt pozisyonlarında; Adam + warmup +
+   cosine, grad-clip, erken durdurma. Checkpoint `seq2seq_ckpt.pt`.
+4. Son hücrede **parity testi**: torch forward vs NumPy `_encode` +
+   `_decoder_logits` farkı < 1e-3 doğrulanır (dropout eval'da kapalı olduğundan
+   birebir eşit olmalıdır).
+
+### Kullanım
+
+1. `intents.json`, `seqgen.py`, `seq2seq.py` dosyalarını `/content` altına
+   yükle.
+2. `nextgen_seq2seq_colab.ipynb`'i aç, `Runtime > Run all`.
+3. Eğitim bitince `model/seq2seq_model.json`'ı indir.
+4. Yerelde `model/seq2seq_model.json`'ı kopyala.
+5. `brain._try_seq_rephrase` artık **önce seq2seq'i** dener (char-level
+   encoder-decoder), çıktı kalite kapısını geçemezse veya dosya yoksa
+   **SeqGen LSTM'e** düşer; ikisi de yoksa canned cevaba döner.
+6. Manuel test:
+   ```python
+   from seq2seq import load_seq2seq
+   m = load_seq2seq()
+   print(m.sample('hava nasil olacak', temperature=0.9, top_k=14))
+   ```
+
+### Hiperparametreler
+
+```
+D_MODEL=128, NUM_BLOCKS=4, NUM_HEADS=4, FF_MULT=3, DROPOUT=0.10
+BATCH_SIZE=64, EPOCHS=400, LR_BASE=1e-3, LR_MIN=0.1, WARMUP=200
+GRAD_CLIP=5.0, PATIENCE=20, MAX_PAIRS=20000
+MAX_ENC_LEN=40, MAX_DEC_LEN=48, TARGET_MAX_LEN=42
+```
+
+### Önemli uyum notları
+
+- Cross-attn çıktı adları kodda `db{i}_Wqc/Wkc/Wvc/Woc` + `db{i}_bqc/bkc/bvc/boc`
+  (docstring ile aynı; export haritası bunlarla birebir eşleşir).
+- `embed` satır 0 (PAD) hem NumPy hem Torch'ta sabit 0 tutulur.
+- Dropout yalnızca eğitimde; `eval()`/export parity'si bozulmaz.
+- `seq2seq.py` yalnızca ileri geçiş yapar; backprop yok (eğitim için Torch).
+
+## Alternatif: Lightning AI ile eğitim (`train_seq2seq.py`)
+
+Notebook'a gerek yok; bağımsız script `train_seq2seq.py` (kök dizinde) aynı
+eğitimi terminalde koşar. Avantajları:
+- **Kalıcı disk**: checkpoint restarta/copmaya rağmen durur; script otomatik
+  kaldığı yerden devam eder (Colab `/content`'e benzeri yok).
+- Arka plan çalıştırma; tarayıcı kapanınca eğitim sürer.
+- Ücretsiz kredi (ayda 15, ~1 dolar = 1 kredi); T4 ~0.2-1.2 kredi/saat.
+
+Çalıştırma: Studio'ya 5 dosyayı yükle (`intents.json`, `seqgen.py`,
+`seq2seq.py`, `normalize.py`, `train_seq2seq.py`), GPU (T4) seç, sonra:
+
+```bash
+python train_seq2seq.py --epochs 250   # veya 400
+SMOKE=1 python train_seq2seq.py        # 2 adım hız testi (CPU/GPU)
+```
+
+Çıktı: `seq2seq_model.json` -> yerel `model/` klasörüne kopyala.

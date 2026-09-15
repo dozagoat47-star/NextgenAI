@@ -442,6 +442,77 @@ class TestTransformer(unittest.TestCase):
         shutil.rmtree(ndir)
 
 
+class TestSeq2Seq(unittest.TestCase):
+    """Seq2Seq encoder-decoder: kayit/yukleme, ornekleme, encode.Shape."""
+
+    @staticmethod
+    def _build():
+        from seq2seq import Seq2Seq
+        vocab = ['<PAD>', '<BOS>', '<EOS>'] + list('abcçdefgğhıijklmnoöprsştuüvyz. ')
+        return Seq2Seq(vocab, d_model=32, num_blocks=1, num_heads=2,
+                       max_enc_len=40, max_dec_len=20, seed=42)
+
+    def test_round_trip(self):
+        import tempfile
+        from seq2seq import save_seq2seq, load_seq2seq
+        m = self._build()
+        path = os.path.join(tempfile.gettempdir(), 'ng_seq2seq_test.json')
+        save_seq2seq(m, path)
+        try:
+            m2 = load_seq2seq(path)
+            self.assertIsNotNone(m2)
+            self.assertEqual(m2.V, m.V)
+            self.assertEqual(m2.d_model, m.d_model)
+            self.assertEqual(m2.num_blocks, m.num_blocks)
+            self.assertEqual(set(m2.params.keys()), set(m.params.keys()))
+            for k in m.params:
+                import numpy as np
+                np.testing.assert_allclose(m2.params[k], m.params[k], atol=1e-6,
+                                           err_msg=f'param farki: {k}')
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
+    def test_sample_returns_str(self):
+        m = self._build()
+        out = m.sample('merhaba', temperature=0.9, top_k=5, max_len=15)
+        self.assertIsInstance(out, str)
+        self.assertTrue(len(out) >= 0)
+
+    def test_sample_terminates(self):
+        m = self._build()
+        for _ in range(5):
+            out = m.sample('test sorgusu', max_len=20)
+            self.assertIsInstance(out, str)
+
+    def test_encode_seq2_shapes(self):
+        from seq2seq import encode_seq2
+        m = self._build()
+        enc, din, dtgt, emask, dmask = encode_seq2(m, 'merhaba', 'hosbuldum')
+        import numpy as np
+        self.assertEqual(enc.ndim, 1)
+        self.assertEqual(din.ndim, 1)
+        self.assertEqual(dtgt.ndim, 1)
+        self.assertEqual(emask.ndim, 1)
+        self.assertEqual(dmask.ndim, 1)
+        self.assertGreater(len(enc), 0)
+        self.assertEqual(len(din), len(dtgt))
+        self.assertEqual(len(din), len(dmask))
+
+    def test_from_dict_overrides_vocab(self):
+        from seq2seq import Seq2Seq
+        m = self._build()
+        d = m.to_dict()
+        new_vocab = ['<PAD>', '<BOS>', '<EOS>'] + list('xyz ')
+        d['vocab'] = new_vocab
+        d['V'] = len(new_vocab)
+        m2 = Seq2Seq(['<PAD>', '<BOS>', '<EOS>'])
+        m2.from_dict(d)
+        self.assertEqual(m2.V, len(new_vocab))
+        self.assertIn('x', m2.c2i)
+        self.assertNotIn('a', m2.c2i)
+
+
 class TestModuleImports(unittest.TestCase):
     """Proje modülleri hicbir yavas runtime'a takilmadan import edilmeli."""
 
@@ -450,11 +521,12 @@ class TestModuleImports(unittest.TestCase):
         import corpus
         import generator
         import seqgen
+        import seq2seq
         import transformer
         import clean_intents
         import scrape_intents
         import train  # egitici komutlari modül olarak da yuklenir
-        for mod in (brain, corpus, generator, seqgen, transformer,
+        for mod in (brain, corpus, generator, seqgen, seq2seq, transformer,
                     clean_intents, scrape_intents, train):
             self.assertIsNotNone(mod)
 
@@ -504,7 +576,11 @@ class TestTwoLayerArchitecture(unittest.TestCase):
         data = bot.conversational_data(data)
         conv_set = set(bot.intent_tags)
         kb = bot.knowledge_intents
-        self.assertEqual(len(kb), 753)
+        # Tanım gereği: knowledge_intents = intents - conversational tags.
+        # Sabit sayı yerine (753) veriden dinamik hesaplanır; yeni intent
+        # eklendikçe test bozulmaz.
+        self.assertEqual(len(kb), len(bot.intents) - len(bot.intent_tags))
+        self.assertGreater(len(kb), 0)
         self.assertTrue(conv_set.isdisjoint(set(kb.keys())))
 
     def test_knowledge_retrieval_response(self):
