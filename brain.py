@@ -657,6 +657,11 @@ class ChatBot:
         # Seq2Seq encoder-decoder ureteci (model/seq2seq_model.json). None ise
         # dosya yok demektir; seq2seq.sample -> quality gate -> LSTM fallback.
         self.seq2 = None
+        # Decoder-only LLM ureteci (model/llm_model.json). llm.sample ->
+        # kalite kapisi -> seq2seq -> LSTM fallbacki. None ise yuklenmedi ya da
+        # dosya yok; llm_enabled dosya yoklugunu bir kez tespit edip biter.
+        self.llm = None
+        self.llm_enabled = None
         # Transformer girdisi icin token -> indeks eslemesi
         self.vocab_to_idx = {}
         self.pad_idx = 0
@@ -1011,10 +1016,15 @@ class ChatBot:
         input_size = len(self.vocabulary)
         output_size = len(self.intent_tags)
 
+        # Mimari: decoder-only LLM'e kiyasla kucuk ama classifier icin guclu.
+        # Colab/Lightning AI egitimi ile ayni degerler kullanilmali (parity).
+        arch = dict(d_model=128, num_blocks=4, num_heads=4, ff_mult=4)
+
         print(f"\nTransformer Architecture:")
         print(f"  Vocab size:   {input_size}")
         print(f"  Max seq len:  {self.max_seq_len}")
-        print(f"  Embed dim:    96 (3 kafa, 3 blok)")
+        print(f"  Embed dim:    {arch['d_model']} "
+              f"({arch['num_heads']} kafa, {arch['num_blocks']} blok)")
         print(f"  Output:       {output_size} intents")
         print(f"\nTraining samples: {len(X)} (val: {len(X_val)})")
         print(f"Optimizer: AdamW | GELU | Pre-LN | Dropout 0.10 | L2: 1e-4")
@@ -1024,7 +1034,8 @@ class ChatBot:
             vocab_size=input_size,
             num_intents=output_size,
             max_seq_len=self.max_seq_len,
-            d_model=96, num_blocks=3, num_heads=3, ff_mult=3,
+            d_model=arch['d_model'], num_blocks=arch['num_blocks'],
+            num_heads=arch['num_heads'], ff_mult=arch['ff_mult'],
             dropout=0.1, attn_dropout=0.05, weight_decay=1e-4,
             seed=42)
 
@@ -1302,25 +1313,27 @@ class ChatBot:
         if negated and neg_content:
             return self._negation_reply(neg_content)
 
-        # ANAHTAR KELIME OVERRIDE bilgi intentine ulasti: canned bilgi yaniti.
+        # ANAHTAR KELIME OVERRIDE bilgi intentine ulasti: canned bilgi yaniti
+        # (LLM varsa bilgi parcasindan yeniden kurulur -> kopya degil).
         if chosen_tag not in self.intent_tags:
-            return self._select_response(chosen_tag, resp_words)
+            kb = self._select_response(chosen_tag, resp_words)
+            return self._try_kb_rephrase(user_input, kb)
 
         # GUVENSIZ SECIM: sohbet siniflarina guvenilmiyorsa once bilgi
-        # intentlerine sor; eslesme varsa bilgi yaniti, yoksa kullanicidan
-        # netlestirme iste.
+        # intentlerine sor; eslesme varsa bilgi yaniti (LLM ile yeniden
+        # kurulur), yoksa kullanicidan netlestirme iste.
         if unclear or probability < self.confidence_threshold:
             kb = self._select_knowledge(
                 resp_words, exclude=neg_content if negated else None)
             if kb:
-                return kb
+                return self._try_kb_rephrase(user_input, kb)
             if unclear:
                 return "Anlayamadim, baska sekilde soyler misin?"
 
-        responses = self.intents.get(chosen_tag, ["Bir hata olustu."])
         best = self._select_response(chosen_tag, resp_words)
 
-        # SeqGen LSTM ureteciyle taze varyant (kalite kapisi gecmezse canned).
+        # Uretici hatti: LLM -> Seq2Seq -> SeqGen LSTM. Kalite kapisi
+        # gecmezse ekranda eski yanit (canned) doner (guvenli fallback).
         gen = self._try_seq_rephrase(chosen_tag, user_input)
         if gen:
             return gen
@@ -1328,18 +1341,23 @@ class ChatBot:
         return best
 
     def _try_seq_rephrase(self, tag, query=None):
-        """Once Seq2Seq encoder-decoder (char), yoksa SeqGen LSTM ile taze bir
-        varyant uretir.
+        """Once Decoder-only LLM, sonra Seq2Seq encoder-decoder (char), en
+        sonunda SeqGen LSTM ile taze bir varyant uretir.
 
         Ornekleme kosulu: asil query (varsa), yoksa tag. Seklendirme modelleri
         bu kosula egitilmis olmalidir (colab notebook'lari sorgu-kosullu egitiyor).
-        Kalite sapagi: cok kisa/tekrariest/sozcuk dagina dokunmayan ciktilari
-        reddeder (None dondurur) -> get_response guvenli sekilde canned'e donebilir.
-        Model dosyalari yoksa da None (sessiz devre disi). Hangi uretec olursa
-        olsun ayni kalite kapisindan gecer: seq2seq -> seqgen LSTM fallbacki.
+        Kalite sapagi: cok kisa/tekrariest/sozcuk dagina dokunmayan ya da
+        KAYITLI YANITIN KOPYASI olan ciktilari reddeder -> akil yurutme: model
+        canned'i ezberlemek yerine konuya yapisik OZGUN cumle kurabilir. Model
+        dosyalari yoksa da None (sessiz devre disi). Hangi uretec olursa olsun
+        ayni kapidan gecer: llm -> seq2seq -> seqgen fallbacki.
         """
         try:
             ctx = query or tag
+            if self._ensure_llm():
+                gen = self.llm.sample(ctx, temperature=0.6, top_k=6, rep_penalty=0.4)
+                if self._accept_generated(gen, tag):
+                    return gen
             if self.seq2 is None:
                 from seq2seq import load_seq2seq
                 self.seq2 = load_seq2seq()
@@ -1359,43 +1377,103 @@ class ChatBot:
         except Exception:
             return None
 
-    def _accept_generated(self, gen, tag):
-        """Uretilen varyanti kalite kapisindan gecirir.
+    def _ensure_llm(self):
+        """LLM'i bir kez yukler (dosya yoksa kalici olarak devre disi)."""
+        if self.llm_enabled is None:
+            self.llm_enabled = False
+            try:
+                from llm import load_llm
+                self.llm = load_llm()
+                self.llm_enabled = self.llm is not None
+            except Exception:
+                self.llm = None
+        return self.llm_enabled and self.llm is not None
 
-        Kisa/tekrar testi + intent sozcuk dagiyla ortu testi tek basina
-        yetmez (rastgele kelime salatinin ortu orani yuksek cikabilir);
-        ek olarak uretilen cumlenin EN AZ BIR bigram'i kayitli yanitlarda
-        GECMELI (frase devamliligi). Bu, kelime salati/yoldan cikmis ciktilari
-        eler -> guvenli canned fallback.
+    def _try_kb_rephrase(self, query, kb):
+        """Bilgi (retrieval) yanitini ozetler/yeniden kurar: kopyala-yapistir
+        yerine bilgi parcasindan yola cikip kisa, ozgun bir aciklama uretir.
+
+        LLM yoksa ya da ozet kalite kapisindan gecmezse ham `kb` doner
+        (guvenli fallback). _accept_generated ile ayni mantik ama konu kumesi
+        bilgi metninin kendisidir (tag yoktur).
+        """
+        if not query or not kb:
+            return kb
+        if not self._ensure_llm():
+            return kb
+        try:
+            gen = self.llm.sample(query, temperature=0.7, top_k=10,
+                                  knowledge=kb[:200], rep_penalty=0.4)
+            if self._accept_kb_rephrase(gen, kb):
+                return gen
+        except Exception:
+            pass
+        return kb
+
+    def _accept_generated(self, gen, tag):
+        """Uretilen varyanti kalite kapisindan gecirir (ozgunluk odakli).
+
+        Rule-check:
+          - Kisa/tekrar/sozcuk dagi denetimi (eski),
+          - konu orusu: token'larin en az %25'i intent sozcuk dagine dokunmali,
+          - OZGUNLUK: token'larin en az %15'i kayitli yanitlarda YOK olmali
+            (kopya reddedilir). Kayitli kanonlar sadece boyle asilir -> akil
+            yurutme/yeni cumle kurmaya alan acilir.
+          - yapisan tekrar (her yeni token ayni) elenir.
         """
         if not gen or len(gen) < 12 or len(gen) > 260:
             return False
         letters = [c for c in gen.lower() if c.isalpha()]
         if len(letters) < 6 or len(set(letters)) < int(len(letters) * 0.30):
             return False
-        union = set()
-        canned_toks = []
+        canned = set()
         for r in (self.intents.get(tag) or []):
-            rt = self.tokenize(r)
-            union |= set(rt)
-            canned_toks.append(rt)
+            canned |= set(self.tokenize(r))
         kws = self.intent_kws.get(tag) or set()
-        gen_toks = set(self.tokenize(gen))
-        if not gen_toks:
-            return False
-        overlap = len(gen_toks & (union | kws))
-        if overlap / float(len(gen_toks)) < 0.30:
-            return False
-        # frase devamliligi: uretilen en az bir bigram kayitli bir yanitta gecmeli
         cand = self.tokenize(gen)
-        gen_bigrams = set(zip(cand, cand[1:]))
-        if not gen_bigrams:
+        if len(cand) < 3:
             return False
-        for rt in canned_toks:
-            cb = set(zip(rt, rt[1:]))
-            if gen_bigrams & cb:
-                return True
-        return False
+        gen_set = set(cand)
+        overlap = len(gen_set & (canned | kws)) / float(len(gen_set))
+        if overlap < 0.25:
+            return False
+        # ozgunluk: canned disinda en az %15 yeni sozcuk (kopyaya hayir)
+        novel = gen_set - canned
+        if len(novel) / float(len(gen_set)) < 0.15:
+            return False
+        # yapiskan tekrar: ayni sozcugun yan yana tekrari dominat olmamali
+        if len(cand) >= 4:
+            dup = sum(1 for a, b in zip(cand, cand[1:]) if a == b)
+            if dup / float(len(cand) - 1) > 0.5:
+                return False
+        return True
+
+    def _accept_kb_rephrase(self, gen, kb):
+        """Bilgi yeniden-kurumu icin ozel kapida: konu bilgi parcasinda,
+        ozgunluk %15, kisa ve akici. Başarisizsa None -> ham kb doner."""
+        if not gen or len(gen) < 12 or len(gen) > 260:
+            return False
+        letters = [c for c in gen.lower() if c.isalpha()]
+        if len(letters) < 6 or len(set(letters)) < int(len(letters) * 0.30):
+            return False
+        kb_set = set(self.tokenize(kb))
+        if not kb_set:
+            return False
+        cand = self.tokenize(gen)
+        if len(cand) < 3:
+            return False
+        gen_set = set(cand)
+        overlap = len(gen_set & kb_set) / float(len(gen_set))
+        if overlap < 0.20:
+            return False
+        novel = gen_set - kb_set
+        if len(novel) / float(len(gen_set)) < 0.15:
+            return False
+        if len(cand) >= 4:
+            dup = sum(1 for a, b in zip(cand, cand[1:]) if a == b)
+            if dup / float(len(cand) - 1) > 0.5:
+                return False
+        return True
 
     def save_model(self, model_dir):
         """Save model and bot data"""

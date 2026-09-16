@@ -37,7 +37,6 @@ import re
 import numpy as np
 
 from seqgen import clean_chars
-from normalize import ascii_normalize
 
 MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           'model', 'seq2seq_model.json')

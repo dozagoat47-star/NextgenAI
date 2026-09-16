@@ -13,7 +13,6 @@ Kullanim:
 
 import sys
 import io
-import os
 import json
 import time
 import argparse

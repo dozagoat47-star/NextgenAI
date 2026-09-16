@@ -513,6 +513,231 @@ class TestSeq2Seq(unittest.TestCase):
         self.assertNotIn('a', m2.c2i)
 
 
+class TestLLM(unittest.TestCase):
+    """Decoder-only LLM: kayit/yukleme, ornekleme, encode, dikkat maske."""
+
+    @staticmethod
+    def _build():
+        from llm import LLM
+        vocab = ['<PAD>', '<BOS>', '<SEP>', '<EOS>'] + list('abc .')
+        return LLM(vocab, d_model=16, num_blocks=2, num_heads=2,
+                   max_ctx_len=20, max_seq_len=50, seed=42)
+
+    def test_round_trip(self):
+        import tempfile
+        import numpy as np
+        from llm import save_llm, load_llm
+        m = self._build()
+        path = os.path.join(tempfile.gettempdir(), 'ng_llm_test.json')
+        save_llm(m, path)
+        try:
+            m2 = load_llm(path)
+            self.assertIsNotNone(m2)
+            self.assertEqual(m2.V, m.V)
+            self.assertEqual(m2.d_model, m.d_model)
+            self.assertEqual(m2.num_blocks, m.num_blocks)
+            self.assertEqual(set(m2.params.keys()), set(m.params.keys()))
+            for k in m.params:
+                np.testing.assert_allclose(m2.params[k], m.params[k], atol=1e-6,
+                                           err_msg=f'param farki: {k}')
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
+    def test_causal_attention_blocks_future(self):
+        import numpy as np
+        m = self._build()
+        seq = np.array([[1, 2, 3, 2, 4]], np.int64)  # BOS a b SEP d
+        logits = m.forward(seq)
+        self.assertEqual(logits.shape, (1, 5, m.V))
+
+    def test_encode_shapes_and_mask(self):
+        import numpy as np
+        from llm import encode_llm
+        m = self._build()
+        seq, smask = encode_llm(m, 'ab', 'bc')
+        self.assertEqual(seq.ndim, 1)
+        self.assertEqual(smask.ndim, 1)
+        self.assertEqual(len(seq), len(smask))
+        self.assertEqual(len(seq), m.max_seq_len)
+        # sadece <SEP> sonrasi maske
+        sep_pos = int(np.where(seq == 2)[0][0])
+        self.assertGreater(sep_pos, 0)
+        self.assertTrue(np.all(smask[:sep_pos + 1] == 0.0))
+        self.assertTrue(np.all(smask[sep_pos + 1:].max() <= 1.0))
+
+    def test_sample_returns_str(self):
+        m = self._build()
+        out = m.sample('abc', temperature=0.9, top_k=5, max_len=15)
+        self.assertIsInstance(out, str)
+
+    def test_sample_terminates(self):
+        m = self._build()
+        for _ in range(5):
+            out = m.sample('test sorgusu', max_len=20)
+            self.assertIsInstance(out, str)
+
+    def test_sample_with_knowledge_returns_str(self):
+        m = self._build()
+        out = m.sample('abc', max_len=15, knowledge='bilgi parcalari ile')
+        self.assertIsInstance(out, str)
+
+    def test_encode_with_context_mask_on_response_only(self):
+        import numpy as np
+        from llm import encode_llm
+        m = self._build()
+        seq, smask = encode_llm(m, 'ab', 'bc', context='bilgi xx koullu')
+        last_sep = int(np.where(seq == 2)[0][-1])
+        self.assertTrue(np.all(smask[:last_sep + 1] == 0.0))
+        self.assertTrue(np.all(smask[last_sep + 1:] <= 1.0))
+        self.assertGreater(float(smask.sum()), 0.0)
+        # context tarafi hicbir zaman maske olmamali
+        self.assertEqual(len(seq), len(smask))
+
+    def test_build_vocab_specials_first(self):
+        from llm import build_llm_vocab
+        v = build_llm_vocab(['abc', 'abd'], min_count=1)
+        self.assertEqual(v[:4], ['<PAD>', '<BOS>', '<SEP>', '<EOS>'])
+        self.assertIn('a', v)
+
+    def test_sample_accepts_rep_penalty(self):
+        m = self._build()
+        out = m.sample('abc', max_len=20, rep_penalty=0.0)
+        self.assertIsInstance(out, str)
+        out2 = m.sample('abc', max_len=20, rep_penalty=0.5)
+        self.assertIsInstance(out2, str)
+
+
+class TestNaturalize(unittest.TestCase):
+    """Dogal yanit parafrazci: deterministik, icerik koruyucu, ASCII."""
+
+    def test_variants_nonempty(self):
+        from naturalize import natural_variants
+        out = natural_variants('istanbul turkiyenin en buyuk sehridir', k=3)
+        self.assertTrue(out)
+        self.assertLessEqual(len(out), 3)
+
+    def test_variants_deterministic(self):
+        from naturalize import natural_variants
+        a = natural_variants('istanbul turkiyenin en buyuk sehridir', k=3, seed=7)
+        b = natural_variants('istanbul turkiyenin en buyuk sehridir', k=3, seed=7)
+        self.assertEqual(a, b)
+
+    def test_variants_ascii_only(self):
+        from naturalize import natural_variants
+        out = natural_variants('guzel bir sehir ve buyuk bir nufusu var', k=4)
+        for v in out:
+            for ch in 'çğıöşü':
+                self.assertNotIn(ch, v)
+            self.assertNotIn(ch.upper(), v)
+
+    def test_variants_preserve_content(self):
+        from naturalize import natural_variants
+        src = 'istanbul turkiyenin en buyuk sehridir'
+        key = set(src.split()) | {'istanbul', 'sehir', 'buyuk'}
+        for v in natural_variants(src, k=5):
+            self.assertTrue(key.intersection(v.split()),
+                            msg=f'icerik korunmadi: {v}')
+
+    def test_variants_include_original(self):
+        from naturalize import natural_variants
+        vs = natural_variants('kisa bir cevap burada', k=2)
+        self.assertIn('kisa bir cevap burada', vs)
+
+    def test_naturalize_pairs_multiplies(self):
+        from naturalize import naturalize_pairs
+        pairs = [('selam nasilsin', 'iyiyim sen nasilsin'),
+                 ('nerelisin', 'istanbulluyum')]
+        out = naturalize_pairs(pairs, k=2)
+        self.assertEqual(len(out), 4)
+        # orijinal yanitlar her ciftte en az bir kez gecer
+        orig = {('selam nasilsin', 'iyiyim sen nasilsin'),
+                ('nerelisin', 'istanbulluyum')}
+        self.assertTrue(orig.issubset(set(out)))
+        # sorgular degismemeli
+        self.assertEqual(sorted({c for c, _ in out}),
+                         ['nerelisin', 'selam nasilsin'])
+
+
+class TestLLMIntegration(unittest.TestCase):
+    """brain._try_seq_rephrase: LLM basamagi kalite kapisindan gecer."""
+
+    class _StubLLM:
+        def __init__(self, out):
+            self.out = out
+
+        def sample(self, ctx, temperature=0.7, top_k=10, max_len=None,
+                   knowledge=None, rep_penalty=0.3):
+            return self.out
+
+    def _bot(self, llm_out):
+        from brain import ChatBot
+        bot = ChatBot()
+        bot.intents = {
+            'selam': ['merhaba dunya nasilsin', 'selam dostum nasilsin'],
+        }
+        bot.intent_tags = ['selam']
+        bot.intent_kws = {'selam': set(bot.tokenize('merhaba selam dunya'))}
+        bot.llm = self._StubLLM(llm_out)
+        bot.llm_enabled = True
+        # alt basamaklar kapali (seq2seq/LSTM) -> yalnizca LLM kalitesi test edilir
+        bot.seq2 = self._StubLLM('xkw sdfjl quwr')
+        bot.seq_enabled = False
+        return bot
+
+    def test_llm_branch_accepts_overlapping_output(self):
+        bot = self._bot('merhaba dunya nasilsin canim')
+        out = bot._try_seq_rephrase('selam', 'merhaba')
+        self.assertEqual(out, 'merhaba dunya nasilsin canim')
+
+    def test_llm_branch_rejects_garbage(self):
+        bot = self._bot('xkw sdfjl quwr')
+        self.assertIsNone(bot._try_seq_rephrase('selam', 'merhaba'))
+
+    def test_llm_disable_flag_when_no_model(self):
+        from brain import ChatBot
+        bot = ChatBot()
+        bot.seq2 = self._StubLLM('xkw sdfjl quwr')
+        bot.seq_enabled = False
+        # Ortam-bagimsiz: model/llm_model.json olmasa da "LLM yok" durumunu simule et
+        bot.llm = None
+        bot.llm_enabled = False
+        self.assertIsNone(bot._try_seq_rephrase('selam', 'merhaba'))
+        self.assertFalse(bot.llm_enabled)
+
+    def test_accept_generated_rejects_verbatim_copy(self):
+        """Kopyala-yapistir: kayitli yanitin birebir kopyasi KAPIDAN GECMEZ."""
+        bot = self._bot('merhaba dunya nasilsin')   # aynen canned
+        self.assertFalse(bot._accept_generated('merhaba dunya nasilsin', 'selam'))
+
+    def test_accept_generated_accepts_novel_paraphrase(self):
+        """Konuya yapisik ama canned'da olmayan kurulus ozgunluk yetkir."""
+        bot = self._bot('merhaba dunya nasilsin canim')
+        self.assertTrue(
+            bot._accept_generated('merhaba dunya nasilsin canim', 'selam'))
+
+    def test_kb_rephrase_fallback_without_llm(self):
+        """LLM yoksa bilgi yaniti oldugu gibi duser (guvenli fallback)."""
+        from brain import ChatBot
+        bot = ChatBot()
+        # Ortam-bagimsiz: model/llm_model.json olsa bile "LLM yok" simule edilir
+        bot.llm = None
+        bot.llm_enabled = False
+        kb = 'Klorofil bitkilerde fotosentezi saglayan yesil pigmenttir.'
+        self.assertEqual(bot._try_kb_rephrase('klorofil nedir', kb), kb)
+
+    def test_accept_kb_rephrase_rejects_verbatim(self):
+        bot = self._bot('xkw sdfjl quwr')
+        kb = 'klorofil bitkilerde fotosentezi saglar'
+        self.assertFalse(bot._accept_kb_rephrase(kb, kb))  # birebir kopya
+
+    def test_accept_kb_rephrase_accepts_novel(self):
+        bot = self._bot('xkw sdfjl quwr')
+        kb = 'klorofil bitkilerde fotosentezi saglar'
+        gen = 'klorofil bitkilerin yesil rengini verir ve guclu bir renktir'
+        self.assertTrue(bot._accept_kb_rephrase(gen, kb))
+
+
 class TestModuleImports(unittest.TestCase):
     """Proje modülleri hicbir yavas runtime'a takilmadan import edilmeli."""
 
@@ -522,6 +747,7 @@ class TestModuleImports(unittest.TestCase):
         import generator
         import seqgen
         import seq2seq
+        import llm
         import transformer
         import clean_intents
         import scrape_intents

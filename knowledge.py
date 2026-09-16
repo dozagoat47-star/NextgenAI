@@ -3,8 +3,6 @@ Nextgen AI - Live Knowledge Retrieval
 Model bilmedigi sorular icin Wikipedia'dan anlik bilgi ceker.
 """
 
-import sys
-import io
 import re
 import requests
 

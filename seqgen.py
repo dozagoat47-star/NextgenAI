@@ -42,11 +42,18 @@ def utf8_stdout():
 
 
 def clean_chars(text, max_len):
-    """Kucuk harf, izinli karakterler, kisaltma."""
+    """Kucuk harf, izinli karakterler, kisaltma.
+
+    Yalnizca ASCII karakterler gecer: ascii_normalize Turkce harfleri
+    (c->c, u->u, i->i) cozdukten sonra kalan IPA/civi yazisi/Arapca gibi
+    alan referans metinlerinden sirizan unicode artiklari (mɑːɹk, –, ”,
+    birden fazla dile ait ligatürler) temizlenir. Askin dibi: vocab'da
+    ASCII disi hicbir karakter olmamalı (train_llm.py karaktersozlugu).
+    """
     t = ascii_normalize((text or '').replace('\u00a0', ' '))
     out = []
     for ch in t.lower():
-        if ch.isalpha() or ch == ' ' or ch in ALLOWED_EXTRAS:
+        if ch.isascii() and (ch.isalpha() or ch == ' ' or ch in ALLOWED_EXTRAS):
             out.append(ch)
     s = ''.join(out).strip()
     if max_len and len(s) > max_len:

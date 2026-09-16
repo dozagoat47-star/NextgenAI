@@ -48,6 +48,7 @@ PPMI_MAX_TERMS = 4000   # co-occurrence matrisini (bellek/sure) kontrol eder
 TRI_BONUS = 0.35
 TRI_MIN_LEN = 6    # sorgu uzunlugu en az bu kadarsa trigram yeniden siralamasi aktif
 TRI_CONTAIN = 0.45 # bu icerme oraninin uzerindeki dokumanlara ciddi bonus
+TRIGRAM_CAP_K = 500  # trigram re-rank yalnizca siradaki ilk K adayda (hiz)
 
 EMB_CACHE_V = 2    # onbellegin surum anahtari (yeni vektor turleri eklenince arttir)
 
@@ -66,6 +67,8 @@ class Corpus:
         # Embedding depolari (None = kullanilmiyor, eski IDF yoluna dusulur)
         self._doc_counts = []
         self._lex_cols = {}      # term -> (numpy doc_idx[], numpy val[]) inverted index
+        self._slug_idx = {}      # slug -> dokuman indeksi (hizli baslik eslesme)
+        self._slug_tri_idx = {}  # trigram -> dokuman indeks kumesi
         self.emb = None          # {'docvecs': (d x k) float32, 'V': (k x v), ...}
         self.emb_terms = None    # {term: terim_indeksi}
         self.emb_idf = None      # {term: idf}
@@ -80,6 +83,9 @@ class Corpus:
         self.ppmi = None         # {'docvecs', 'W', 'terms', 'idf'}
         # Char-trigram indexi (yazim hatasi / takilma eslemesi)
         self._doc_tri = []       # her dokumanin ascii-normalize trigram kumesi
+        # Patterns icin hizli tam-kelime esleme indeksi (search() icin)
+        self._pat_idx = {}       # kelime -> chunk indeks kumesi
+        self._pat_sets = []      # her chunk icin pattern token kumesi
 
     def _slug(self, title):
         return self.tokenizer.ascii_normalize(title.strip().lower()).replace(' ', '_')
@@ -150,10 +156,17 @@ class Corpus:
 
         self._doc_counts = []
         self._slugs = []
+        self._slug_idx = {}     # slug -> dokuman indeksi (tam eslesme bonusu)
+        self._slug_tri_idx = {} # trigram -> dokuman indeks kumesi (kismi eslesme)
         self.vectors = []
         col_pairs = {}
         for i, c in enumerate(self.chunks):
-            self._slugs.append(self._slug(c.get('title', '')))
+            slug = self._slug(c.get('title', ''))
+            self._slugs.append(slug)
+            if slug:
+                self._slug_idx.setdefault(slug, i)
+                for tr in self._trigrams(slug):
+                    self._slug_tri_idx.setdefault(tr, set()).add(i)
             counts = {}
             for w in title_tokens[i]:
                 counts[w] = counts.get(w, 0) + TITLE_BOOST
@@ -181,6 +194,19 @@ class Corpus:
             raw = (c.get('title', '') + ' ' + c.get('text', '')
                    + ' ' + c.get('patterns', ''))
             self._doc_tri.append(self._trigrams(raw))
+
+        # Patterns tam-kelime indeksi: search() icin O(kelime) hizli yol
+        self._pat_idx = {}
+        self._pat_sets = []
+        for i, c in enumerate(self.chunks):
+            pat = c.get('patterns', '')
+            if pat:
+                ptoks = set(self._tokens(pat))
+            else:
+                ptoks = set()
+            self._pat_sets.append(ptoks)
+            for w in ptoks:
+                self._pat_idx.setdefault(w, set()).add(i)
 
         self.loaded = True
         self._ensure_embeddings()
@@ -523,19 +549,34 @@ class Corpus:
         #    Sorunun anlamli kelimelerinin TAMAMI o kalip icinde geciyorsa
         #    uzun metin kosinusunun sinyali seyreltip kaybetmesi onlenir
         #    ("akropol nerede" -> 400 karaklik Akropolis metnine ragmen tutar).
-        for c in self.chunks:
-            pat = c.get('patterns', '')
-            if not pat:
-                continue
-            pat_norm = self.tokenizer.ascii_normalize(pat.lower())
-            # Tek kelimelik eslesme yalnizca ayirt edici (en az 6 harf) bir
-            # kelimeyle olsun; 'sence' gibi genel kelimeyle kisa-yol
-            # tetiklenip ilgisiz cevap cekmesin.
-            distinct = len(qtoks) >= 2 or max(len(w) for w in qtoks) >= 6
-            if distinct and all(w in pat_norm for w in qtoks):
-                return {'title': c.get('title', ''),
-                        'text': c.get('text', ''),
-                        'score': 0.5}
+        distinct = len(qtoks) >= 2 or max(len(w) for w in qtoks) >= 6
+        if distinct and self._pat_idx:
+            # Inverted index: her qtok icin aday kumeleri kes ve kesis
+            candidates = None
+            for w in qtoks:
+                idx_set = self._pat_idx.get(w)
+                if idx_set is None:
+                    candidates = set()
+                    break
+                if candidates is None:
+                    candidates = set(idx_set)
+                else:
+                    candidates &= idx_set
+            for ci in candidates:
+                if qtoks <= self._pat_sets[ci]:
+                    return {'title': self.chunks[ci].get('title', ''),
+                            'text': self.chunks[ci].get('text', ''),
+                            'score': 0.5}
+        elif distinct:
+            for c in self.chunks:
+                pat = c.get('patterns', '')
+                if not pat:
+                    continue
+                pat_norm = self.tokenizer.ascii_normalize(pat.lower())
+                if all(w in pat_norm for w in qtoks):
+                    return {'title': c.get('title', ''),
+                            'text': c.get('text', ''),
+                            'score': 0.5}
 
         qnorm = self.tokenizer.ascii_normalize(query.lower())
         qcounts = {}
@@ -562,16 +603,24 @@ class Corpus:
             if col:
                 lex[col[0]] += val * col[1]
 
-        # Baslik bonusu yalnizca gercek kelimeyse (kelime sinirinda eslesme).
-        # Hiz: once ucuz set/atlik aramasi, regex yalnizca atlik eslestiginde.
-        for i, tslug in enumerate(self._slugs):
-            if not tslug:
-                continue
-            if tslug in qtoks:
-                lex[i] += 0.30
-            elif tslug in qnorm and re.search(
-                    r'(?<![a-z0-9])' + re.escape(tslug) + r'(?![a-z0-9])', qnorm):
-                lex[i] += 0.30
+        # Baslik bonusu: tam slug eslesmesi indeksten, kismi/yazim-varianti
+        # eslesme (triagram ortusen adaylarda ucuz substring+regex).
+        for w in qtoks:
+            si = self._slug_idx.get(w)
+            if si is not None:
+                lex[si] += 0.30
+        qtri = self._trigrams(query)
+        if qtri:
+            cand = set()
+            for tr in qtri:
+                cand |= self._slug_tri_idx.get(tr, ())
+            for i in cand:
+                tslug = self._slugs[i]
+                if not tslug or tslug in qtoks:
+                    continue
+                if tslug in qnorm and re.search(
+                        r'(?<![a-z0-9])' + re.escape(tslug) + r'(?![a-z0-9])', qnorm):
+                    lex[i] += 0.30
 
         # 4) SEMANTIK SKOR (LSA dokuman vektoru)
         dots = None
@@ -590,12 +639,17 @@ class Corpus:
         #    Yalnizca taban skoru > 0 olan adaylari gueclendirir; sogum taban
         #    skorsuz (ilgisiz) dokumanlarin trigrama dayanip on plana cikmasi
         #    engellenir ("akropol nerede" -> alakasiz makale hatali donmesin).
-        if len(qnorm) >= TRI_MIN_LEN:
-            tri = self._trigram_containment(self._trigrams(query))
-            if tri is not None and len(tri) == len(final):
-                boost = tri * TRI_BONUS
-                boost[final <= 0.0] = 0.0
-                final = final + boost
+        #    Hiz: 43K dokumanin tamaminda set islemi yerine yalnizca ontaki
+        #    adaylarda hesaplanir (siralamanin degismeyecegi esik gorev gorur).
+        if len(qnorm) >= TRI_MIN_LEN and qtri:
+            tri = np.zeros(len(final), np.float32)
+            active = np.flatnonzero(final > 0)
+            if len(active) > TRIGRAM_CAP_K:
+                active = active[np.argsort(final[active])[-TRIGRAM_CAP_K:]]
+            if len(active):
+                tri[active] = np.array(
+                    [len(self._doc_tri[i] & qtri) for i in active], np.float32) / len(qtri)
+            final = final + tri * TRI_BONUS
 
         # 7) BM25 NADIR-TERIM KURTARMA: semantik/lex sicakligi dusukse ve BM25
         #    tek bir dokumanda net once cikiyorsa onu onde tut (kesin terimli

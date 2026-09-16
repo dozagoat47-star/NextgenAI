@@ -227,7 +227,7 @@ class TransformerNN:
     """
 
     def __init__(self, vocab_size, num_intents, max_seq_len,
-                 d_model=128, num_blocks=3, num_heads=4, ff_mult=3,
+                 d_model=128, num_blocks=4, num_heads=4, ff_mult=4,
                  dropout=0.1, attn_dropout=0.05, weight_decay=1e-4,
                  max_grad_norm=5.0, seed=42):
         self.vocab_size = vocab_size

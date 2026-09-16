@@ -33,7 +33,7 @@ import torch.nn as nn
 BASE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE)
 
-from seqgen import clean_chars, build_vocab, load_pairs
+from seqgen import build_vocab, load_pairs
 from seq2seq import Seq2Seq, encode_seq2
 
 # ---------------- hiperparametreler (numpy inference ile AYNI mimari)
