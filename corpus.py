@@ -563,7 +563,7 @@ class Corpus:
                 else:
                     candidates &= idx_set
             for ci in candidates:
-                if qtoks <= self._pat_sets[ci]:
+                if set(qtoks) <= self._pat_sets[ci]:
                     return {'title': self.chunks[ci].get('title', ''),
                             'text': self.chunks[ci].get('text', ''),
                             'score': 0.5}
@@ -613,7 +613,7 @@ class Corpus:
         if qtri:
             cand = set()
             for tr in qtri:
-                cand |= self._slug_tri_idx.get(tr, ())
+                cand.update(self._slug_tri_idx.get(tr, ()))
             for i in cand:
                 tslug = self._slugs[i]
                 if not tslug or tslug in qtoks:

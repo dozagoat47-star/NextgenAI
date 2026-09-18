@@ -4,6 +4,7 @@ Built using only numpy, no TensorFlow or PyTorch.
 """
 
 import numpy as np
+import io
 import json
 import math
 import random
@@ -662,6 +663,10 @@ class ChatBot:
         # dosya yok; llm_enabled dosya yoklugunu bir kez tespit edip biter.
         self.llm = None
         self.llm_enabled = None
+        # Bilgi (retrieval) hatti: knowledge_map desen->parca eslesmesi ve
+        # corpus fallback'i lazy yuklenir; LLM'e verilecek bilgi parcasini
+        # zenginlestirmektedir (yoksa canned bilgi yaniti yeter).
+        self._kb_map = None
         # Transformer girdisi icin token -> indeks eslemesi
         self.vocab_to_idx = {}
         self.pad_idx = 0
@@ -1355,8 +1360,8 @@ class ChatBot:
         try:
             ctx = query or tag
             if self._ensure_llm():
-                gen = self.llm.sample(ctx, temperature=0.6, top_k=6, rep_penalty=0.4)
-                if self._accept_generated(gen, tag):
+                gen = self._best_of_llm(ctx, tag)
+                if gen:
                     return gen
             if self.seq2 is None:
                 from seq2seq import load_seq2seq
@@ -1377,6 +1382,24 @@ class ChatBot:
         except Exception:
             return None
 
+    def _best_of_llm(self, query, tag, tries=3):
+        """LLM ile best-of-N sohbet/yanit adayi uretir.
+
+        Ilk-token entropisi yanlis baslangica kaydiginda tek deneme usually
+        tutmaz; birden fazla numune alinir, kalite kapisindan gecen adaylardan
+        en uzun/anlamli olani secilir. Gecen yoksa None (ust katman seq2seq/
+        seqgen/canned fallbackina duser).
+        """
+        best, best_len = None, 0
+        for _ in range(max(1, int(tries))):
+            gen = self.llm.sample(query, temperature=0.6, top_k=6,
+                                  rep_penalty=0.4)
+            if not self._accept_generated(gen, tag):
+                continue
+            if best is None or len(gen) > best_len:
+                best, best_len = gen, len(gen)
+        return best
+
     def _ensure_llm(self):
         """LLM'i bir kez yukler (dosya yoksa kalici olarak devre disi)."""
         if self.llm_enabled is None:
@@ -1389,23 +1412,88 @@ class ChatBot:
                 self.llm = None
         return self.llm_enabled and self.llm is not None
 
-    def _try_kb_rephrase(self, query, kb):
+    def _external_knowledge(self, query, tag=None):
+        """Bilgi sorgusu icin corpus'tan en alakali parcayi dondurur.
+
+        Sira: (1) knowledge_map.jsonl desen->parca eslesmesi (deterministik,
+        egitimle ayni harita; once `tag`'in desenleri, sonra ham sorgu),
+        (2) canli corpus.search fallback. Ikisi de yoksa None (canned bilgi
+        yanitina duser). Corpus, egitimdekiyle ayni kaynak oldugu icin LLM
+        koullandirmasi train/val ile tutarli olur.
+        """
+        try:
+            if self._kb_map is None:
+                kmap = {}
+                p = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                 'knowledge_map.jsonl')
+                if os.path.exists(p):
+                    with io.open(p, encoding='utf-8') as f:
+                        for line in f:
+                            line = line.strip()
+                            if not line:
+                                continue
+                            row = json.loads(line)
+                            if row.get('ctx') and row.get('text'):
+                                kmap[row['ctx']] = row['text']
+                self._kb_map = kmap or {}
+            if self._kb_map:
+                qn = query.strip().lower()
+                # 1a) hedef bilgi intent'inin desenleriyle esles
+                if qn in self._kb_map:
+                    return self._kb_map[qn]
+                # 1b) desenlerin normallesmis haliyle kesis (cok desenli tutarli)
+                best, bs = None, 0.0
+                qset = set(qn.split()) - {'nedir', 'kimdir', 'kactir', 'nerede',
+                                          'hakkinda', 'bilgi', 'ver', 'anlat',
+                                          'ne', 'demek', 'bana', 'mi', 'mu'}
+                for ctx, text in self._kb_map.items():
+                    cset = set(ctx.split()) - {'nedir', 'kimdir', 'kactir',
+                                               'nerede', 'hakkinda', 'bilgi',
+                                               'ver', 'anlat', 'ne', 'demek',
+                                               'bana', 'mi', 'mu'}
+                    score = len(qset & cset)
+                    if score > bs:
+                        bs, best = score, text
+                if bs >= 2:
+                    return best
+        except Exception:
+            pass
+        return None
+
+    def _try_kb_rephrase(self, query, kb, tries=3):
         """Bilgi (retrieval) yanitini ozetler/yeniden kurar: kopyala-yapistir
         yerine bilgi parcasindan yola cikip kisa, ozgun bir aciklama uretir.
 
         LLM yoksa ya da ozet kalite kapisindan gecmezse ham `kb` doner
         (guvenli fallback). _accept_generated ile ayni mantik ama konu kumesi
         bilgi metninin kendisidir (tag yoktur).
+
+        `tries`: best-of-N ornekleme. Ilk token entropisi yanlis basa
+        kactiginda (tek denemede tutmama) birden fazla aday uretilir, kalite
+        kapisindan gecen ilk/EN_OTORITATIF aday secilir; gecen yoksa kb.
         """
         if not query or not kb:
             return kb
         if not self._ensure_llm():
             return kb
+        ext = None
         try:
-            gen = self.llm.sample(query, temperature=0.7, top_k=10,
-                                  knowledge=kb[:200], rep_penalty=0.4)
-            if self._accept_kb_rephrase(gen, kb):
-                return gen
+            ext = self._external_knowledge(query)
+        except Exception:
+            ext = None
+        try:
+            knowledge = (ext + '\n' + kb) if ext else kb
+            best, best_len = None, 0
+            for _ in range(max(1, int(tries))):
+                gen = self.llm.sample(query, temperature=0.7, top_k=10,
+                                      knowledge=knowledge[:500],
+                                      rep_penalty=0.4)
+                if not self._accept_kb_rephrase(gen, kb):
+                    continue
+                if best is None or len(gen) > best_len:
+                    best, best_len = gen, len(gen)
+            if best:
+                return best
         except Exception:
             pass
         return kb
@@ -1434,7 +1522,13 @@ class ChatBot:
         if len(cand) < 3:
             return False
         gen_set = set(cand)
-        overlap = len(gen_set & (canned | kws)) / float(len(gen_set))
+        known = canned | kws
+        inter = gen_set & known
+        # konu orusu: en az 2 TANIDIK sozcuk (tek "tatli icin" ile konudan
+        # sapan kisa karmasik uretim kalite kapisini gecmesin).
+        if len(inter) < 2:
+            return False
+        overlap = len(inter) / float(len(gen_set))
         if overlap < 0.25:
             return False
         # ozgunluk: canned disinda en az %15 yeni sozcuk (kopyaya hayir)
@@ -1463,7 +1557,12 @@ class ChatBot:
         if len(cand) < 3:
             return False
         gen_set = set(cand)
-        overlap = len(gen_set & kb_set) / float(len(gen_set))
+        kb_inter = gen_set & kb_set
+        # konu kumesi: en az 2 tanidik kelime (tek kelimelik kesisle ilgisiz
+        # uretim kalite kapisini gecmesin).
+        if len(kb_inter) < 2:
+            return False
+        overlap = len(kb_inter) / float(len(gen_set))
         if overlap < 0.20:
             return False
         novel = gen_set - kb_set

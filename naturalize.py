@@ -9,8 +9,9 @@ Kullanim:
     from naturalize import natural_variants, naturalize_pairs
     variants = natural_variants("merhaba ben nextgen asistaniyim", k=3)
 
-Tum metin ASCII-only (vocab ile uyumlu; normalize.ascii_normalize / seqgen
-clean_chars pipeline'ini kullanir).
+Tum metin dogal (gercek) Turkce imla ile uretilir: o/u/s/g/c gibi karakterler
+dosyalanir; kucuk harf donusumu Turkce kurallaridir (I->i degil I->u). Bu uzay
+bpe.py'nin (subword tokenizer) metin uzayiyla birebir aynidir.
 """
 
 import random
@@ -24,16 +25,16 @@ import re
 OPENERS = [
     "", "", "", "", "", "", "", "", "",       # cogunlukla acici yok
     "bak, ",
-    "soyle: ",
-    "aslinda, ",
+    "şöyle: ",
+    "aslında, ",
     "yani, ",
     "hmm, ",
-    "kisaca soyleyeyim: ",
-    "dogrudan soyleyeyim: ",
-    "bu konuda soyleyebilecegim sey su: ",
-    "sana soyle anlatayim: ",
-    "su sekilde dusunebilirsin: ",
-    "guzel bir soru. ",
+    "kısaca söyleyeyim: ",
+    "doğrudan söyleyeyim: ",
+    "bu konuda söyleyebilecegim sey şu: ",
+    "sana şöyle anlatayım: ",
+    "şu şekilde düşünebilirsin: ",
+    "güzel bir soru. ",
     "kesinlikle. ",
     "tabii, ",
 ]
@@ -42,51 +43,51 @@ OPENERS = [
 FILLERS = [
     "", "", "", "", "", "", "",                # cogunlukla doldurucu yok
     "yani ",
-    "soyle ki ",
-    "bir bakima ",
-    "kisaca ",
+    "şöyle ki ",
+    "bir bakıma ",
+    "kısaca ",
 ]
 
 # Ikinci cumle basina baglama kelimeleri (dogal okunur olanlar)
 CONNECTORS = [
     "", "",                                     # cogunlukla baglayici yok
-    "ayrica, ",
-    "ustelik, ",
-    "diger taraftan, ",
+    "ayrıca, ",
+    "üstelik, ",
+    "diğer taraftan, ",
     "buna ek olarak, ",
-    "kisacasi, ",
-    "ozellikle, ",
+    "kısacası, ",
+    "özellikle, ",
 ]
 
 # Soru-sonrasi kapanislar
 CLOSERS_Q = [
     "", "", "",
     " ne dersin?",
-    " degil mi?",
+    "değil mi?",
     " biliyor muydun?",
-    " hic dusundun mu?",
+    " hiç düşündün mü?",
 ]
 
 # Bilgi/onermeler icin kapanislar
 CLOSERS_STMT = [
     "", "", "", "",
-    " umarim yardimci olmustur.",
-    " baska bir sey merak ediyor musun?",
+    " umarım yardımcı olmuştur.",
+    " başka bir şey merak ediyor musun?",
     " daha fazla detay ister misin?",
-    " istersen ustune konusalim.",
+    " istersen üstüne konuşalım.",
     " devam edelim mi?",
 ]
 
 # Kelime esanlamli varyantlari (yuksek dogallik, dusuk risk)
 WORD_ALT = {
-    "buyuk": ["genis", "onemli"],
-    "guzel": ["harika", "muhtesem"],
-    "kotu": ["hos olmayan", "olumsuz"],
-    "var": ["mevcut", "bulunmaktadir"],
-    "yok": ["mevcut degil", "bulunmamaktadir"],
-    "gerekli": ["lazim", "sart"],
-    "cok": ["oldukca", "son derece"],
-    "sonra": ["ardindan", "daha sonra"],
+    "büyük": ["geniş", "önemli"],
+    "güzel": ["harika", "muhteşem"],
+    "kötü": ["hoş olmayan", "olumsuz"],
+    "var": ["mevcut", "bulunmaktadır"],
+    "yok": ["mevcut değil", "bulunmamaktadır"],
+    "gerekli": ["lazım", "şart"],
+    "çok": ["oldukça", "son derece"],
+    "sonra": ["ardından", "daha sonra"],
 }
 
 
@@ -138,11 +139,18 @@ def _maybe_connector(sents, rng, prob):
 
 
 def _maybe_swap(sentence, rng, prob):
-    """Tek kelimelik esanlamli varyant uygula."""
+    """Tek kelimelik esanlamli varyant uygula.
+
+    Ilk kelimeye (i==0) dokunulmaz: modelin ilk-yanit-token'i kosullu
+    ogrenebilmesi icin varyantlarin ilk token'i orijinalle ayni kalmalidir.
+    """
     if not sentence or rng.random() > prob:
         return sentence
     words = sentence.split()
-    for i, w in enumerate(words):
+    if len(words) < 2:
+        return sentence
+    for i in range(1, len(words)):
+        w = words[i]
         base = w.rstrip('.,!?;:')
         suf = w[len(base):]
         if base in WORD_ALT and rng.random() < 0.5:
@@ -153,12 +161,12 @@ def _maybe_swap(sentence, rng, prob):
 
 _MID_FILLERS = [
     ", yani ",
-    ", kisaca ",
-    ", soyle ki ",
-    ", bir bakima ",
-    "; ustelik ",
-    "; ayrica ",
-    ", ayni zamanda ",
+    ", kısaca ",
+    ", şöyle ki ",
+    ", bir bakıma ",
+    "; üstelik ",
+    "; ayrıca ",
+    ", aynı zamanda ",
 ]
 
 
@@ -178,19 +186,23 @@ def _maybe_insert_mid(sentence, rng, prob=0.35):
     hi = int(len(sentence) * 0.85)
     candidates = [p for p in candidates if lo <= p <= hi]
     if not candidates:
-        # virgul yoksa: kelime bazli orta bolgeyi sinirla
+        # virgul yoksa: kelime bazli orta bolgeyi sinirla (SLICE index'i ile)
         words = sentence.split()
         if len(words) < 8:
             return sentence
-        cut_words = words[max(2, len(words) // 3): max(3, len(words) // 2)]
-        if not cut_words:
+        cut_from = max(2, len(words) // 3)
+        cut_to = max(3, len(words) // 2)
+        if cut_from >= cut_to or cut_from >= len(words):
             return sentence
-        b4 = ' '.join(words[:words.index(cut_words[0])])
-        pos = len(b4)
+        b4 = ' '.join(words[:cut_from])   # slice konumu, kelime icerigi degil
+        pos = len(b4)                     # burada bir bosluk karakteri var
     else:
         pos = rng.choice(candidates)
+    if not (0 < pos < len(sentence) - 1):
+        return sentence
     f = rng.choice(_MID_FILLERS)
-    return sentence[:pos] + f + sentence[pos + 1:] if pos < len(sentence) - 1 else sentence
+    # Komadan sonra / kelime sinirinda dogal sekilde birakir; karakter yemez.
+    return sentence[:pos] + f.rstrip() + ' ' + sentence[pos + 1:]
 
 
 def _maybe_open(sentence, rng, prob):
@@ -223,6 +235,11 @@ def natural_variants(response, k=3, seed=42):
     egitiminde gordugu formata uyar (ASCII, kucuk harf). Orijinal cevap da
     ilk varyant olarak korunur (model ezberi de gorsun).
 
+    ILK TOKEN KURALI: Tum varyantlar orijinalin ilk token'iyla baslar
+    (cumle basi acici/doldurucu ile 2. cumle ve sonrasinda oynanir). Bu,
+    modelin 'soru -> ilk yanit kelimesi' iliskisini ogrenmesini saglar;
+    baslangici rastgele degismis yanitlar ezbere dolgu uretimine yol aciyordu.
+
     Args:
         response: Ham (ya da temizlenmis) cevap metni.
         k: Uretilecek varyant sayisi (orijinal dahil).
@@ -234,14 +251,15 @@ def natural_variants(response, k=3, seed=42):
     if not response or not response.strip():
         return []
 
-    from normalize import ascii_normalize
-    text = ascii_normalize(response.strip().lower())
+    from bpe import clean_text as _bpe_clean
+    text = _bpe_clean(response)
     if len(text) < 6:
         return [text]
 
     base_hash = _stable_hash(text)
     sentences = _split_sentences(text) or [text]
     is_question = text.rstrip().endswith('?')
+    first_word = text.split()[0].strip('.,!?;:') if text.split() else ''
 
     variants = [text]
     for vi in range(1, k):
@@ -251,17 +269,24 @@ def natural_variants(response, k=3, seed=42):
             rng = _seeded_random(seed, base_hash + vi * 7 + attempt * 13)
 
             sents = list(sentences)
-            sents = [_maybe_fill(s, rng, 0.12) for s in sents]
+            # Ilk token ORIGINALIN ilk token'i ile ayni kalir: acici/doldurucu/
+            # esanlamli degisim SADECE 2. cumle ve sonrasina uygulanir. Boylece
+            # model 'soru -> ilk yanit kelimesi' kosullu dagilimini ogrenebilir
+            # (cok cesitli baslangic, ezbere filier uretimine yol aciyordu).
+            sents = [_maybe_fill(s, rng, 0.12) if i > 0 else s
+                     for i, s in enumerate(sents)]
             sents = _maybe_connector(sents, rng, 0.25)
+            sents = [s if i == 0 else _maybe_open(s, rng, 0.40)
+                     for i, s in enumerate(sents)]
             wp = 0.40 if len(sents) <= 2 else 0.20
             sents = [_maybe_swap(s, rng, wp) for s in sents]
             sents = [_maybe_insert_mid(s, rng, 0.40) for s in sents]
 
             body = _join_sentences(sents)
-            body = _maybe_open(body, rng, 0.45)
             body = _maybe_close(body, is_question, rng, 0.30)
             body = ' '.join(body.strip().split())
-            if body and body not in variants:
+            head = body.split()[0].strip('.,!?;:') if body.split() else ''
+            if body and head == first_word and body not in variants:
                 break
             body = None
         if body:

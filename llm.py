@@ -1,14 +1,15 @@
 """
 Nextgen AI - LLM: Decoder-only GPT benzeri dil modeli (NumPy inference)
 =========================================================================
-Sorgu-koullu, karakter-seviye otoregresif uretec. Egitim Colab/Lightning AI'da
-PyTorch ile yapilir (train_llm.py), agirliklar model/llm_model.json formatinda
-saklanir; bu modul YALNIZCA ileri gecis + ornekleme yapar (backprop yok).
+Sorgu-koullu, otoregresif uretec. Egitim Colab/Lightning AI'da PyTorch ile
+yapilir (train_llm.py), agirliklar model/llm_model.json formatinda saklanir;
+bu modul YALNIZCA ileri gecis + ornekleme yapar (backprop yok).
 
-Mimari (GPT stili decoder-only):
-  - Paylasilan karakter embedding + sinusoidal konum kodlari (1/sqrt(d))
-  - N adet Pre-LN blok: causal multi-head self-attn + GELU-FFN + residual
-  - Final Pre-LN + lineer kafa -> karakter logitleri
+Iki tokenizer modu (geriye donuk uyumlu):
+  - bpe  (yeni): tokenizer = BPETokenizer (tokenizer/bpe.json, V~16K subword)
+  - char (eski): vocab = karakter listesi (V~54)
+  Model JSON'da 'tok_mode' + ('tokenizer' | 'vocab') ile tasinir; her iki
+  sekim de encode_llm/sample uzerinden ayni sekans semasini kullanir.
 
 Sekans formati (tek zincir, otoregresif teacher forcing):
     <PAD> <BOS> <sorgu> <SEP> <yanit> <EOS>
@@ -35,9 +36,12 @@ import re
 import numpy as np
 
 from seqgen import clean_chars
+from bpe import BPETokenizer
 
 MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           'model', 'llm_model.json')
+TOKENIZER_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              'tokenizer', 'bpe.json')
 
 # <PAD> <BOS> <SEP> <EOS> (sira build_vocab ile hizali tutulmalidir)
 PAD, BOS, SEP, EOS = 0, 1, 2, 3
@@ -72,14 +76,30 @@ def _f32(a):
 
 
 class LLM:
-    """GPT-benzeri decoder-only karakter seviyesi dil modeli (NumPy)."""
+    """GPT-benzeri decoder-only dil modeli (NumPy).
 
-    def __init__(self, vocab, d_model=128, num_blocks=4, num_heads=4, ff_mult=4,
-                 max_ctx_len=40, max_seq_len=160, seed=7):
-        self.vocab = list(vocab)
-        self.c2i = {ch: i for i, ch in enumerate(self.vocab)}
-        self.i2c = {i: ch for i, ch in enumerate(self.vocab)}
-        self.V = len(self.vocab)
+    Iki calisma modu:
+      - char (eski): vocab = karakter listesi; V kucuk (~54)
+      - bpe (yeni) : tokenizer = BPETokenizer; V ~16K subword
+    Geriye donukluk: tokenizer=None ise eski char mod calisir.
+    """
+
+    def __init__(self, vocab=None, d_model=128, num_blocks=4, num_heads=4,
+                 ff_mult=4, max_ctx_len=40, max_seq_len=160, seed=7,
+                 tokenizer=None):
+        self.tokenizer = tokenizer
+        if tokenizer is not None:
+            # --- BPE modu: subword vocab ---
+            self.vocab = None
+            self.c2i = {}
+            self.i2c = {}
+            self.V = tokenizer.vocab_size
+        else:
+            # --- Eski karakter modu ---
+            self.vocab = list(vocab or ['<PAD>', '<BOS>', '<SEP>', '<EOS>'])
+            self.c2i = {ch: i for i, ch in enumerate(self.vocab)}
+            self.i2c = {i: ch for i, ch in enumerate(self.vocab)}
+            self.V = len(self.vocab)
         self.d_model = int(d_model)
         self.num_blocks = int(num_blocks)
         self.num_heads = int(num_heads)
@@ -174,6 +194,31 @@ class LLM:
         h = ln(x, p['out_ln_g'], p['out_ln_b'])
         return h @ p['head'] + p['head_b']
 
+    # ------------------------------------------------------------ YARDIMCILAR
+    def _enc(self, text, max_len=None):
+        """Metni model moduna uygun token id listesine cevirir."""
+        if self.tokenizer is not None:
+            ids = [i for i in self.tokenizer.encode(text)
+                   if i not in (PAD, BOS, SEP, EOS)]
+            if max_len is not None:
+                ids = ids[:max_len]
+            return ids
+        text = clean_chars(text, max_len or self.max_ctx_len)
+        return [self.c2i[ch] for ch in text if ch in self.c2i]
+
+    def _dec(self, ids):
+        """Token id listesini model moduna uygun metne cevirir."""
+        if self.tokenizer is not None:
+            return self.tokenizer.decode(ids)
+        return ''.join(self.i2c[i] for i in ids if i in self.i2c)
+
+    def _tok_of(self, ch, default=PAD):
+        """Tek karakteri token id listesine cevirir (fallback doldurucu)."""
+        if self.tokenizer is not None:
+            ids = self.tokenizer.encode(ch)
+            return ids if ids else [default]
+        return [self.c2i.get(ch, default)]
+
     # ------------------------------------------------------------ ORNEKLEME
     def _sample_next(self, logits, temperature, top_k, banned):
         probs = softmax(logits, axis=-1)
@@ -204,19 +249,22 @@ class LLM:
         (0.0 = ceza yok; 0.3 = dengeli cesitlilik).
         """
         max_len = max_len or 96
-        ctx = clean_chars(context, self.max_ctx_len)
-        ids = [self.c2i[ch] for ch in ctx if ch in self.c2i]
-        if ctx and not ids:
-            ids = [self.c2i.get(' ', PAD)]
+        ids = self._enc(context, self.max_ctx_len)
+        if not ids:
+            ids = [PAD]
+
+        # Egitimde (encode_llm) bilgi parcasi max_seq - max_ctx - 8 token'a
+        # kirlir; inference'ta da ayni butce kullanilir, yoksa koullandirma
+        # egitimdekinden cok daha kisa kalir (RAG formati bozulur).
+        kb_budget = max(8, self.max_seq_len - self.max_ctx_len - 8)
 
         dec = [BOS] + list(ids[:self.max_ctx_len]) + [SEP]
         if knowledge:
-            kmid = [self.c2i[ch] for ch in clean_chars(knowledge, self.max_ctx_len)
-                    if ch in self.c2i]
+            kmid = self._enc(knowledge, kb_budget)
             if kmid:
-                dec += list(kmid[:self.max_ctx_len]) + [SEP]
+                dec += list(kmid[:kb_budget]) + [SEP]
         banned = {PAD, BOS}
-        out_chars = []
+        out_ids = []
         seen_ngrams = set()
         generated = set()
         for _ in range(max_len):
@@ -227,19 +275,19 @@ class LLM:
             idx = self._sample_next(logits, temperature, top_k, banned)
             if idx == EOS or idx == SEP:
                 break
-            out_chars.append(idx)
+            out_ids.append(idx)
             dec.append(idx)
             generated.add(idx)
             if len(dec) >= self.max_seq_len - 2:
                 break
-            if len(out_chars) >= 6:
-                ngram = tuple(out_chars[-6:])
+            if len(out_ids) >= 6:
+                ngram = tuple(out_ids[-6:])
                 if ngram in seen_ngrams:
-                    del out_chars[-6:]
+                    del out_ids[-6:]
                     break
                 seen_ngrams.add(ngram)
 
-        return self._decode_clean(''.join(self.i2c[i] for i in out_chars))
+        return self._decode_clean(self._dec(out_ids))
 
     @staticmethod
     def _decode_clean(text):
@@ -252,7 +300,7 @@ class LLM:
 
     # ------------------------------------------------------------ KAYDET/YUKLE
     def to_dict(self):
-        return {
+        d = {
             'arch': 'llm',
             'V': self.V,
             'd_model': self.d_model,
@@ -261,16 +309,39 @@ class LLM:
             'ff_mult': self.ff_dim // self.d_model,
             'max_ctx_len': self.max_ctx_len,
             'max_seq_len': self.max_seq_len,
-            'vocab': self.vocab,
             'params': {k: np.asarray(v, np.float32).tolist()
                        for k, v in self.params.items()},
         }
+        if self.tokenizer is not None:
+            d['tok_mode'] = 'bpe'
+            d['vocab'] = None
+            d['tokenizer'] = {
+                'specials': self.tokenizer.specials,
+                'chars': self.tokenizer.chars,
+                'merges': [list(m) for m in self.tokenizer.merges],
+            }
+        else:
+            d['tok_mode'] = 'char'
+            d['vocab'] = self.vocab
+        return d
 
     def from_dict(self, data):
-        self.vocab = list(data['vocab'])
-        self.c2i = {ch: i for i, ch in enumerate(self.vocab)}
-        self.i2c = {i: ch for i, ch in enumerate(self.vocab)}
-        self.V = int(data['V'])
+        tok = data.get('tokenizer')
+        if tok:
+            self.tokenizer = BPETokenizer(
+                chars=tok.get('chars', []),
+                merges=[tuple(m) for m in tok.get('merges', [])],
+                specials=tok.get('specials'))
+            self.vocab = None
+            self.c2i = {}
+            self.i2c = {}
+            self.V = self.tokenizer.vocab_size
+        else:
+            self.tokenizer = None
+            self.vocab = list(data['vocab'])
+            self.c2i = {ch: i for i, ch in enumerate(self.vocab)}
+            self.i2c = {i: ch for i, ch in enumerate(self.vocab)}
+            self.V = int(data['V'])
         self.d_model = int(data['d_model'])
         self.num_blocks = int(data['num_blocks'])
         self.num_heads = int(data['num_heads'])
@@ -307,28 +378,31 @@ def encode_llm(model, ctx, resp, context=None, max_seq=None):
 
     Returns:
         (seq, smask)  (numpy dizileri, uzunluklari esit)
-        smask = 1 yalnizca yanit (bilgi <SEP> sonrasi) pozisyonlarinda
+        smask = 1 yalnizca yanit uretim pozisyonlarinda: son <SEP>'in
+        kendisi DAHIL (konumu start-1) ile yanit token'lari. Decoder-only
+        mimaride i konumu i+1 token'ini tahmin eder; yanitin ilk token'i
+        start konumunda oldugundan <SEP> -> ilk yanit token'i eslemisinin
+        ogrenilmesi icin <SEP> pozisyonu da maskelemeli olmalidir (sample()
+        da son prompt token'inden ilk token uretilir). <EOS> ve PAD-dolgu
+        pozisyonlari maskesiz kalir.
     """
     max_seq = int(max_seq or getattr(model, 'max_seq_len', 160))
     max_ctx = int(getattr(model, 'max_ctx_len', 40))
     kb_budget = max(8, max_seq - max_ctx - 8)
-    cc = clean_chars(ctx, max_ctx)
-    rr = clean_chars(resp, kb_budget)
-    ck = clean_chars(context, kb_budget) if context else ''
-    enc = [model.c2i[ch] for ch in cc if ch in model.c2i]
-    kenc = [model.c2i[ch] for ch in ck if ch in model.c2i]
-    renc = [model.c2i[ch] for ch in rr if ch in model.c2i]
+    enc = model._enc(ctx, max_ctx)
+    kenc = model._enc(context, kb_budget) if context else []
+    renc = model._enc(resp, kb_budget)
     if not enc:
-        enc = [model.c2i.get(' ', PAD)]
+        enc = model._tok_of(' ')
     if not renc:
-        renc = [model.c2i.get('.', PAD)]
+        renc = model._tok_of('.')
     seq = [BOS] + list(enc) + [SEP]
     if kenc:
         seq += list(kenc) + [SEP]
     start = len(seq)                       # yanit baslangici (<SEP> sonrasi)
     renc = renc[:max_seq - start - 1]      # yalnizca yanit kismi kirpilir
     if not renc:
-        renc = [model.c2i.get('.', PAD)]
+        renc = model._tok_of('.')
     seq += list(renc) + [EOS]
     seq = seq[:max_seq]
     start = min(start, len(seq))
@@ -348,6 +422,24 @@ def load_llm(path=MODEL_PATH):
     if not data or data.get('arch') != 'llm':
         return None
     return LLM(['<PAD>', '<BOS>', '<SEP>', '<EOS>']).from_dict(data)
+
+
+def load_tokenizer(path=TOKENIZER_PATH):
+    """tokenizer/bpe.json'dan BPETokenizer yukler (yoksa None)."""
+    if not os.path.exists(path):
+        return None
+    try:
+        return BPETokenizer.load(path)
+    except Exception:
+        return None
+
+
+def build_llm_with_tokenizer(path=TOKENIZER_PATH, **kwargs):
+    """BPETokenizer ile yeni (egitimsiz) BPE-modlu LLM kurar."""
+    tok = load_tokenizer(path)
+    if tok is None:
+        raise FileNotFoundError(f'Tokenizer bulunamadi: {path}')
+    return LLM(tokenizer=tok, **kwargs)
 
 
 def save_llm(model, path=MODEL_PATH):
@@ -377,3 +469,22 @@ if __name__ == '__main__':
     m2 = load_llm(tmp)
     assert m2 is not None and m2.params.keys() == m.params.keys()
     print('round-trip OK:', tmp)
+
+    # BPE modu: hizli tokenizer ile donanim dogrulamasi
+    from bpe import train_bpe
+    tok = train_bpe(['merhaba nasilsin iyiyim sen nasilsin',
+                     'bugun hava cok guzel yuruyecek misin',
+                     'nerelisin istanbuldan geliyorum'],
+                    vocab_size=200, min_freq=1, min_word_freq=1)
+    mb = LLM(d_model=32, num_blocks=2, num_heads=2,
+             max_ctx_len=40, max_seq_len=80, seed=7, tokenizer=tok)
+    assert mb.V == len(tok) and mb.tokenizer is tok
+    enc_b = encode_llm(mb, 'nasilsin', 'iyiyim')
+    assert int(np.where(enc_b[0] == EOS)[0][0]) > 0   # EOS pad oncesi var
+    assert enc_b[1].max() <= 1.0 and enc_b[1].min() >= 0.0
+    tmpb = os.path.join(tempfile.gettempdir(), 'llm_bpe_test.json')
+    save_llm(mb, tmpb)
+    mb2 = load_llm(tmpb)
+    assert mb2 is not None and mb2.tokenizer is not None
+    assert mb2.tokenizer.encode('nasilsin') == tok.encode('nasilsin')
+    print('BPE round-trip OK:', tmpb)

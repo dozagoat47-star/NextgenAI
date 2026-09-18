@@ -47,7 +47,7 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE)
 
 from seqgen import clean_chars, load_pairs
-from llm import PAD, LLM, build_llm_vocab, encode_llm
+from llm import PAD, LLM, build_llm_vocab, encode_llm, load_tokenizer
 from naturalize import naturalize_pairs
 
 # ---------------- hiperparametreler (numpy inference ile AYNI mimari)
@@ -201,16 +201,88 @@ def refine_resp(r, maxc=MAX_SEQ_LEN - MAX_CTX_LEN - 4):
     return r
 
 
-def prepare_data(RAG, NATURAL=0):
+FUNCTIONAL_OPENERS = frozenset("""
+    merhaba selam selamlar selamet hey merhabalar gunaydin gunaydinlar
+    iyi iyiyim iyiym hosgeldin hosgeldiniz hosbulduk
+    evet tabii tabi tabii ki elbette peki aynen kesinlikle dogru
+    harika super guzel cok cok guzel muhtesem bayagi baya
+    bir bu su o ben benim biz sana size lutfen rica ederim rica
+    paylasayim vereyim anlatayim soyleyeyim yazayim bakayim dusunelim
+    vaktim seve seve memnuniyetle elbette ki
+    no tamam olur olur tabi evet tabii
+""".split())
+
+
+def stabilize_first_words(pairs, seed=SEED):
+    """IŞLEVSEL açılışların İLK KELİMESİNİ moda sabitler (içerik korunur).
+
+    Ocak (pattern) başına yanıtlar farklı IŞLEVSEL açılış kelimeleriyle
+    başladığında (merhaba/selam/selamlar, evet/tabii/elbette, harika/süper...)
+    model ilk yanıt-tokenini (o=0) ayırt edemez -> ilk-token doğruluğu
+    düşer, bu token sampling'i zehirler. Burada YALNIZCA işlevsel açılış
+    kelimeleri o pattern için mod işlevsel kelimeye hizalanır; İÇERİK
+    taşıyan ilk kelimeler (tarif adı, isim, sayı...) olduğu gibi bırakılır
+    (anlam bozulmaz). naturalize ilk kelimeyi zaten korur -> uyumludur.
+
+    intents.json DEĞİŞTİRİLMEZ; dönüşüm yalnızca eğitim çiftlerinde olur.
+    """
+    by_ctx = {}
+    for i, (ctx, _resp) in enumerate(pairs):
+        by_ctx.setdefault(ctx, []).append(i)
+    changed = 0
+    for _ctx, idxs in by_ctx.items():
+        func_counts = {}
+        for i in idxs:
+            w = pairs[i][1].strip().split()
+            if not w:
+                continue
+            w0 = w[0].strip('.,;:!?…"\'()').lower()
+            if w0 in FUNCTIONAL_OPENERS:
+                func_counts[w0] = func_counts.get(w0, 0) + 1
+        if len(func_counts) < 2:
+            continue
+        mode = max(func_counts, key=func_counts.get)
+        for i in idxs:
+            parts = pairs[i][1].strip().split()
+            if not parts:
+                continue
+            w0 = parts[0].strip('.,;:!?…"\'()').lower()
+            if w0 not in FUNCTIONAL_OPENERS:
+                continue
+            cap = parts[0][:1].isupper()
+            newfirst = mode if not cap else mode[:1].upper() + mode[1:]
+            parts[0] = newfirst
+            pairs[i] = (pairs[i][0], ' '.join(parts))
+            changed += 1
+    print(f'islevsel acilis sabitendi ({changed} yanit)', flush=True)
+    return pairs
+
+
+def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
+                 FIRST_WORD_STABILIZE=True):
     """Veri + RAG hattini HAZIRLAR (yalnizca numpy; torch gerektirmez).
     --dry-run bu fonksiyonu calistirip dogrular; egitim de ayni yolu kullanir.
 
     NATURAL > 0 ise her (sorgu, yanit) cifti, yanitin dogal varyantlariyla
     cogaltilir (naturalize_pairs): model ayni icerigi pek cok dogal sekilde
-    ifade etmeyi ogrenip kopya-yerine-canli-sohbet icin veri kazanir."""
+    ifade etmeyi ogrenip kopya-yerine-canli-sohbet icin veri kazanir.
+
+    kb_map_path verilirse (enrich_intents.py uretimi knowledge_map.jsonl)
+    desen->bilgi parcasini CANLI corpus.search yerine ezberlenmis haritadan
+    alir: deterministik (RAG hit orani %100'la simrek istedigimiz bilgi
+    intent'leri icin guvenli) ve corplar shisha yapisirken hizlidir.
+
+    tokenizer (BPETokenizer) verilirse BPE modu kullanilir (subword vocab);
+    yoksa eski karakter sozlugu (build_llm_vocab) kullanilir."""
     assert os.path.exists(INTENTS), f'intents.json bulunamadi: {INTENTS}'
     pairs = load_pairs(INTENTS, max_pairs=MAX_PAIRS, use_query=True)
     pairs = [(ctx, rr) for ctx, r in pairs if (rr := refine_resp(r)) is not None]
+    if FIRST_WORD_STABILIZE:
+        n_before = len(pairs)
+        pairs = stabilize_first_words(pairs)
+        print(f'islevsel acilis sabitlendi: {n_before} cift'
+              f' (yalnizca islevsel acilislar -> mod; icerik korunur),'
+              f' o=0 entropisi dusuruldu', flush=True)
     if NATURAL > 0:
         n_before = len(pairs)
         pairs = naturalize_pairs(pairs, k=NATURAL)
@@ -218,16 +290,21 @@ def prepare_data(RAG, NATURAL=0):
               f' (varyant: {NATURAL})', flush=True)
     print('egitim cifti (sorgu, yanit):', len(pairs), flush=True)
 
-    all_text = []
-    for ctx, resp in pairs:
-        all_text.append(ctx)
-        all_text.append(resp)
-    vocab = build_llm_vocab(all_text)
-    print('karakter sozlugu:', len(vocab), flush=True)
+    vocab = None
+    if tokenizer is None:
+        all_text = []
+        for ctx, resp in pairs:
+            all_text.append(ctx)
+            all_text.append(resp)
+        vocab = build_llm_vocab(all_text)
+        print('karakter sozlugu:', len(vocab), flush=True)
 
-    # Dummy numpy modeli yalnizca encode icin (c2i + uzunluk bilgisi)
+    # Dummy modeli yalnizca encode icin (c2i/tokenizer + uzunluk bilgisi)
     dummy = LLM(vocab, d_model=4, num_blocks=1, num_heads=1,
-                max_ctx_len=MAX_CTX_LEN, max_seq_len=MAX_SEQ_LEN, seed=SEED)
+                max_ctx_len=MAX_CTX_LEN, max_seq_len=MAX_SEQ_LEN,
+                seed=SEED, tokenizer=tokenizer)
+    if tokenizer is not None:
+        print('BPE tokenizer: vocab =', len(tokenizer), flush=True)
 
     rng = np.random.RandomState(SEED)
     perm = rng.permutation(len(pairs))
@@ -238,6 +315,17 @@ def prepare_data(RAG, NATURAL=0):
     # ---- RAG: her (sorgu, yanit) ciftine corpus'tan ilgili bilgi parcasi
     ctx_map = {}
     corpus = None
+    kb_pre = {}
+    if kb_map_path and os.path.exists(kb_map_path):
+        with io.open(kb_map_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                row = json.loads(line)
+                if row.get('ctx') and row.get('text'):
+                    kb_pre[row['ctx']] = row['text']
+        print('kb-map yuklendi (desen):', len(kb_pre), flush=True)
     if RAG:
         try:
             from corpus import Corpus
@@ -249,6 +337,8 @@ def prepare_data(RAG, NATURAL=0):
             print('RAG corpus yuklenemedi, bilgi-parcasiz egitim:', e, flush=True)
 
     def kb_for(ctx):
+        if ctx in kb_pre:
+            return kb_pre[ctx]
         if corpus is None:
             return None
         try:
@@ -292,7 +382,8 @@ def prepare_data(RAG, NATURAL=0):
     print('train batch:', len(tr), '| val batch:', len(va), flush=True)
     print('ornek cift:', (clean_chars(tr_pairs[0][0], 30),
                           clean_chars(tr_pairs[0][1], 30)), flush=True)
-    return {'vocab': vocab, 'tr': tr, 'va': va, 'ctx_map': ctx_map}
+    return {'vocab': vocab, 'tokenizer': tokenizer,
+            'tr': tr, 'va': va, 'ctx_map': ctx_map}
 
 
 def main():
@@ -300,6 +391,10 @@ def main():
     ap.add_argument('--epochs', type=int, default=250)
     ap.add_argument('--rag', action='store_true',
                     help='corpus.jsonl riddaren bilgi-parcalariyla koullu egitim')
+    ap.add_argument('--kb-map', default=None, metavar='PATH',
+                    help='enrich_intents.py uretimi knowledge_map.jsonl; '
+                         'RAG desen->parca eslemesini corpus.search yerine '
+                         'bu haritadan alir (deterministik, --rag ile birlikte)')
     ap.add_argument('--natural', type=int, default=0, metavar='K',
                     help='her cevabin K dogal varyantiyla veriyi buyut (orijinal dahil)')
     ap.add_argument('--dry-run', action='store_true',
@@ -314,10 +409,12 @@ def main():
     patience = args.patience
 
     if args.dry_run:
-        d = prepare_data(RAG, NATURAL=NATURAL)
+        d = prepare_data(RAG, NATURAL=NATURAL, tokenizer=load_tokenizer(),
+                         kb_map_path=args.kb_map)
         ex = next((c for c in d['ctx_map'].values() if c), None)
         print('DRY-RUN OK: train batch', len(d['tr']), '| val batch',
-              len(d['va']), '| vocab', len(d['vocab']), flush=True)
+              len(d['va']), '| tokenizer', d['tokenizer'].vocab_size
+              if d['tokenizer'] else len(d['vocab']), flush=True)
         if RAG:
             print('RAG ornek baslam:', (ex or '')[:80].replace('\n', ' '), flush=True)
         return 0
@@ -337,8 +434,11 @@ def main():
           '| SAVE_DIR:', SAVE_DIR, '| RAG:', RAG, '| patience:', patience, flush=True)
 
     # ---------------- veri
-    d = prepare_data(RAG, NATURAL=NATURAL)
+    d = prepare_data(RAG, NATURAL=NATURAL, tokenizer=load_tokenizer(),
+                     kb_map_path=args.kb_map)
     vocab = d['vocab']
+    tok = d['tokenizer']
+    V = tok.vocab_size if tok is not None else len(vocab)
     tr, va = d['tr'], d['va']
 
     trX = [torch.from_numpy(b[0]).long().to(DEVICE) for b in tr]
@@ -347,7 +447,7 @@ def main():
     vaM = [torch.from_numpy(b[1]).float().to(DEVICE) for b in va]
 
     # ---------------- model + resume
-    model = TorchLLM(len(vocab)).to(DEVICE)
+    model = TorchLLM(V).to(DEVICE)
     opt = torch.optim.Adam(model.parameters(), lr=LR_BASE)
 
     best_state = None
@@ -431,31 +531,74 @@ def main():
     model.eval()
     data = {
         'arch': 'llm',
-        'V': len(vocab),
+        'V': V,
         'd_model': D_MODEL, 'num_blocks': NUM_BLOCKS, 'num_heads': NUM_HEADS,
         'ff_mult': FF_MULT,
         'max_ctx_len': MAX_CTX_LEN, 'max_seq_len': MAX_SEQ_LEN,
-        'vocab': vocab,
         'params': {k: v.numpy().tolist() for k, v in best_state.items()},
     }
+    if tok is not None:
+        data['tok_mode'] = 'bpe'
+        data['vocab'] = None
+        data['tokenizer'] = {
+            'specials': tok.specials,
+            'chars': tok.chars,
+            'merges': [list(m) for m in tok.merges],
+        }
+    else:
+        data['tok_mode'] = 'char'
+        data['vocab'] = vocab
     dest = os.path.join(SAVE_DIR, 'llm_model.json')
     with io.open(dest, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False)
     print('model yazildi:', dest, flush=True)
 
-    # --------- parity dogrulamasi: ayni girdide numpy logits vs torch logits
+    # --------- parity 1: dogrudan tensor -> numpy (best_state uzerinden)
     x = trX[0][:4]
     with torch.no_grad():
         torch_logits = model(x).float().numpy() if DEVICE == 'cpu' else \
             model(x).cpu().float().numpy()
     np_model = LLM(vocab, d_model=D_MODEL, num_blocks=NUM_BLOCKS, num_heads=NUM_HEADS,
                    ff_mult=FF_MULT, max_ctx_len=MAX_CTX_LEN, max_seq_len=MAX_SEQ_LEN,
-                   seed=SEED)
+                   seed=SEED, tokenizer=tok)
     np_model.params = {k: np.asarray(v, np.float32) for k, v in best_state.items()}
     numpy_logits = np_model.forward(x.detach().cpu().numpy())
     diff = float(np.max(np.abs(torch_logits - numpy_logits)))
-    print(f'parity max-abs fark: {diff:.6f} (beklenen < 1e-3)', flush=True)
+    print(f'parity dogrudan: {diff:.6f} (beklenen < 1e-3)', flush=True)
     assert diff < 1e-3, f'Parity bozuk: {diff}'
+
+    # --------- parity 2: JSON round-trip (data -> from_dict -> forward)
+    json_model = LLM(['<PAD>', '<BOS>', '<SEP>', '<EOS>']).from_dict(data)
+    json_logits = json_model.forward(x.detach().cpu().numpy())
+    diff2 = float(np.max(np.abs(torch_logits - json_logits)))
+    print(f'parity JSON round-trip: {diff2:.6f} (beklenen < 1e-3)', flush=True)
+
+    # --------- agirlik karsilastirmasi: her param key icin max-abs fark
+    worst_key, worst_val = '', 0.0
+    for k in sorted(set(json_model.params) & set(best_state)):
+        d = float(np.max(np.abs(json_model.params[k] -
+                                np.asarray(best_state[k].cpu().numpy(), np.float32))))
+        if d > worst_val:
+            worst_val = d
+            worst_key = k
+    print(f'agirlik en buyuk fark: {worst_key} = {worst_val:.3e}', flush=True)
+
+    # --------- val-batch karsilastirmasi: ilk val batch'te torch vs json numpy
+    if va:
+        xv, mv = va[0]
+        with torch.no_grad():
+            tv = model(torch.from_numpy(xv).long().to(DEVICE))
+            tv = tv.cpu().float().numpy()
+        nv = json_model.forward(xv)
+        diff3 = float(np.max(np.abs(tv - nv)))
+        xv_t = torch.from_numpy(xv).long()
+        mv_t = torch.from_numpy(mv).float()
+        tv_acc = masked_acc(torch.from_numpy(tv), xv_t, mv_t)
+        nv_acc = masked_acc(torch.from_numpy(nv), xv_t, mv_t)
+        print(f'val-batch: torch acc={tv_acc:.3f} | json-numpy acc={nv_acc:.3f} | logit-fark={diff3:.3e}', flush=True)
+
+    if diff2 >= 1e-3:
+        print('[HATA] JSON round-trip parity tutarsiz!', flush=True)
     return 0
 
 

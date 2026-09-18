@@ -560,11 +560,15 @@ class TestLLM(unittest.TestCase):
         self.assertEqual(smask.ndim, 1)
         self.assertEqual(len(seq), len(smask))
         self.assertEqual(len(seq), m.max_seq_len)
-        # sadece <SEP> sonrasi maske
+        # maske: son <SEP> pozisyonu DAHIL (ilk yanit token'ini o tahmin eder)
+        # sonrasi ve yanit token'lari; <EOS> ve dolgu maskedisiz kalir.
         sep_pos = int(np.where(seq == 2)[0][0])
+        eos_pos = int(np.where(seq == 3)[0][0])
         self.assertGreater(sep_pos, 0)
-        self.assertTrue(np.all(smask[:sep_pos + 1] == 0.0))
-        self.assertTrue(np.all(smask[sep_pos + 1:].max() <= 1.0))
+        self.assertTrue(np.all(smask[:sep_pos] == 0.0))
+        self.assertEqual(float(smask[sep_pos]), 1.0)
+        self.assertTrue(np.all(smask[sep_pos:eos_pos] == 1.0))
+        self.assertTrue(np.all(smask[eos_pos:] == 0.0))
 
     def test_sample_returns_str(self):
         m = self._build()
@@ -588,8 +592,11 @@ class TestLLM(unittest.TestCase):
         m = self._build()
         seq, smask = encode_llm(m, 'ab', 'bc', context='bilgi xx koullu')
         last_sep = int(np.where(seq == 2)[0][-1])
-        self.assertTrue(np.all(smask[:last_sep + 1] == 0.0))
+        eos_pos = int(np.where(seq == 3)[0][0])
+        self.assertTrue(np.all(smask[:last_sep] == 0.0))
+        self.assertEqual(float(smask[last_sep]), 1.0)
         self.assertTrue(np.all(smask[last_sep + 1:] <= 1.0))
+        self.assertTrue(np.all(smask[last_sep:eos_pos] == 1.0))
         self.assertGreater(float(smask.sum()), 0.0)
         # context tarafi hicbir zaman maske olmamali
         self.assertEqual(len(seq), len(smask))
@@ -623,13 +630,16 @@ class TestNaturalize(unittest.TestCase):
         b = natural_variants('istanbul turkiyenin en buyuk sehridir', k=3, seed=7)
         self.assertEqual(a, b)
 
-    def test_variants_ascii_only(self):
+    def test_variants_no_ascii_mangling(self):
+        # FAZ 2 karari: varyantlar gercek Turkce imla ile uretilir (ASCII-only
+        # degil). Girdi ASCII ise kendisi bozulmadan korunur; kelime degisimleri
+        # ('var' -> 'bulunmaktadir' gibi) dogal Turkce harfler katabilir.
         from naturalize import natural_variants
         out = natural_variants('guzel bir sehir ve buyuk bir nufusu var', k=4)
+        self.assertTrue(out)
         for v in out:
-            for ch in 'çğıöşü':
-                self.assertNotIn(ch, v)
-            self.assertNotIn(ch.upper(), v)
+            self.assertIn('guzel', v, msg=f'girdi bozuldu: {v!r}')
+            self.assertIn('nufusu', v, msg=f'girdi bozuldu: {v!r}')
 
     def test_variants_preserve_content(self):
         from naturalize import natural_variants
