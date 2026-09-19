@@ -35,6 +35,7 @@ model/ klasorune kopyala (llm.load_llm otomatik agar).
 SAVE_DIR varsayilani script klasoru; ortam degiskeni ile asilabilir.
 """
 import argparse
+import hashlib
 import io
 import json
 import math
@@ -192,6 +193,24 @@ def llm_loss(logits, tgt, mask):
     return -(nll * mask).sum() / mask.sum().clamp(min=1.0)
 
 
+def _cache_fp(tokenizer, kb_map_path, n_pairs, NATURAL, RAG,
+              max_ctx_len, max_seq_len, batch_size, vocab):
+    """Veri ondeklenti parmak izi: veri/tokenizer/kb-map degisince yeniden
+    encode edilir; ayniysa ondeklent onbellegi (npz) kullanilir."""
+    h = hashlib.md5()
+    h.update(('%d|%d|%d|%d|%d|%d|%d' % (n_pairs, NATURAL, int(RAG),
+                                         max_ctx_len, max_seq_len,
+                                         batch_size, SEED)).encode('utf-8'))
+    if kb_map_path and os.path.exists(kb_map_path):
+        with io.open(kb_map_path, 'rb') as f:
+            h.update(f.read(2_000_000))
+    if tokenizer is not None:
+        h.update(('tok:%d:%d' % (len(tokenizer), len(tokenizer.merges))).encode('utf-8'))
+    else:
+        h.update(('char:%d' % (len(vocab) if vocab else 0)).encode('utf-8'))
+    return h.hexdigest()[:16]
+
+
 def masked_acc(logits, tgt, mask):
     nxt = torch.full_like(tgt, PAD)
     nxt[:, :-1] = tgt[:, 1:]
@@ -326,10 +345,11 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
     tr_pairs = [pairs[i] for i in perm[n_val:]]
     va_pairs = [pairs[i] for i in perm[:n_val]]
 
-    # ---- RAG: her (sorgu, yanit) ciftine corpus'tan ilgili bilgi parcasi
+    # ---- RAG: her (sorgu, yanit) ciftine ilgili bilgi parcasi
     ctx_map = {}
     corpus = None
     kb_pre = {}
+    use_corpus = False
     if kb_map_path and os.path.exists(kb_map_path):
         with io.open(kb_map_path, 'r', encoding='utf-8') as f:
             for line in f:
@@ -341,19 +361,27 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
                     kb_pre[row['ctx']] = row['text']
         print('kb-map yuklendi (desen):', len(kb_pre), flush=True)
     if RAG:
-        try:
-            from corpus import Corpus
-            corpus = Corpus()
-            corpus.load()
-            print('RAG corpus yuklendi (parca:', len(corpus.chunks), ')', flush=True)
-        except Exception as e:
-            corpus = None
-            print('RAG corpus yuklenemedi, bilgi-parcasiz egitim:', e, flush=True)
+        if kb_pre:
+            # Harita deterministiktir: corpus'a hic dokunmadan desen->bilgi
+            # dogrudan alinir -> Colab/Kaggle ilk calistirmada dev corpus
+            # embeddingi kurmaz (yoksa ~10 dk CPU beklentisi). Elesma
+            # olmayan desen bilgi-parcasiz kalir (cani zaklamaz).
+            print('RAG kaynagi: kb-map (corpus yuklenmez - hizli)', flush=True)
+        else:
+            use_corpus = True
+            try:
+                from corpus import Corpus
+                corpus = Corpus()
+                corpus.load()
+                print('RAG corpus yuklendi (parca:', len(corpus.chunks), ')', flush=True)
+            except Exception as e:
+                corpus = None
+                print('RAG corpus yuklenemedi, bilgi-parcasiz egitim:', e, flush=True)
 
     def kb_for(ctx):
         if ctx in kb_pre:
             return kb_pre[ctx]
-        if corpus is None:
+        if corpus is None and not use_corpus:
             return None
         try:
             chunk = corpus.search(ctx)
@@ -374,6 +402,23 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
             if ctx_map[ctx]:
                 hits += 1
         print(f'RAG contextli ornek: {hits}/{len(tr_pairs) + len(va_pairs)}', flush=True)
+
+    # ---- veri ondeklenti: ayni veri+tokenizerla tekrar cagrildiginda
+    # (Colab resume / dry-run sonrasi egitim) 10dk'lik BPE-encode ATLANIR.
+    fp = _cache_fp(tokenizer, kb_map_path, len(pairs), NATURAL, RAG,
+                   max_ctx_len, max_seq_len, batch_size, vocab)
+    CACHE = os.path.join(SAVE_DIR, 'llm_data_%s.npz' % fp)
+    if os.path.exists(CACHE):
+        try:
+            with np.load(CACHE, allow_pickle=True) as z:
+                tr0 = [(z['Xt'][i], z['Mt'][i]) for i in range(len(z['Xt']))]
+                va0 = [(z['Xv'][i], z['Mv'][i]) for i in range(len(z['Xv']))]
+            print('veri ondeklenti kullanildi:', os.path.basename(CACHE),
+                  '(%d+%d batch)' % (len(tr0), len(va0)), flush=True)
+            return {'vocab': vocab, 'tokenizer': tokenizer,
+                    'tr': tr0, 'va': va0, 'ctx_map': ctx_map}
+        except Exception as e:
+            print('ondeklent yuklenemedi, yeniden encode:', e, flush=True)
 
     def make_batches(pairs_, B):
         items = sorted(pairs_, key=lambda pr: len(pr[0]))
@@ -396,6 +441,18 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
     print('train batch:', len(tr), '| val batch:', len(va), flush=True)
     print('ornek cift:', (clean_chars(tr_pairs[0][0], 30),
                           clean_chars(tr_pairs[0][1], 30)), flush=True)
+    try:
+        Xt = np.empty(len(tr), dtype=object); Mt = np.empty(len(tr), dtype=object)
+        Xv = np.empty(len(va), dtype=object); Mv = np.empty(len(va), dtype=object)
+        for i, (x_, m_) in enumerate(tr):
+            Xt[i] = x_; Mt[i] = m_
+        for i, (x_, m_) in enumerate(va):
+            Xv[i] = x_; Mv[i] = m_
+        os.makedirs(SAVE_DIR, exist_ok=True)
+        np.savez(CACHE, Xt=Xt, Mt=Mt, Xv=Xv, Mv=Mv)
+        print('veri ondeklenti yazildi:', os.path.basename(CACHE), flush=True)
+    except Exception as e:
+        print('ondeklent yazilamadi (devam):', e, flush=True)
     return {'vocab': vocab, 'tokenizer': tokenizer,
             'tr': tr, 'va': va, 'ctx_map': ctx_map}
 
