@@ -215,6 +215,24 @@ def _cache_fp(tokenizer, kb_map_path, n_pairs, NATURAL, RAG,
     return h.hexdigest()[:16]
 
 
+# ---- cok cekirdekli BPE-encode (ilk veri hazirligini hizlandirir).
+# encode_llm saf/deterministiktir; sira korundugu icin cikti birebir ayni
+# kalir, ondeklent parmak izi degismez. Yalnizca Linux (fork) -> Kaggle/Colab.
+_mp_dummy = None
+_mp_ctx = {}
+
+
+def _mp_init(dummy_, ctx_map_):
+    global _mp_dummy, _mp_ctx
+    _mp_dummy = dummy_
+    _mp_ctx = ctx_map_
+
+
+def _mp_enc(item):
+    ctx, resp = item
+    return encode_llm(_mp_dummy, ctx, resp, context=_mp_ctx.get(ctx))
+
+
 def masked_acc(logits, tgt, mask):
     nxt = torch.full_like(tgt, PAD)
     nxt[:, :-1] = tgt[:, 1:]
@@ -426,6 +444,29 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
 
     def make_batches(pairs_, B):
         items = sorted(pairs_, key=lambda pr: len(pr[0]))
+        # Cok cekirdekli ilk-encode (Kaggle/Colab: 2-4 CPU). Sonuc SIRAYLA
+        # dondugu gorundugu icin cikti birebir ayni -> ondeklent gecerli.
+        enc_all = None
+        if (sys.platform.startswith('linux') and len(items) >= 20000
+                and os.environ.get('LLM_MP_OFF') is None):
+            try:
+                import multiprocessing as mp
+                nw = max(2, min(4, os.cpu_count() or 2))
+                with mp.get_context('fork').Pool(
+                        nw, initializer=_mp_init, initargs=(dummy, ctx_map)) as p:
+                    enc_all = p.map(_mp_enc, items, chunksize=4096)
+                print('BPE-encode %d cift (%.1fM token) %d cekirdekle' % (
+                    len(items), len(items) * 0.16, nw), flush=True)
+            except Exception as e:
+                enc_all = None
+                print('paralel encode atlandi (sirali):', str(e)[:120], flush=True)
+        if enc_all is not None:
+            batches = []
+            for i in range(0, len(enc_all), B):
+                seqs = [e[0] for e in enc_all[i:i + B]]
+                masks = [e[1] for e in enc_all[i:i + B]]
+                batches.append((np.stack(seqs), np.stack(masks)))
+            return batches
         batches = []
         for i in range(0, len(items), B):
             block = items[i:i + B]
