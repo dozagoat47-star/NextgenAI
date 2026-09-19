@@ -51,6 +51,9 @@ try:
     import torch
     import torch.nn as nn
     HAVE_TORCH = True
+    if torch.cuda.is_available():
+        # sabit boyutlu matmul'lar icin cuDNN ototune (bir kez olu, sonra hiz)
+        torch.backends.cudnn.benchmark = True
 except Exception:
     torch = nn = None
     HAVE_TORCH = False
@@ -596,12 +599,25 @@ def main():
             print('Devam: epoch', start_ep, '| step', step,
                   '| best val:', round(best_val, 4), flush=True)
 
+    # PyTorch 2.x kernel derleme (değişken batch uzunluklari icin dynamic=True:
+    # sabit boyutta tek kerelik compile, degisen boyutta tekrar derlemez).
+    # Bir sorun olursa sessizce derlenmemis modele donulur.
+    if DEVICE.startswith('cuda') and torch.__version__.split('.')[0] >= '2':
+        try:
+            model = torch.compile(model, dynamic=True)
+            print('torch.compile aktif (PyTorch 2.x kernel derleme)', flush=True)
+        except Exception as e:
+            print('torch.compile atlandi:', str(e)[:140], flush=True)
     if DEVICE.startswith('cuda') and torch.cuda.device_count() > 1:
-        print('DataParallel: %d GPU kullaniliyor (batch parcalaniyor)' %
-              torch.cuda.device_count(), flush=True)
-        model = torch.nn.DataParallel(model)
-    # DataParallel sarmasindan sonra DUZ (module prefix'siz) anahtarlar:
-    # checkpoint/export her zaman buradan beslenir -> tek GPU'da sorunsuz ya imkani.
+        try:
+            model = torch.nn.DataParallel(model)
+            print('DataParallel: %d GPU kullaniliyor (batch parcalaniyor)' %
+                  torch.cuda.device_count(), flush=True)
+        except Exception as e:
+            model = model.module if hasattr(model, 'module') else model
+            print('DataParallel atlandi (tek GPU ile devam):', str(e)[:140], flush=True)
+    # DataParallel/kernel sarmasindan sonra DUZ (module prefix'siz) anahtarlar:
+    # checkpoint/export her zaman buradan beslenir -> tek GPU'da sorunsuzlasir.
     base = model.module if hasattr(model, 'module') else model
 
     # ---------------- egitim
