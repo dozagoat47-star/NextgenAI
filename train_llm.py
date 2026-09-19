@@ -150,17 +150,18 @@ if HAVE_TORCH:
 
         @staticmethod
         def _causal_attn(q, k, v, rsqrt, heads, hd, drop_p=0.0, training=False):
+            """Causal self-attention: torch SDPA (is_causal=True). Uygun GPU'da
+            Flash/MemoryEfficient backend; degilse hizlandirilmis math backend.
+            Eval'da dropout 0 -> numpy (llm.py) parity bozulmaz."""
             B, T, d = q.shape
             Q = q.reshape(B, T, heads, hd).transpose(1, 2)
             K = k.reshape(B, T, heads, hd).transpose(1, 2)
             V = v.reshape(B, T, heads, hd).transpose(1, 2)
-            scores = (Q @ K.transpose(-1, -2)) * rsqrt
-            tri = torch.triu(torch.full((T, T), -1e9, device=q.device), 1)
-            scores = scores + tri[None, None]
-            p = torch.softmax(scores, dim=-1)
-            if training and drop_p > 0:
-                p = torch.nn.functional.dropout(p, drop_p)
-            return (p @ V).transpose(1, 2).reshape(B, T, d)
+            o = torch.nn.functional.scaled_dot_product_attention(
+                Q, K, V, attn_mask=None,
+                dropout_p=drop_p if training else 0.0,
+                is_causal=True)
+            return o.transpose(1, 2).reshape(B, T, d)
 
         def _ffn(self, x, i):
             W1, b1 = getattr(self, f'b{i}_W1'), getattr(self, f'b{i}_b1')
@@ -651,26 +652,50 @@ def main():
             print('Devam: epoch', start_ep, '| step', step,
                   '| best val:', round(best_val, 4), flush=True)
 
-    # PyTorch 2.x kernel derleme — VARIYADAN GEREKIRSE (LLM_COMPILE=1). Varsayilan
-    # KAPALI: cloud GPU'larinda (Kaggle T4) torch.compile + DataParallel kaynak
-    # onbellegi 'embed' kaybi gibi AttributeError'lara yol aciyordu; AMP + DP
-    # hiz kazancinin cogunu zaten sagliyor.
-    if (DEVICE.startswith('cuda') and os.environ.get('LLM_COMPILE')
-            and tuple(map(int, torch.__version__.split('.')[:2])) >= (2, 0)):
+    # ---- kernel derleme (torch.compile) + coklu GPU sarmaci ------------------
+    # Derleme varsayilan ACIK (LLM_COMPILE=0 ile kapatilir). Onceki
+    # 'embed' AttributeError'u fork+canli CUDA baglamindan geliyordu; CUDA
+    # artik prepare_data'dan sonra acildigi icin kilitsiz. Yine de warmup
+    # forward'iyla dogrulanir; basarisizsa DERLENMEMIS modele geri donulur.
+    raw = model                       # duz TorchLLM yedegi (fallback)
+    compiled = False
+    dp = False
+    if (DEVICE.startswith('cuda')
+            and tuple(map(int, torch.__version__.split('.')[:2])) >= (2, 0)
+            and os.environ.get('LLM_COMPILE', '1') != '0'):
         try:
             model = torch.compile(model, dynamic=True)
-            print('torch.compile aktif (LLM_COMPILE=1)', flush=True)
+            compiled = True
+            print('torch.compile aktif (kernel derleme)', flush=True)
         except Exception as e:
             print('torch.compile atlandi:', str(e)[:140], flush=True)
     if DEVICE.startswith('cuda') and torch.cuda.device_count() > 1 \
             and os.environ.get('LLM_DP_OFF') is None:
         try:
             model = torch.nn.DataParallel(model)
+            dp = True
             print('DataParallel: %d GPU kullaniliyor (batch parcalaniyor)' %
                   torch.cuda.device_count(), flush=True)
         except Exception as e:
             model = model.module if hasattr(model, 'module') else model
             print('DataParallel atlandi (tek GPU ile devam):', str(e)[:140], flush=True)
+    if compiled:
+        try:
+            with torch.no_grad():
+                probe = torch.randint(0, max(2, V), (1, 16), device=DEVICE)
+                model.eval()
+                _ = model(probe)
+            model.train()
+            print('kernel on-isinmasi OK (derleme calisiyor)', flush=True)
+        except Exception as e:
+            print('kernel on-isinmasi hatali, derlenmemis modele donuyorum:',
+                  str(e)[:140], flush=True)
+            model = raw
+            if dp and torch.cuda.device_count() > 1:
+                try:
+                    model = torch.nn.DataParallel(model)
+                except Exception:
+                    pass
     # DataParallel/kernel sarmasindan sonra DUZ (module prefix'siz) anahtarlar:
     # checkpoint/export her zaman buradan beslenir -> tek GPU'da sorunsuzlasir.
     base = model.module if hasattr(model, 'module') else model
