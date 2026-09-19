@@ -35,6 +35,7 @@ model/ klasorune kopyala (llm.load_llm otomatik agar).
 SAVE_DIR varsayilani script klasoru; ortam degiskeni ile asilabilir.
 """
 import argparse
+import contextlib
 import hashlib
 import io
 import json
@@ -186,7 +187,7 @@ if HAVE_TORCH:
 
 def llm_loss(logits, tgt, mask):
     """Otoregresif next-token: logits[t] -> tgt[t+1] (KENDI token'i degil)."""
-    lg = torch.log_softmax(logits, dim=-1)
+    lg = torch.log_softmax(logits.float(), dim=-1)
     nxt = torch.full_like(tgt, PAD)
     nxt[:, :-1] = tgt[:, 1:]
     nll = lg.gather(-1, nxt.unsqueeze(-1)).squeeze(-1)
@@ -530,6 +531,7 @@ def main():
     print('PyTorch', torch.__version__, '| device:', DEVICE,
           '| GPU:', torch.cuda.get_device_name(0) if DEVICE == 'cuda' else '-',
           '(Count: %d)' % n_gpu,
+          '| AMP:', 'fp16' if DEVICE == 'cuda' else 'off',
           '| SAVE_DIR:', SAVE_DIR, '| RAG:', RAG, '| patience:', patience, flush=True)
 
     # ---------------- veri
@@ -550,6 +552,16 @@ def main():
     model = TorchLLM(V, d_model=dm, num_blocks=nb, num_heads=nh, ff_mult=ff,
                      max_seq_len=mxs).to(DEVICE)
     opt = torch.optim.Adam(model.parameters(), lr=lr_base)
+
+    # AMP (fp16): T4 Tensor Core'lari devreye girer (~2x). Master agirliklar
+    # FP32 kalir (GradScaler) -> export/parity etkilenmez. Veri zaten egitimin
+    # basinda CUDA'ya tek seferde tasindigi icin DataLoader num_workers/pin_memory
+    # darboğaz DEGILDIR (per-step transfer yok); o yuzden eklenmedi.
+    use_amp = DEVICE.startswith('cuda')
+    try:
+        scaler = torch.amp.GradScaler('cuda', enabled=use_amp)
+    except Exception:
+        scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
 
     best_state = None
     best_val = 1e9
@@ -612,10 +624,14 @@ def main():
             for g in opt.param_groups:
                 g['lr'] = cur
             opt.zero_grad()
-            loss = llm_loss(model(trX[bi]), trX[bi], trM[bi])
-            loss.backward()
+            with torch.autocast('cuda', torch.float16) if use_amp \
+                    else contextlib.nullcontext():
+                loss = llm_loss(model(trX[bi]), trX[bi], trM[bi])
+            scaler.scale(loss).backward()
+            scaler.unscale_(opt)
             torch.nn.utils.clip_grad_norm_(model.parameters(), GRAD_CLIP)
-            opt.step()
+            scaler.step(opt)
+            scaler.update()
             tl += loss.item()
             if os.environ.get('SMOKE') and step >= 2:
                 print('SMOKE OK:', float(loss.item()), flush=True)
