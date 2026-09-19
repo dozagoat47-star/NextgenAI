@@ -599,13 +599,15 @@ def main():
             print('Devam: epoch', start_ep, '| step', step,
                   '| best val:', round(best_val, 4), flush=True)
 
-    # PyTorch 2.x kernel derleme (değişken batch uzunluklari icin dynamic=True:
-    # sabit boyutta tek kerelik compile, degisen boyutta tekrar derlemez).
-    # Bir sorun olursa sessizce derlenmemis modele donulur.
-    if DEVICE.startswith('cuda') and torch.__version__.split('.')[0] >= '2':
+    # PyTorch 2.x kernel derleme — VARIYADAN GEREKIRSE (LLM_COMPILE=1). Varsayilan
+    # KAPALI: cloud GPU'larinda (Kaggle T4) torch.compile + DataParallel kaynak
+    # onbellegi 'embed' kaybi gibi AttributeError'lara yol aciyordu; AMP + DP
+    # hiz kazancinin cogunu zaten sagliyor.
+    if (DEVICE.startswith('cuda') and os.environ.get('LLM_COMPILE')
+            and tuple(map(int, torch.__version__.split('.')[:2])) >= (2, 0)):
         try:
             model = torch.compile(model, dynamic=True)
-            print('torch.compile aktif (PyTorch 2.x kernel derleme)', flush=True)
+            print('torch.compile aktif (LLM_COMPILE=1)', flush=True)
         except Exception as e:
             print('torch.compile atlandi:', str(e)[:140], flush=True)
     if DEVICE.startswith('cuda') and torch.cuda.device_count() > 1:
