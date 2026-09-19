@@ -51,9 +51,9 @@ try:
     import torch
     import torch.nn as nn
     HAVE_TORCH = True
-    if torch.cuda.is_available():
-        # sabit boyutlu matmul'lar icin cuDNN ototune (bir kez olu, sonra hiz)
-        torch.backends.cudnn.benchmark = True
+    # Dikkat: burada torch.cuda.is_available() CAĞRILMAZ. Cok-cekirdekli
+    # BPE-encode 'fork' kullanir; canli CUDA baglamiyla fork edilirse
+    # tilekilenebilir. CUDA ancak prepare_data (fork) BITTIKTEN sonra acilir.
 except Exception:
     torch = nn = None
     HAVE_TORCH = False
@@ -570,15 +570,9 @@ def main():
     torch.manual_seed(SEED)
     np.random.seed(SEED)
     random.seed(SEED)
-    DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-    n_gpu = torch.cuda.device_count() if DEVICE == 'cuda' else 0
-    print('PyTorch', torch.__version__, '| device:', DEVICE,
-          '| GPU:', torch.cuda.get_device_name(0) if DEVICE == 'cuda' else '-',
-          '(Count: %d)' % n_gpu,
-          '| AMP:', 'fp16' if DEVICE == 'cuda' else 'off',
-          '| SAVE_DIR:', SAVE_DIR, '| RAG:', RAG, '| patience:', patience, flush=True)
 
-    # ---------------- veri
+    # ---------------- veri  (Bu noktaya kadar CUDA HIC AYAGA KALKMAZ;
+    # fork tabanli cok-cekirdekli BPE-encode bu sayede guvenli)
     d = prepare_data(RAG, NATURAL=NATURAL, tokenizer=load_tokenizer(),
                      kb_map_path=args.kb_map, max_ctx_len=mxc, max_seq_len=mxs,
                      batch_size=bs)
@@ -586,6 +580,23 @@ def main():
     tok = d['tokenizer']
     V = tok.vocab_size if tok is not None else len(vocab)
     tr, va = d['tr'], d['va']
+
+    # CUDA bu NOKTAIYLA baslar: encode fork'lari bitmis, birden fazla GPU'yla
+    # DataParallel oncesi her cihaz sicakligi tek tek dogrulanir (kilitlenme
+    # yerine aninda hata dondurur).
+    DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+    n_gpu = torch.cuda.device_count() if DEVICE == 'cuda' else 0
+    if DEVICE.startswith('cuda'):
+        torch.backends.cudnn.benchmark = True
+        for g in range(n_gpu):
+            t = torch.tensor(1.0, device='cuda:%d' % g)
+            _ = (t + 1).item()
+        print('CUDA sicak: %d GPU dogrulandi' % n_gpu, flush=True)
+    print('PyTorch', torch.__version__, '| device:', DEVICE,
+          '| GPU:', torch.cuda.get_device_name(0) if DEVICE == 'cuda' else '-',
+          '(Count: %d)' % n_gpu,
+          '| AMP:', 'fp16' if DEVICE == 'cuda' else 'off',
+          '| SAVE_DIR:', SAVE_DIR, '| RAG:', RAG, '| patience:', patience, flush=True)
 
     trX = [torch.from_numpy(b[0]).long().to(DEVICE) for b in tr]
     trM = [torch.from_numpy(b[1]).float().to(DEVICE) for b in tr]
@@ -651,7 +662,8 @@ def main():
             print('torch.compile aktif (LLM_COMPILE=1)', flush=True)
         except Exception as e:
             print('torch.compile atlandi:', str(e)[:140], flush=True)
-    if DEVICE.startswith('cuda') and torch.cuda.device_count() > 1:
+    if DEVICE.startswith('cuda') and torch.cuda.device_count() > 1 \
+            and os.environ.get('LLM_DP_OFF') is None:
         try:
             model = torch.nn.DataParallel(model)
             print('DataParallel: %d GPU kullaniliyor (batch parcalaniyor)' %
