@@ -44,14 +44,18 @@ esac
 
 if [ -n "$DONE" ]; then
   echo ""
-  echo "[2/3] Cikti zip'e aliniyor (webfetch'te indirme sorunu olmasin diye)..."
+  echo "[2/3] Cikti zip'e aliniyor (model: llm_model.json + llm_model_weights.npz)..."
   mkdir -p /kaggle/working/cikti
-  cp -f model/llm_model.json /kaggle/working/cikti/ 2>/dev/null || true
+  cp -f llm_model.json llm_model_weights.npz /kaggle/working/cikti/ 2>/dev/null || true
   cp -f kaggle_train.log /kaggle/working/cikti/ 2>/dev/null || true
-  (cd /kaggle/working/cikti && zip -q -9 /kaggle/working/nde-irma.zip llm_model.json kaggle_train.log 2>/dev/null || \
-     (tar -czf /kaggle/working/nde-irma.tar.gz llm_model.json kaggle_train.log 2>/dev/null || true))
+  ls -la /kaggle/working/cikti/
+  (cd /kaggle/working/cikti && zip -q -9 /kaggle/working/nde-irma.zip \
+     llm_model.json llm_model_weights.npz kaggle_train.log 2>/dev/null || \
+     (tar -czf /kaggle/working/nde-irma.tar.gz \
+        llm_model.json llm_model_weights.npz kaggle_train.log 2>/dev/null || true))
   echo "[3/3] INDIRME: Asagidaki sekmelerden birini kullan:"
   echo "  - /kaggle/working/nde-irma.zip  (ya da .tar.gz)"
   echo "  Kaggle'da dosya indirme: Notebook'u SAVE (Version) yapinca Output"
   echo "  sekmesinden 'Download All' ile iner; veya dosya adlariyla aratip tek tek."
+  echo "  Iki dosya birlikte model/ klasorune kopyalanir (llm_model.json + llm_model_weights.npz)."
 fi
