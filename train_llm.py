@@ -659,6 +659,12 @@ def main():
     # forward'iyla dogrulanir; basarisizsa DERLENMEMIS modele geri donulur.
     raw = model                       # duz TorchLLM yedegi (fallback)
 
+    # torch.compile varsayilan KAPALI (LLM_COMPILE=1 ile acilir): bu modul
+    # tamamen parametre/buffer tabanli (alt module yok); cloud GPU'da compile
+    # rebuild'i 'embed' gibi parametre erisimlerini dusurup
+    # AttributeError:'TorchLLM' ... no attribute 'embed' verebiliyor (2 kez).
+    # SDPA + AMP + DataParallel hiz kazancini zaten veriyor.
+
     # .train()/.eval() sarmalari (torch.compile + DataParallel birlikte) bazi
     # torch surumlerinde RecursionError uretir (children traversal sonsuz dongu).
     # Modelin HIC alt module'u yok (yalnizca parametre/buffer) -> en ice module'un
@@ -674,7 +680,7 @@ def main():
     dp = False
     if (DEVICE.startswith('cuda')
             and tuple(map(int, torch.__version__.split('.')[:2])) >= (2, 0)
-            and os.environ.get('LLM_COMPILE', '1') != '0'):
+            and os.environ.get('LLM_COMPILE') == '1'):
         try:
             model = torch.compile(model, dynamic=True)
             compiled = True
@@ -697,8 +703,24 @@ def main():
                 probe = torch.randint(0, max(2, V), (1, 16), device=DEVICE)
                 _set_mode(False)
                 _ = model(probe)
+            # EGITIM grafini da derlet: 'embed' kaybina benzer hatalar eval'da
+            # gorunmez, ilk backward sirasinda patlar. Kucuk bir forward+backward
+            # ile derleme-oncesi yakalanir, hata olursa derlenmemis modele donulur.
             _set_mode(True)
-            print('kernel on-isinmasi OK (derleme calisiyor)', flush=True)
+            p2 = torch.randint(0, max(2, V), (1, 16), device=DEVICE)
+            out = model(p2)
+            out.sum().backward()
+            if hasattr(model, 'module'):
+                mm = model.module
+            else:
+                mm = model
+            if hasattr(mm, '_orig_mod'):
+                for _p in mm._orig_mod.parameters():
+                    _p.grad = None
+            else:
+                for _p in mm.parameters():
+                    _p.grad = None
+            print('kernel on-isinmasi OK (ders/derleme calisiyor)', flush=True)
         except Exception as e:
             print('kernel on-isinmasi hatali, derlenmemis modele donuyorum:',
                   str(e)[:140], flush=True)
