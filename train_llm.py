@@ -428,6 +428,8 @@ def main():
     ap.add_argument('--lr-base', type=float, default=LR_BASE)
     ap.add_argument('--export-dir', default=None,
                     help='llm_model.json + _weights.npz ciktisi (varsayilan: SAVE_DIR)')
+    ap.add_argument('--fresh', action='store_true',
+                    help='mevcut checkpoint yok sayilir, sifirdan basla')
     args = ap.parse_args()
     EPOCHS = args.epochs
     RAG = args.rag
@@ -496,20 +498,25 @@ def main():
     start_ep = 0
     step = 0
     tot_steps = EPOCHS * len(trX)
+    # veri parmak izi: cift sayisi + natural + uzunluklar -> veri degisince
+    # eski checkpoint otomatik atlanir (eski veriyle egitilmis devam etmez).
+    data_fp = '%d-%d-%d-%d' % (len(trX), NATURAL, mxc, mxs)
 
-    if os.path.exists(CKPT):
+    if args.fresh:
+        print('Uyari: --fresh verildi, mevcut checkpoint yok sayilir '
+              '(sifirdan basliyorum, eski dosya korunur).', flush=True)
+    elif os.path.exists(CKPT):
         cp = torch.load(CKPT, map_location=DEVICE, weights_only=True)
         arch = cp.get('arch', {})
         same_arch = (arch.get('d_model') == dm and arch.get('num_blocks') == nb
                      and arch.get('num_heads') == nh and arch.get('ff_mult') == ff
                      and arch.get('max_seq_len') == mxs and arch.get('V') == V)
-        if not same_arch:
-            print('Uyari: mevcut checkpoint baska mimaride '
-                  '(beklenen d=%s blk=%s k=%s f=%s mxs=%s V=%s). '
+        same_data = cp.get('data') == data_fp
+        if not same_arch or not same_data:
+            print('Uyari: mevcut checkpoint eski (mimari-uyum: %s, '
+                  'veri-uyum: %s, beklenen data=%s). '
                   'Sifirdan basliyorum (eski dosya korunur).' % (
-                      arch.get('d_model'), arch.get('num_blocks'),
-                      arch.get('num_heads'), arch.get('ff_mult'),
-                      arch.get('max_seq_len'), arch.get('V')), flush=True)
+                      same_arch, same_data, data_fp), flush=True)
         else:
             model.load_state_dict(cp['model'])
             opt.load_state_dict(cp['opt'])
@@ -574,7 +581,8 @@ def main():
                         'opt': opt.state_dict(), 'best_val': best_val,
                         'best_state': best_state,
                         'arch': {'d_model': dm, 'num_blocks': nb, 'num_heads': nh,
-                                 'ff_mult': ff, 'max_seq_len': mxs, 'V': V}}, CKPT)
+                                 'ff_mult': ff, 'max_seq_len': mxs, 'V': V},
+                        'data': data_fp}, CKPT)
             print(f'  checkpoint -> {CKPT}', flush=True)
         if done:
             break
