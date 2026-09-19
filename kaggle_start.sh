@@ -13,6 +13,10 @@
 #      (once deneme istersen:  !bash kaggle_start.sh verify   )
 #   5) Egitim sonrasi indirme hucresi (asagidaki INDIRME notuna bak).
 #
+#   Veri NOTU: train_llm MAX_PAIRS=70000 cifti natural 5 ile ~330k cifte
+#   cikarir -> epoch basina sure eskiye gore ~5.5x. erken durdurma (patience)
+#   otomatik keser; sure endiseleniyorsan 250 yerine 80 ver.
+#
 #   Veriyi/intents'i degistirdiysen repo'ya push ettikten sonra yine 1. adim
 #   (clone) yeterli - tum dosyalar taze gelir.
 
@@ -25,8 +29,8 @@ EPOCHS="${2:-250}"
 DONE=''
 case "$MODE" in
   train)
-    echo "[1/3] RAG egitim (epochs=$EPOCHS) -> model/llm_model.json"
-    python train_llm.py --rag --kb-map knowledge_map.jsonl --natural 3 \
+    echo "[1/3] RAG egitim (natural 5, epochs=$EPOCHS) -> llm_model.json"
+    python train_llm.py --rag --kb-map knowledge_map.jsonl --natural 5 \
       --epochs "$EPOCHS" 2>&1 | tee kaggle_train.log
     DONE='yes'
     ;;

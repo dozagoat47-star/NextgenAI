@@ -15,10 +15,13 @@ Kullanim (yerel dogrulama icin torch gerektirmez):
   SMOKE=1 python train_llm.py                            # 2 adim CPU hiz testi
 
 Kaggle'da egitim (GPU notebook):
-  python train_llm.py --rag --natural 3                  # varsayilan buyuk model
-  python train_llm.py --rag --natural 3 --d-model 384 --num-blocks 6
-  python train_llm.py --rag --natural 3 --max-ctx-len 48 --max-seq-len 192
+  python train_llm.py --rag --natural 5 --kb-map knowledge_map.jsonl   # oneri (d=256)
+  python train_llm.py --rag --natural 5 --kb-map knowledge_map.jsonl --d-model 384 --num-blocks 6
+  python train_llm.py --rag --natural 3 --kb-map knowledge_map.jsonl --max-ctx-len 48 --max-seq-len 192
   python train_llm.py --epochs 400 --patience 40 --batch-size 64
+Veri boyu: MAX_PAIRS=70000 ham cift N5 ile ~330k cift -> epoch basina sure eski
+(60k cift) 60/gore ~5.5x artar; erken durdurma (patience) devrede -> genelde
+cok daha azda durur, asiriya kacmaz. Sure endiseleniyorsan --epochs 80 --patience 12.
 
 Kapasite flag'leri: --d-model --num-blocks --num-heads --ff-mult
   --max-ctx-len --max-seq-len --batch-size --lr-base. Varsayilani d=256'dir;
@@ -73,7 +76,7 @@ WARMUP = 200
 PATIENCE = 20
 GRAD_CLIP = 5.0
 CKPT_FREQ = 5
-MAX_PAIRS = 20000
+MAX_PAIRS = 70000   # ham ciftlerin TAMAMI kullanilir (intents.json: ~68.654); eski 20k kirpiyordu
 MAX_CTX_LEN = 40
 MAX_SEQ_LEN = 160
 SEED = 7
