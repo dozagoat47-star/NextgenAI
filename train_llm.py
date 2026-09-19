@@ -658,6 +658,18 @@ def main():
     # artik prepare_data'dan sonra acildigi icin kilitsiz. Yine de warmup
     # forward'iyla dogrulanir; basarisizsa DERLENMEMIS modele geri donulur.
     raw = model                       # duz TorchLLM yedegi (fallback)
+
+    # .train()/.eval() sarmalari (torch.compile + DataParallel birlikte) bazi
+    # torch surumlerinde RecursionError uretir (children traversal sonsuz dongu).
+    # Modelin HIC alt module'u yok (yalnizca parametre/buffer) -> en ice module'un
+    # `training` bayragi dogrudan atanir; children gezilmez.
+    def _set_mode(training):
+        m = model
+        while hasattr(m, 'module'):
+            m = m.module
+        if hasattr(m, '_orig_mod'):
+            m = m._orig_mod
+        m.training = bool(training)
     compiled = False
     dp = False
     if (DEVICE.startswith('cuda')
@@ -683,9 +695,9 @@ def main():
         try:
             with torch.no_grad():
                 probe = torch.randint(0, max(2, V), (1, 16), device=DEVICE)
-                model.eval()
+                _set_mode(False)
                 _ = model(probe)
-            model.train()
+            _set_mode(True)
             print('kernel on-isinmasi OK (derleme calisiyor)', flush=True)
         except Exception as e:
             print('kernel on-isinmasi hatali, derlenmemis modele donuyorum:',
@@ -704,7 +716,7 @@ def main():
     t0_all = time.time()
     done = False
     for ep in range(start_ep + 1, EPOCHS + 1):
-        model.train()
+        _set_mode(True)
         t0 = time.time()
         order = list(range(len(trX)))
         random.Random(ep).shuffle(order)
@@ -734,7 +746,7 @@ def main():
                 return 0
         tl /= len(trX)
 
-        model.eval()
+        _set_mode(False)
         vl = va_acc = 0.0
         with torch.no_grad():
             for x, m in zip(vaX, vaM):
@@ -770,7 +782,7 @@ def main():
 
     # ---------------- export (numpy inference ile uyumlu compact NPZ format)
     base.load_state_dict(best_state)
-    model.eval()
+    _set_mode(False)
     data = {
         'arch': 'llm',
         'V': V,
