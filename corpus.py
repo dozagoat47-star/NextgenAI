@@ -17,6 +17,7 @@ import json
 import math
 import re
 import datetime
+import hashlib
 
 import numpy as np
 
@@ -28,8 +29,8 @@ TITLE_BOOST = 2.0
 SNIPPET_MAX_LEN = 600
 
 # EMBEDDING VEKTOR DEPOSU (numpy-only LSA/SVD)
-EMB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'corpus_embedding.npz')
-EMB_META = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'corpus_embedding_meta.json')
+# Onbellek yollari oz-ornek bazinda (self._emb_file/_emb_meta) tutulur;
+# varsayilan konum 'corpus_embedding.npz' / 'corpus_embedding_meta.json'dir.
 EMB_K = 128          # gizli boyut (latent) sayisi
 EMB_MIN_TERM = 3     # term minimum uzunlugu (Turkce kokler kisa: ked, mar, su)
 EMB_MIN_DF = 5       # en az 5 dokumanda gecen termler (nadir term gurultusunu keser)
@@ -61,9 +62,15 @@ class Corpus:
         self.tokenizer = ChatBot()
         self.chunks = []
         self.idf = {}
+        self._df = {}
         self.vectors = []
         self.loaded = False
         self.min_score = CORPUS_MIN_SCORE
+        # Embedding onbellek yollari örnek bazinda (testler gercek cache'i ezmesin):
+        # 'corpus.jsonl' -> 'corpus_embedding.npz' / 'corpus_embedding_meta.json'
+        stem = os.path.splitext(path)[0]
+        self._emb_file = stem + '_embedding.npz'
+        self._emb_meta = stem + '_embedding_meta.json'
         # Embedding depolari (None = kullanilmiyor, eski IDF yoluna dusulur)
         self._doc_counts = []
         self._lex_cols = {}      # term -> (numpy doc_idx[], numpy val[]) inverted index
@@ -89,6 +96,19 @@ class Corpus:
 
     def _slug(self, title):
         return self.tokenizer.ascii_normalize(title.strip().lower()).replace(' ', '_')
+
+    def _row_hash(self, c):
+        """Bir parcanin icerik kimligi (id+baslik+metin+kalip)."""
+        h = hashlib.md5()
+        for part in (str(c.get('id', '')), str(c.get('title', '')),
+                     str(c.get('text', '')), str(c.get('patterns', ''))):
+            h.update(part.encode('utf-8', 'ignore'))
+            h.update(b'\x1f')
+        return h.hexdigest()
+
+    def _row_hash_all(self):
+        """Tum parcalarin icerik kimlikleri (chunks sirasiyla)."""
+        return [self._row_hash(c) for c in self.chunks]
 
     def _tokens(self, text):
         return [t for t in self.tokenizer.tokenize(text) if t not in STOPWORDS]
@@ -126,6 +146,7 @@ class Corpus:
             for w in set(tt + xt):
                 df[w] = df.get(w, 0) + 1
 
+        self._df = df
         n = len(self.chunks)
         self.idf = {w: math.log(n / (1.0 + cnt)) for w, cnt in df.items()}
         self._bm25_idf = {w: math.log(1.0 + (n - cnt + 0.5) / (cnt + 0.5))
@@ -220,7 +241,14 @@ class Corpus:
     # ------------------------------------------------------------------
 
     def _ensure_embeddings(self):
-        """Onbellegi kullan veya (gerekirse) embedding deposunu yeniden uret."""
+        """Onbellegi kullan veya (gerekirse) embedding deposunu yeniden uret.
+
+        Onbellek dogru surumde ise dogrudan okunur. Geçersizse (corpus
+        degismis) tam SVD'nin dakikalarca surmesi yerine ONAYLI temel
+        uzayina () yeni/dogrulanmis dokumalar fold-in edilir (append durumu).
+        Coklu, cikarilan ya da sifirdan kurulan corpus'ta tam yeniden kuruluma
+        dusulur.
+        """
         try:
             import numpy as np
         except ImportError:
@@ -231,20 +259,20 @@ class Corpus:
 
         mtime = os.path.getmtime(self.path) if os.path.exists(self.path) else -1
         cached = False
-        if os.path.exists(EMB_FILE) and os.path.exists(EMB_META):
+        if os.path.exists(self._emb_file) and os.path.exists(self._emb_meta):
             try:
-                with open(EMB_META, 'r', encoding='utf-8') as f:
+                with open(self._emb_meta, 'r', encoding='utf-8') as f:
                     meta = json.load(f)
-                if (meta.get('mtime') == mtime and meta.get('k') == EMB_K
-                        and meta.get('v') == EMB_CACHE_V):
+                if (meta.get('mtime') == mtime and meta.get('v') == EMB_CACHE_V
+                        and 0 < meta.get('k', 0) <= EMB_K):
                     cached = True
             except (json.JSONDecodeError, OSError):
                 cached = False
         if cached:
             try:
-                data = np.load(EMB_FILE)
+                data = np.load(self._emb_file)
                 self.emb = {'docvecs': data['docvecs'], 'V': data['V']}
-                with open(EMB_META, 'r', encoding='utf-8') as f:
+                with open(self._emb_meta, 'r', encoding='utf-8') as f:
                     meta = json.load(f)
                 self.emb_terms = meta.get('terms', {})
                 self.emb_idf = meta.get('idf', {})
@@ -259,7 +287,120 @@ class Corpus:
             except Exception:
                 self.emb = None
                 self.ppmi = None
+        # Geçersiz onbellek: mevcut temel uzayi varsa fold-in dene
+        if os.path.exists(self._emb_file) and os.path.exists(self._emb_meta):
+            try:
+                with np.load(self._emb_file) as data:
+                    with open(self._emb_meta, 'r', encoding='utf-8') as f:
+                        meta = json.load(f)
+                    if self._incremental_embeddings(data, meta, mtime):
+                        return
+            except Exception:
+                pass
+            self.emb = None
+            self.ppmi = None
         self._build_embeddings(mtime)
+
+    def _incremental_embeddings(self, data, meta, mtime):
+        """Mevcut LSA/PPMI temel uzayina DEGISEN/YENI dokumalari izdusurur.
+
+        Onbellekteki temel (V / ppmi-W) aynen korunur; yalnizca icerigi
+        degisen ya da yeni eklenen satirlar fold-in ile yeniden izdusurulur,
+        diger vektorler onbellekten aynen kalir (SVD/PPMI yeniden
+        kurulmaz). Satirlarin yaridan fazlasi degistiyse False -> arayan
+        tam kuruluma duser (temel uzay cogunlukla eski/ilgisiz kalmis).
+        """
+        import numpy as np
+        n = len(self.chunks)
+        old_n = len(meta.get('slugs', []))
+        if old_n <= 0 or old_n != data['docvecs'].shape[0] or n < old_n:
+            return False
+
+        old_ids = meta['slugs']
+        cur_ids = [c.get('id', '') for c in self.chunks]
+        old_hash = meta.get('hashes')
+
+        # Degisen satir kumesi.
+        # Sik durum (append): yeni parcalar sona eklendiyse on-ek eslesmesi,
+        # tum dokuman hashlerini yeniden hesap ETMEDEN hizli yol (O(n) kimlik
+        # karsilastirmasi, hash yok). Sadece normal gorunumdeki icerik
+        # degisimlerinde (n==old_n) pahali ama nadir tum-hash taramasi yapilir.
+        if n > old_n and cur_ids[:old_n] == old_ids:
+            if not old_hash:
+                return False
+            changed = list(range(old_n, n))
+            cur_hash = list(old_hash) + [
+                self._row_hash(self.chunks[i]) for i in range(old_n, n)]
+        else:
+            cur_hash = self._row_hash_all() if old_hash else []
+            changed = []
+            for i in range(min(old_n, n)):
+                if (old_ids[i] != cur_ids[i]
+                        or (old_hash and old_hash[i] != cur_hash[i])):
+                    changed.append(i)
+            if n > old_n:
+                changed.extend(range(old_n, n))
+        if not changed:
+            return False
+        if len(changed) > max(4, int(0.5 * n)):
+            return False
+
+        V = np.asarray(data['V'], np.float32)          # (k, vocab_n)
+        t2i = meta.get('terms', {})
+        vidf = meta.get('idf', {})
+        W = np.asarray(data['ppmi_W'], np.float32)     # (v, kp)
+        pt2i = meta.get('ppmi_terms', {})
+        pidf = meta.get('ppmi_idf', {})
+
+        old_doc = np.asarray(data['docvecs'], np.float32)      # (old_n, k)
+        old_ppmi = np.asarray(data['ppmi_docvecs'], np.float32)  # (old_n, kp)
+        k, kp = V.shape[0], W.shape[1]
+        docvecs = np.concatenate(
+            [old_doc, np.zeros((max(0, n - old_n), k), np.float32)], axis=0)
+        ppmi_docvecs = np.concatenate(
+            [old_ppmi, np.zeros((max(0, n - old_n), kp), np.float32)], axis=0)
+
+        for i in changed:
+            acc = np.zeros(k, np.float32)
+            for w, cnt in self._doc_counts[i].items():
+                idx = t2i.get(w)
+                if idx is None:
+                    continue
+                val = float((1.0 + math.log(max(1.0, cnt))) * vidf.get(w, 0.0))
+                if val:
+                    acc += val * V[:, idx]
+            nrm = float(np.sqrt(np.dot(acc, acc)))
+            docvecs[i] = acc / nrm if nrm > 1e-9 else acc
+
+            pacc = np.zeros(kp, np.float32)
+            for w, cnt in self._doc_counts[i].items():
+                jj = pt2i.get(w)
+                if jj is None:
+                    continue
+                pacc += W[jj] * float(0.5 + cnt) * pidf.get(w, 0.0)
+            pnrm = float(np.sqrt(np.dot(pacc, pacc)))
+            ppmi_docvecs[i] = pacc / pnrm if pnrm > 1e-9 else pacc
+
+        self.emb = {'docvecs': docvecs, 'V': V}
+        self.emb_terms = t2i
+        self.emb_idf = vidf
+        self.ppmi = {'docvecs': ppmi_docvecs, 'W': W,
+                     'terms': pt2i, 'idf': pidf, 'k': kp}
+        try:
+            np.savez(self._emb_file, docvecs=docvecs, V=V,
+                     ppmi_docvecs=ppmi_docvecs, ppmi_W=W)
+            meta2 = dict(meta)
+            meta2.update({'mtime': mtime, 'k': k, 'v': EMB_CACHE_V,
+                          'slugs': cur_ids, 'hashes': cur_hash})
+            self._save_emb_meta(meta2)
+        except OSError:
+            pass
+        print(f"[EMB] {len(changed)} parca fold-in ({n} toplam, {k} boyut)")
+        return True
+
+    def _save_emb_meta(self, meta):
+        with open(self._emb_meta, 'w', encoding='utf-8') as f:
+            json.dump(meta, f, ensure_ascii=False)
 
     def _build_embeddings(self, mtime):
         """Randomized SVD (Halko et al.) ile TF-IDF matrisini gizli boyuta dusur."""
@@ -337,14 +478,16 @@ class Corpus:
         self._build_ppmi(terms, df, n)
 
         try:
-            np.savez_compressed(EMB_FILE, docvecs=docvecs, V=VB.astype(np.float32),
+            np.savez_compressed(self._emb_file, docvecs=docvecs, V=VB.astype(np.float32),
                                 ppmi_docvecs=self.ppmi['docvecs'],
                                 ppmi_W=self.ppmi['W'])
-            with open(EMB_META, 'w', encoding='utf-8') as f:
+            with open(self._emb_meta, 'w', encoding='utf-8') as f:
                 json.dump({'mtime': mtime, 'k': k, 'v': EMB_CACHE_V,
                            'terms': t2i, 'idf': vidf,
                            'ppmi_terms': self.ppmi['terms'],
-                           'ppmi_idf': self.ppmi['idf']}, f)
+                           'ppmi_idf': self.ppmi['idf'],
+                           'slugs': [c.get('id', '') for c in self.chunks],
+                           'hashes': self._row_hash_all()}, f)
         except OSError:
             pass
         print(f"[EMB] {n} parca -> {k} boyutlu vektor deposu insa edildi ({vocab_n} term).")
@@ -757,9 +900,125 @@ class Corpus:
     def refresh(self):
         """append_many sonrasi bellekteki indexi gunceller.
 
-        Sunucu calisirken ogrenilen parcalar bir sonraki soruya aninda
-        kutuphaneden cevap verebilsin diye dosya yeniden yuklenir.
+        Dosyaya yalnizca YENI parcalar eklendiyse (sik gecen ogrenme akisi)
+        tum indexler artimli olarak guncellenir (saniyeler); eklenenlerle
+        birlikte icerik degisen/ciikarilan parca da varsa guvenli tam
+        yeniden yuklemeye dusulur (embedding fold-in ile hizlanir).
         """
-        if self.loaded and os.path.exists(self.path):
-            self.load()
+        if not self.loaded or not os.path.exists(self.path):
+            if os.path.exists(self.path):
+                self.load()
+            return self.loaded
+
+        new_chunks = []
+        try:
+            with open(self.path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        new_chunks.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+        except OSError:
+            return self.loaded
+
+        old_n = len(self.chunks)
+        new_n = len(new_chunks)
+        old_ids = [c.get('id', '') for c in self.chunks]
+        new_ids = [c.get('id', '') for c in new_chunks]
+        if new_n > old_n and new_ids[:old_n] == old_ids:
+            self._append_chunks(new_chunks[old_n:], new_chunks)
+            print(f"[CORPUS] Artimli guncelleme: +{new_n - old_n} parca "
+                  f"({new_n} toplam).")
+            return True
+
+        # Icerik degisimi / cikarma / siralama -> guvenli tam yukleme.
+        self.load()
+        return self.loaded
+
+    def _append_chunks(self, added, full_chunks):
+        """Yalnizca sondan eklenen parcalar icin indexleri artimli gunceller."""
+        import numpy as np
+        old_n = len(self.chunks)
+        m = len(added)
+
+        # 1) Yeni parcalarin tokenlari + df guncellemesi
+        add_toks = []
+        for c in added:
+            tt = self._tokens(c.get('title', ''))
+            xt = self._tokens(c.get('text', '') + ' ' + c.get('patterns', ''))
+            add_toks.append((tt, xt))
+
+        df = self._df
+        for i in range(m):
+            for w in set(add_toks[i][0] + add_toks[i][1]):
+                df[w] = df.get(w, 0) + 1
+        n = len(full_chunks)
+        self.idf = {w: math.log(n / (1.0 + cnt)) for w, cnt in df.items()}
+        self._bm25_idf = {w: math.log(1.0 + (n - cnt + 0.5) / (cnt + 0.5))
+                          for w, cnt in df.items()}
+
+        # 2) BM25 counter + cosine vektor + slug/trigram/pattern indexleri
+        for j in range(m):
+            i = old_n + j
+            c = full_chunks[i]
+            tt, xt = add_toks[j]
+            counts = {}
+            for w in tt:
+                counts[w] = counts.get(w, 0) + TITLE_BM25_WEIGHT
+            for w in xt:
+                counts[w] = counts.get(w, 0) + 1.0
+            doc_i = sum(counts.values()) or 1.0
+
+            self._doc_tf.append(counts)
+            self._doc_len.append(doc_i)
+            for w, cnt in counts.items():
+                row = self._lex_tf.get(w)
+                if row is None:
+                    self._lex_tf[w] = (np.array([i], np.int64),
+                                       np.array([cnt], np.float32))
+                else:
+                    self._lex_tf[w] = (np.concatenate([row[0], np.array([i], np.int64)]),
+                                       np.concatenate([row[1], np.array([cnt], np.float32)]))
+
+            self._doc_counts.append(dict(counts))
+            vec = {w: (0.5 + cnt) * self.idf.get(w, 0.0) for w, cnt in counts.items()}
+            norm = math.sqrt(sum(v * v for v in vec.values()))
+            if norm > 0:
+                vec = {w: v / norm for w, v in vec.items()}
+                for w, val in vec.items():
+                    row = self._lex_cols.get(w)
+                    if row is None:
+                        self._lex_cols[w] = (np.array([i], np.int64),
+                                             np.array([val], np.float32))
+                    else:
+                        self._lex_cols[w] = (np.concatenate([row[0], np.array([i], np.int64)]),
+                                             np.concatenate([row[1], np.array([val], np.float32)]))
+            self.vectors.append(vec if norm > 0 else {})
+
+            slug = self._slug(c.get('title', ''))
+            self._slugs.append(slug)
+            if slug:
+                self._slug_idx.setdefault(slug, i)
+                for tr in self._trigrams(slug):
+                    self._slug_tri_idx.setdefault(tr, set()).add(i)
+
+            raw = (c.get('title', '') + ' ' + c.get('text', '')
+                   + ' ' + c.get('patterns', ''))
+            self._doc_tri.append(self._trigrams(raw))
+
+            pat = c.get('patterns', '')
+            ptoks = set(self._tokens(pat)) if pat else set()
+            self._pat_sets.append(ptoks)
+            for w in ptoks:
+                self._pat_idx.setdefault(w, set()).add(i)
+
+        self.chunks = full_chunks
+        self._doc_len_arr = np.array(self._doc_len, np.float32)
+        self._avgdl = max(1.0, float(np.mean(self._doc_len_arr))) if n else 1.0
+
+        # 3) Embedding deposu: degisen/yeni satirlari fold-in ile guncelle
+        self._ensure_embeddings()
         return self.loaded

@@ -1,8 +1,8 @@
 """Nextgen AI - Decoder-only LLM (llm.py) egitimi (bagimsiz script).
 
-colab ve lightning.ai uyumlu PyTorch egitim scripti. Nucleo inference (llm.py)
-ile Torch modeli BIREBIR ayni cebiri calistirir; dropout yalnizca training'de,
-eval'da kapali -> parity bozulmaz.
+Kaggle/Colab/Lightning AI uyumlu PyTorch egitim scripti. Nucleo inference
+(llm.py) ile Torch modeli BIREBIR ayni cebiri calistirir; dropout yalnizca
+training'de, eval'da kapali -> parity bozulmaz.
 
 Veri formati (tek zincir, otoregresif):
     <PAD> <BOS> <sorgu> <SEP> <yanit> <EOS>
@@ -10,18 +10,25 @@ Veri formati (tek zincir, otoregresif):
   Kayip YALNIZCA yanit pozisyonlarinda; --rag ile bilgi parcasi bağlam
   olur -> model verilen bilgiden OZGUN cumle kurmayi (akil yurutme) ogrenir.
 
-Kullanim:
-  python train_llm.py                       # 250 epoch, sorgu-koullu yanit
-  python train_llm.py --rag                 # corpus'tan bilgi-parcali egitim
-  python train_llm.py --natural 3           # her cevabin 3 dogal varyantiyla buyut
-  python train_llm.py --rag --natural 3     # bilgi-parcali + dogal varyant (oneri)
-  python train_llm.py --epochs 400          # daha uzun egitim
-  python train_llm.py --dry-run [--rag] [--natural K]  # torch'suz veri dogrulama
-  SMOKE=1 python train_llm.py               # 2 adim calis ve cik (CPU hiz testi)
+Kullanim (yerel dogrulama icin torch gerektirmez):
+  python train_llm.py --dry-run [--rag] [--natural K]   # veri hattini dogrula
+  SMOKE=1 python train_llm.py                            # 2 adim CPU hiz testi
+
+Kaggle'da egitim (GPU notebook):
+  python train_llm.py --rag --natural 3                  # varsayilan buyuk model
+  python train_llm.py --rag --natural 3 --d-model 384 --num-blocks 6
+  python train_llm.py --rag --natural 3 --max-ctx-len 48 --max-seq-len 192
+  python train_llm.py --epochs 400 --patience 40 --batch-size 64
+
+Kapasite flag'leri: --d-model --num-blocks --num-heads --ff-mult
+  --max-ctx-len --max-seq-len --batch-size --lr-base. Varsayilani d=256'dir;
+  eski (d=128) model dosyalari veri ogesi tasidigi icin geriye donuk yuklenir.
 
 Ciktilari:
   <SAVE_DIR>/llm_ckpt.pt    -> kaldigi yerden devam (restart/copma guvenli)
-  <SAVE_DIR>/llm_model.json -> yerel model/ klasorune kopyala (llm.load_llm)
+  <export-dir>/llm_model.json + llm_model_weights.npz
+Notebook'ta SAVE_DIR='../working' ayarla; indirilen iki dosyayi yerel
+model/ klasorune kopyala (llm.load_llm otomatik agar).
 SAVE_DIR varsayilani script klasoru; ortam degiskeni ile asilabilir.
 """
 import argparse
@@ -51,12 +58,15 @@ from llm import PAD, LLM, build_llm_vocab, encode_llm, load_tokenizer
 from naturalize import naturalize_pairs
 
 # ---------------- hiperparametreler (numpy inference ile AYNI mimari)
-D_MODEL = 128
+# Varsayilanlar "buyuk" kapasite icindir (d=256); eski model dosyalari veri
+# ogesi oldugu icin geriye donuk yuklenmeye devam eder. Kaggle'da daha
+# buyuk model icin:  python train_llm.py --d-model 384 --num-blocks 6
+D_MODEL = 256
 NUM_BLOCKS = 4
-NUM_HEADS = 4
+NUM_HEADS = 8
 FF_MULT = 4
 DROPOUT = 0.10
-BATCH_SIZE = 64
+BATCH_SIZE = 48
 LR_BASE = 1e-3
 LR_MIN = 0.1
 WARMUP = 200
@@ -259,7 +269,8 @@ def stabilize_first_words(pairs, seed=SEED):
 
 
 def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
-                 FIRST_WORD_STABILIZE=True):
+                 FIRST_WORD_STABILIZE=True, max_ctx_len=MAX_CTX_LEN,
+                 max_seq_len=MAX_SEQ_LEN, batch_size=BATCH_SIZE):
     """Veri + RAG hattini HAZIRLAR (yalnizca numpy; torch gerektirmez).
     --dry-run bu fonksiyonu calistirip dogrular; egitim de ayni yolu kullanir.
 
@@ -301,7 +312,7 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
 
     # Dummy modeli yalnizca encode icin (c2i/tokenizer + uzunluk bilgisi)
     dummy = LLM(vocab, d_model=4, num_blocks=1, num_heads=1,
-                max_ctx_len=MAX_CTX_LEN, max_seq_len=MAX_SEQ_LEN,
+                max_ctx_len=max_ctx_len, max_seq_len=max_seq_len,
                 seed=SEED, tokenizer=tokenizer)
     if tokenizer is not None:
         print('BPE tokenizer: vocab =', len(tokenizer), flush=True)
@@ -377,8 +388,8 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
             batches.append((X, M))
         return batches
 
-    tr = make_batches(tr_pairs, BATCH_SIZE)
-    va = make_batches(va_pairs, BATCH_SIZE)
+    tr = make_batches(tr_pairs, batch_size)
+    va = make_batches(va_pairs, batch_size)
     print('train batch:', len(tr), '| val batch:', len(va), flush=True)
     print('ornek cift:', (clean_chars(tr_pairs[0][0], 30),
                           clean_chars(tr_pairs[0][1], 30)), flush=True)
@@ -402,15 +413,39 @@ def main():
     ap.add_argument('--patience', type=int, default=PATIENCE,
                     help='erken durdurmada calinmasi gereken iyilesmesiz epoch sayisi '
                          '(ornegin --patience 250 ile neredeyse tamamen devre disi)')
+    ap.add_argument('--d-model', type=int, default=D_MODEL, help='gizli boyut')
+    ap.add_argument('--num-blocks', type=int, default=NUM_BLOCKS, help='transformer blok sayisi')
+    ap.add_argument('--num-heads', type=int, default=NUM_HEADS, help='dikkat kafa sayisi')
+    ap.add_argument('--ff-mult', type=int, default=FF_MULT, help='FFN genisletme carpani')
+    ap.add_argument('--max-ctx-len', type=int, default=MAX_CTX_LEN,
+                    help='sorgu icin token butcesi (secenek: 48)')
+    ap.add_argument('--max-seq-len', type=int, default=MAX_SEQ_LEN,
+                    help='toplam sekans uzunlugu (secenek: 192)')
+    ap.add_argument('--batch-size', type=int, default=BATCH_SIZE)
+    ap.add_argument('--lr-base', type=float, default=LR_BASE)
+    ap.add_argument('--export-dir', default=None,
+                    help='llm_model.json + _weights.npz ciktisi (varsayilan: SAVE_DIR)')
     args = ap.parse_args()
     EPOCHS = args.epochs
     RAG = args.rag
     NATURAL = args.natural
     patience = args.patience
+    dm, nb, nh, ff = args.d_model, args.num_blocks, args.num_heads, args.ff_mult
+    mxc, mxs = args.max_ctx_len, args.max_seq_len
+    bs, lr_base = args.batch_size, args.lr_base
+    export_dir = args.export_dir or SAVE_DIR
+    if dm % nh != 0:
+        raise SystemExit(f'--d-model {dm} --num-heads {nh} ile bolunebilir olmali')
+    os.makedirs(export_dir, exist_ok=True)
+
+    print('CONFIG: d_model=%d blocks=%d heads=%d ff_mult=%d '
+          'max_ctx=%d max_seq=%d batch=%d lr=%.1e export=%s' % (
+              dm, nb, nh, ff, mxc, mxs, bs, lr_base, export_dir), flush=True)
 
     if args.dry_run:
         d = prepare_data(RAG, NATURAL=NATURAL, tokenizer=load_tokenizer(),
-                         kb_map_path=args.kb_map)
+                         kb_map_path=args.kb_map, max_ctx_len=mxc, max_seq_len=mxs,
+                         batch_size=bs)
         ex = next((c for c in d['ctx_map'].values() if c), None)
         print('DRY-RUN OK: train batch', len(d['tr']), '| val batch',
               len(d['va']), '| tokenizer', d['tokenizer'].vocab_size
@@ -435,7 +470,8 @@ def main():
 
     # ---------------- veri
     d = prepare_data(RAG, NATURAL=NATURAL, tokenizer=load_tokenizer(),
-                     kb_map_path=args.kb_map)
+                     kb_map_path=args.kb_map, max_ctx_len=mxc, max_seq_len=mxs,
+                     batch_size=bs)
     vocab = d['vocab']
     tok = d['tokenizer']
     V = tok.vocab_size if tok is not None else len(vocab)
@@ -447,8 +483,9 @@ def main():
     vaM = [torch.from_numpy(b[1]).float().to(DEVICE) for b in va]
 
     # ---------------- model + resume
-    model = TorchLLM(V).to(DEVICE)
-    opt = torch.optim.Adam(model.parameters(), lr=LR_BASE)
+    model = TorchLLM(V, d_model=dm, num_blocks=nb, num_heads=nh, ff_mult=ff,
+                     max_seq_len=mxs).to(DEVICE)
+    opt = torch.optim.Adam(model.parameters(), lr=lr_base)
 
     best_state = None
     best_val = 1e9
@@ -459,11 +496,24 @@ def main():
 
     if os.path.exists(CKPT):
         cp = torch.load(CKPT, map_location=DEVICE, weights_only=True)
-        model.load_state_dict(cp['model'])
-        opt.load_state_dict(cp['opt'])
-        best_val, best_state, start_ep, step = cp['best_val'], cp['best_state'], cp['epoch'], cp['step']
-        best_state = {k: v.detach().cpu().clone() for k, v in best_state.items()}
-        print('Devam: epoch', start_ep, '| step', step, '| best val:', round(best_val, 4), flush=True)
+        arch = cp.get('arch', {})
+        same_arch = (arch.get('d_model') == dm and arch.get('num_blocks') == nb
+                     and arch.get('num_heads') == nh and arch.get('ff_mult') == ff
+                     and arch.get('max_seq_len') == mxs and arch.get('V') == V)
+        if not same_arch:
+            print('Uyari: mevcut checkpoint baska mimaride '
+                  '(beklenen d=%s blk=%s k=%s f=%s mxs=%s V=%s). '
+                  'Sifirdan basliyorum (eski dosya korunur).' % (
+                      arch.get('d_model'), arch.get('num_blocks'),
+                      arch.get('num_heads'), arch.get('ff_mult'),
+                      arch.get('max_seq_len'), arch.get('V')), flush=True)
+        else:
+            model.load_state_dict(cp['model'])
+            opt.load_state_dict(cp['opt'])
+            best_val, best_state, start_ep, step = cp['best_val'], cp['best_state'], cp['epoch'], cp['step']
+            best_state = {k: v.detach().cpu().clone() for k, v in best_state.items()}
+            print('Devam: epoch', start_ep, '| step', step,
+                  '| best val:', round(best_val, 4), flush=True)
 
     # ---------------- egitim
     t0_all = time.time()
@@ -476,12 +526,12 @@ def main():
         tl = 0.0
         for bi in order:
             step += 1
-            cur = LR_BASE
+            cur = lr_base
             if step <= WARMUP:
-                cur = LR_BASE * (step / WARMUP)
+                cur = lr_base * (step / WARMUP)
             else:
                 prog = (step - WARMUP) / max(1, tot_steps - WARMUP)
-                cur = LR_BASE * (LR_MIN + (1 - LR_MIN) * 0.5 * (1 + math.cos(math.pi * prog)))
+                cur = lr_base * (LR_MIN + (1 - LR_MIN) * 0.5 * (1 + math.cos(math.pi * prog)))
             for g in opt.param_groups:
                 g['lr'] = cur
             opt.zero_grad()
@@ -519,23 +569,25 @@ def main():
         if ep % CKPT_FREQ == 0 or done:
             torch.save({'epoch': ep, 'step': step, 'model': best_state,
                         'opt': opt.state_dict(), 'best_val': best_val,
-                        'best_state': best_state}, CKPT)
+                        'best_state': best_state,
+                        'arch': {'d_model': dm, 'num_blocks': nb, 'num_heads': nh,
+                                 'ff_mult': ff, 'max_seq_len': mxs, 'V': V}}, CKPT)
             print(f'  checkpoint -> {CKPT}', flush=True)
         if done:
             break
 
     print('\nToplam egitim suresi: %.1f dk' % ((time.time() - t0_all) / 60), flush=True)
 
-    # ---------------- export (numpy inference ile uyumlu JSON)
+    # ---------------- export (numpy inference ile uyumlu compact NPZ format)
     model.load_state_dict(best_state)
     model.eval()
     data = {
         'arch': 'llm',
         'V': V,
-        'd_model': D_MODEL, 'num_blocks': NUM_BLOCKS, 'num_heads': NUM_HEADS,
-        'ff_mult': FF_MULT,
-        'max_ctx_len': MAX_CTX_LEN, 'max_seq_len': MAX_SEQ_LEN,
-        'params': {k: v.numpy().tolist() for k, v in best_state.items()},
+        'd_model': dm, 'num_blocks': nb, 'num_heads': nh,
+        'ff_mult': ff,
+        'max_ctx_len': mxc, 'max_seq_len': mxs,
+        'weights_file': 'llm_model_weights.npz',
     }
     if tok is not None:
         data['tok_mode'] = 'bpe'
@@ -548,18 +600,22 @@ def main():
     else:
         data['tok_mode'] = 'char'
         data['vocab'] = vocab
-    dest = os.path.join(SAVE_DIR, 'llm_model.json')
+    dest = os.path.join(export_dir, 'llm_model.json')
     with io.open(dest, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False)
+    weights_dest = os.path.join(export_dir, 'llm_model_weights.npz')
+    np.savez(weights_dest,
+             **{k: np.asarray(v, dtype=np.float32) for k, v in best_state.items()})
     print('model yazildi:', dest, flush=True)
+    print('agirliklar yazildi:', weights_dest, flush=True)
 
     # --------- parity 1: dogrudan tensor -> numpy (best_state uzerinden)
     x = trX[0][:4]
     with torch.no_grad():
         torch_logits = model(x).float().numpy() if DEVICE == 'cpu' else \
             model(x).cpu().float().numpy()
-    np_model = LLM(vocab, d_model=D_MODEL, num_blocks=NUM_BLOCKS, num_heads=NUM_HEADS,
-                   ff_mult=FF_MULT, max_ctx_len=MAX_CTX_LEN, max_seq_len=MAX_SEQ_LEN,
+    np_model = LLM(vocab, d_model=dm, num_blocks=nb, num_heads=nh,
+                   ff_mult=ff, max_ctx_len=mxc, max_seq_len=mxs,
                    seed=SEED, tokenizer=tok)
     np_model.params = {k: np.asarray(v, np.float32) for k, v in best_state.items()}
     numpy_logits = np_model.forward(x.detach().cpu().numpy())
@@ -567,8 +623,9 @@ def main():
     print(f'parity dogrudan: {diff:.6f} (beklenen < 1e-3)', flush=True)
     assert diff < 1e-3, f'Parity bozuk: {diff}'
 
-    # --------- parity 2: JSON round-trip (data -> from_dict -> forward)
-    json_model = LLM(['<PAD>', '<BOS>', '<SEP>', '<EOS>']).from_dict(data)
+    # --------- parity 2: export round-trip (data + npz -> from_dict -> forward)
+    json_model = LLM(['<PAD>', '<BOS>', '<SEP>', '<EOS>']).from_dict(
+        data, weights_path=weights_dest)
     json_logits = json_model.forward(x.detach().cpu().numpy())
     diff2 = float(np.max(np.abs(torch_logits - json_logits)))
     print(f'parity JSON round-trip: {diff2:.6f} (beklenen < 1e-3)', flush=True)

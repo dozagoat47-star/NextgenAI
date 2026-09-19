@@ -299,7 +299,7 @@ class LLM:
         return text[:1].upper() + text[1:]
 
     # ------------------------------------------------------------ KAYDET/YUKLE
-    def to_dict(self):
+    def to_dict(self, weights_file='llm_model_weights.npz', include_params=True):
         d = {
             'arch': 'llm',
             'V': self.V,
@@ -309,9 +309,11 @@ class LLM:
             'ff_mult': self.ff_dim // self.d_model,
             'max_ctx_len': self.max_ctx_len,
             'max_seq_len': self.max_seq_len,
-            'params': {k: np.asarray(v, np.float32).tolist()
-                       for k, v in self.params.items()},
+            'weights_file': weights_file,
         }
+        if include_params:
+            d['params'] = {k: np.asarray(v, np.float32).tolist()
+                           for k, v in self.params.items()}
         if self.tokenizer is not None:
             d['tok_mode'] = 'bpe'
             d['vocab'] = None
@@ -325,7 +327,7 @@ class LLM:
             d['vocab'] = self.vocab
         return d
 
-    def from_dict(self, data):
+    def from_dict(self, data, weights_path=None):
         tok = data.get('tokenizer')
         if tok:
             self.tokenizer = BPETokenizer(
@@ -350,7 +352,15 @@ class LLM:
         self.max_ctx_len = int(data.get('max_ctx_len', 40))
         self.max_seq_len = int(data.get('max_seq_len', 160))
         self.rsqrt = np.float32(1.0 / math.sqrt(self.head_dim))
-        self.params = {k: _f32(v) for k, v in data['params'].items()}
+        # Yeni format: ağırlıklar ayrı bir NPZ dosyasında (compact header).
+        # weights_path verilmişse NPZ'den, verilmemişse eski inline 'params' gövdesinden
+        # (geriye dönük uyumluluk) yüklenir.
+        if weights_path and os.path.exists(weights_path):
+            with np.load(weights_path) as _npz:
+                self.params = {k: _f32(np.asarray(_npz[k], dtype=np.float32))
+                               for k in _npz.files}
+        else:
+            self.params = {k: _f32(v) for k, v in data['params'].items()}
         self.pos_enc = self._sinusoidal(self.max_seq_len)
         return self
 
@@ -414,14 +424,25 @@ def encode_llm(model, ctx, resp, context=None, max_seq=None):
 
 
 def load_llm(path=MODEL_PATH):
-    """model/llm_model.json'dan LLM yukler (yoksa None)."""
+    """model/llm_model.json'dan LLM yukler (yoksa None).
+
+    Yeni format: agirliklar json'in yanindaki *_weights.npz dosyasindan
+    yuklenir; eski inline-'params' dosyalari da geriye donuk yuklenir.
+    """
     if not os.path.exists(path):
         return None
     with io.open(path, 'r', encoding='utf-8') as f:
         data = json.load(f)
     if not data or data.get('arch') != 'llm':
         return None
-    return LLM(['<PAD>', '<BOS>', '<SEP>', '<EOS>']).from_dict(data)
+    weights_path = None
+    wf = data.get('weights_file')
+    if wf:
+        cand = os.path.join(os.path.dirname(os.path.abspath(path)), wf)
+        if os.path.exists(cand):
+            weights_path = cand
+    return LLM(['<PAD>', '<BOS>', '<SEP>', '<EOS>']).from_dict(
+        data, weights_path=weights_path)
 
 
 def load_tokenizer(path=TOKENIZER_PATH):
@@ -443,10 +464,24 @@ def build_llm_with_tokenizer(path=TOKENIZER_PATH, **kwargs):
 
 
 def save_llm(model, path=MODEL_PATH):
+    """Modeli compact formatta kaydeder: kucuk JSON header + *_weights.npz.
+
+    Hard disk / yukleme bellegi icin buyuk 'params' JSON gövdesi yerine
+    ayni agirliklar ikili NPZ formatinda yazilir (dosya ~%90 kucuk).
+    """
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    base = os.path.splitext(os.path.basename(path))[0]
+    weights_file = base + '_weights.npz'
     with io.open(path, 'w', encoding='utf-8') as f:
-        json.dump(model.to_dict(), f, ensure_ascii=False)
-    print(f"[llm] Model kaydedildi: {path}")
+        json.dump(model.to_dict(weights_file=weights_file, include_params=False),
+                  f, ensure_ascii=False)
+    weights_path = os.path.join(os.path.dirname(os.path.abspath(path)), weights_file)
+    np.savez(weights_path,
+             **{k: np.asarray(v, dtype=np.float32) for k, v in model.params.items()})
+    json_mb = os.path.getsize(path) / (1024 * 1024)
+    wp_mb = os.path.getsize(weights_path) / (1024 * 1024)
+    print(f"[llm] Model kaydedildi: {path} "
+          f"(json {json_mb:.2f}MB + {os.path.basename(weights_path)} {wp_mb:.2f}MB)")
 
 
 if __name__ == '__main__':
