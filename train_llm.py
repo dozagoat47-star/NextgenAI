@@ -526,8 +526,10 @@ def main():
     np.random.seed(SEED)
     random.seed(SEED)
     DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+    n_gpu = torch.cuda.device_count() if DEVICE == 'cuda' else 0
     print('PyTorch', torch.__version__, '| device:', DEVICE,
           '| GPU:', torch.cuda.get_device_name(0) if DEVICE == 'cuda' else '-',
+          '(Count: %d)' % n_gpu,
           '| SAVE_DIR:', SAVE_DIR, '| RAG:', RAG, '| patience:', patience, flush=True)
 
     # ---------------- veri
@@ -586,6 +588,8 @@ def main():
         print('DataParallel: %d GPU kullaniliyor (batch parcalaniyor)' %
               torch.cuda.device_count(), flush=True)
         model = torch.nn.DataParallel(model)
+    # DataParallel sarmasindan sonra DUZ (module prefix'siz) anahtarlar:
+    # checkpoint/export her zaman buradan beslenir -> tek GPU'da sorunsuz ya imkani.
     base = model.module if hasattr(model, 'module') else model
 
     # ---------------- egitim
