@@ -582,6 +582,12 @@ def main():
             print('Devam: epoch', start_ep, '| step', step,
                   '| best val:', round(best_val, 4), flush=True)
 
+    if DEVICE.startswith('cuda') and torch.cuda.device_count() > 1:
+        print('DataParallel: %d GPU kullaniliyor (batch parcalaniyor)' %
+              torch.cuda.device_count(), flush=True)
+        model = torch.nn.DataParallel(model)
+    base = model.module if hasattr(model, 'module') else model
+
     # ---------------- egitim
     t0_all = time.time()
     done = False
@@ -626,7 +632,7 @@ def main():
 
         if vl < best_val - 1e-4:
             best_val = vl
-            best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+            best_state = {k: v.detach().cpu().clone() for k, v in base.state_dict().items()}
             bad = 0
         else:
             bad += 1
@@ -647,7 +653,7 @@ def main():
     print('\nToplam egitim suresi: %.1f dk' % ((time.time() - t0_all) / 60), flush=True)
 
     # ---------------- export (numpy inference ile uyumlu compact NPZ format)
-    model.load_state_dict(best_state)
+    base.load_state_dict(best_state)
     model.eval()
     data = {
         'arch': 'llm',
