@@ -205,9 +205,10 @@ def _cache_fp(tokenizer, kb_map_path, n_pairs, NATURAL, RAG,
     """Veri ondeklenti parmak izi: veri/tokenizer/kb-map degisince yeniden
     encode edilir; ayniysa ondeklent onbellegi (npz) kullanilir."""
     h = hashlib.md5()
-    # 'fmt:2' -> cache format v2 (int32 + sıkıştırmalı npz). v1 cache (int64,
-    # sıkıştırmasız, 634MB) Kaggle'da ~10dk yukleniyordu; v2 cok daha kucuk.
-    h.update(('fmt:2|%d|%d|%d|%d|%d|%d|%d' % (n_pairs, NATURAL, int(RAG),
+    # 'fmt:3' -> v3 cache: duz (flat) duz arrays, pickle YOK. v1/v2 object-array
+    # npz'leri Kaggle'da 10 dk'lik yukleme takilmalari yapiyordu; v3 tek seferde
+    # okunur. format degisince eski cache gecersiz -> ilk koşuda 1 kez encode.
+    h.update(('fmt:3|%d|%d|%d|%d|%d|%d|%d' % (n_pairs, NATURAL, int(RAG),
                                               max_ctx_len, max_seq_len,
                                               batch_size, SEED)).encode('utf-8'))
     if kb_map_path and os.path.exists(kb_map_path):
@@ -439,11 +440,18 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
         try:
             print('ondeklent yukleniyor: %s (%.0f MB) ...' % (
                 os.path.basename(CACHE), os.path.getsize(CACHE) / 1e6), flush=True)
-            with np.load(CACHE, allow_pickle=True) as z:
-                tr0 = [(z['Xt'][i], z['Mt'][i]) for i in range(len(z['Xt']))]
-                va0 = [(z['Xv'][i], z['Mv'][i]) for i in range(len(z['Xv']))]
+            # v3: DUZ diziler (pickle/object-array YOK) -> tek seferde okunur.
+            with np.load(CACHE) as z:
+                Xg, Mg = z['Xtr'], z['Mtr']
+                Xvg, Mv = z['Xva'], z['Mva']
+                sht, shv = z['sh_tr'], z['sh_va']
+            ntr, nva = len(sht), len(shv)
+            tr0 = [(Xg[i, :sht[i, 0], :sht[i, 1]],
+                    Mg[i, :sht[i, 0], :sht[i, 1]]) for i in range(ntr)]
+            va0 = [(Xvg[i, :shv[i, 0], :shv[i, 1]],
+                    Mv[i, :shv[i, 0], :shv[i, 1]]) for i in range(nva)]
             print('veri ondeklenti kullanildi:', os.path.basename(CACHE),
-                  '(%d+%d batch)' % (len(tr0), len(va0)), flush=True)
+                  '(%d+%d batch)' % (ntr, nva), flush=True)
             return {'vocab': vocab, 'tokenizer': tokenizer,
                     'tr': tr0, 'va': va0, 'ctx_map': ctx_map}
         except Exception as e:
@@ -494,15 +502,33 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
     print('ornek cift:', (clean_chars(tr_pairs[0][0], 30),
                           clean_chars(tr_pairs[0][1], 30)), flush=True)
     try:
-        Xt = np.empty(len(tr), dtype=object); Mt = np.empty(len(tr), dtype=object)
-        Xv = np.empty(len(va), dtype=object); Mv = np.empty(len(va), dtype=object)
+        # v3: pickle YOK. Tum batch'ler sabit (Bmax, T0)-boyutlu TEK duz diziye
+        # pad'lenir; gercek (B,T) olculeri sh_tr/sh_va ile saklanir. Pad ile
+        # gelen kuyruk pozisyonlarinin maskesi 0 -> loss'a KATILMAZ, egitim
+        # matematigi birebir ayni. Boyut -> maske tek seferde okunur.
+        Bmax = batch_size
+        T0 = max(x.shape[1] for x, _ in tr)
+        T0v = max(x.shape[1] for x, _ in va)
+        sh_tr = np.array([[x.shape[0], x.shape[1]] for x, _ in tr], dtype=np.int32)
+        sh_va = np.array([[x.shape[0], x.shape[1]] for x, _ in va], dtype=np.int32)
+        Xtr = np.zeros((len(tr), Bmax, T0), dtype=np.int32)
+        Mtr = np.zeros_like(Xtr, dtype=np.float32)
         for i, (x_, m_) in enumerate(tr):
-            Xt[i] = x_.astype(np.int32); Mt[i] = m_
+            B, T = x_.shape
+            Xtr[i, :B, :T] = x_.astype(np.int32)
+            Mtr[i, :B, :T] = m_
+        Xva = np.zeros((len(va), Bmax, T0v), dtype=np.int32)
+        Mva = np.zeros_like(Xva, dtype=np.float32)
         for i, (x_, m_) in enumerate(va):
-            Xv[i] = x_.astype(np.int32); Mv[i] = m_
+            B, T = x_.shape
+            Xva[i, :B, :T] = x_.astype(np.int32)
+            Mva[i, :B, :T] = m_
         os.makedirs(SAVE_DIR, exist_ok=True)
-        np.savez_compressed(CACHE, Xt=Xt, Mt=Mt, Xv=Xv, Mv=Mv)
-        print('veri ondeklenti yazildi:', os.path.basename(CACHE), flush=True)
+        np.savez_compressed(CACHE, Xtr=Xtr, Mtr=Mtr, Xva=Xva, Mva=Mva,
+                            sh_tr=sh_tr, sh_va=sh_va)
+        print('ondeklent yazildi (v3):', os.path.basename(CACHE),
+              '| T0=%d T0v=%d | toplam %.0f MB' % (
+                  T0, T0v, os.path.getsize(CACHE) / 1e6), flush=True)
     except Exception as e:
         print('ondeklent yazilamadi (devam):', e, flush=True)
     return {'vocab': vocab, 'tokenizer': tokenizer,
