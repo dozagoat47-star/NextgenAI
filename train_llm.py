@@ -79,6 +79,8 @@ LR_BASE = 1e-3
 LR_MIN = 0.1
 WARMUP = 200
 PATIENCE = 20
+VAL_IMP = 5e-4   # erken-durdurma iyilesme toleransi: val ancak bu kadar altina
+# duserse 'iyilesti' sayilir (gurultulu dalgalanmalar sayaci tetiklemesin)
 GRAD_CLIP = 5.0
 CKPT_FREQ = 1   # her epoch kaydedilir -> Colab kesilse bile max ~1 epoch kayip, resume aninda
 MAX_PAIRS = 70000   # ham ciftlerin TAMAMI kullanilir (intents.json: ~68.654); eski 20k kirpiyordu
@@ -773,7 +775,7 @@ def main():
         print(f'epoch {ep:3d}/{EPOCHS} | train {tl:.4f} | val {vl:.4f} | acc {va_acc:.3f} | '
               f'{time.time()-t0:.1f}s | lr {cur:.5f}', flush=True)
 
-        if vl < best_val - 1e-4:
+        if vl < best_val - VAL_IMP:
             best_val = vl
             best_state = {k: v.detach().cpu().clone() for k, v in base.state_dict().items()}
             bad = 0
