@@ -435,6 +435,8 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
     CACHE = os.path.join(SAVE_DIR, 'llm_data_%s.npz' % fp)
     if os.path.exists(CACHE):
         try:
+            print('ondeklent yukleniyor: %s (%.0f MB) ...' % (
+                os.path.basename(CACHE), os.path.getsize(CACHE) / 1e6), flush=True)
             with np.load(CACHE, allow_pickle=True) as z:
                 tr0 = [(z['Xt'][i], z['Mt'][i]) for i in range(len(z['Xt']))]
                 va0 = [(z['Xv'][i], z['Mv'][i]) for i in range(len(z['Xv']))]
