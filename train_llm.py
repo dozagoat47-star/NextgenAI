@@ -652,33 +652,13 @@ def main():
             print('Devam: epoch', start_ep, '| step', step,
                   '| best val:', round(best_val, 4), flush=True)
 
-    # ---- kernel derleme (torch.compile) + coklu GPU sarmaci ------------------
-    # Derleme varsayilan ACIK (LLM_COMPILE=0 ile kapatilir). Onceki
-    # 'embed' AttributeError'u fork+canli CUDA baglamindan geliyordu; CUDA
-    # artik prepare_data'dan sonra acildigi icin kilitsiz. Yine de warmup
-    # forward'iyla dogrulanir; basarisizsa DERLENMEMIS modele geri donulur.
+    # ---- coklu GPU sarmaci (DataParallel) -------------------------------------
+    # torch.compile VARSAYILAN KAPALI: bu parametre/buffer tabanli modulde cloud
+    # GPU'sunda 'embed' AttributeError ve DP.train() RecursionError verdigi icin
+    # hicbir kosulda otomatik denenmez. Yalnizca acik istekle (LLM_COMPILE=1)
+    # denenir; o durumda bile warmup-backward zirhi hatayi epoch oncesi yakalar.
     raw = model                       # duz TorchLLM yedegi (fallback)
 
-    # Bu modul tamamen parametre/buffer tabanli (alt module yok) oldugundan
-    # torch.compile'in yeniden-kurulum yolu 'embed' gibi parametre erisimlerini
-    # dusurebiliyor. Param adlari/flat-layout checkpoint ve export anahtarlariyla
-    # birebir ayni kalmalidir -> mimari DEGISMEZ. Onun yerine:
-    #  - dynamo hata emniyeti (suppress_errors): trace hatasi -> o op eager
-    #  - buyuk derleme onbellegi (cache_size_limit): shape-ce${B,T} recompile
-    #    firtinasini onler
-    #  - warmup EGITIM grafini (forward+backward) derler: 'embed' benzeri bir
-    #    hata epoch dongusune girmeden YAKALANIR -> otomatik fallback, kayip yok.
-    try:
-        import torch._dynamo as _dyn
-        _dyn.config.suppress_errors = True
-        _dyn.config.cache_size_limit = 128
-    except Exception:
-        pass
-
-    # .train()/.eval() sarmalari (torch.compile + DataParallel birlikte) bazi
-    # torch surumlerinde RecursionError uretir (children traversal sonsuz dongu).
-    # Modelin HIC alt module'u yok (yalnizca parametre/buffer) -> en ice module'un
-    # `training` bayragi dogrudan atanir; children gezilmez.
     def _set_mode(training):
         m = model
         while hasattr(m, 'module'):
@@ -690,7 +670,13 @@ def main():
     dp = False
     if (DEVICE.startswith('cuda')
             and tuple(map(int, torch.__version__.split('.')[:2])) >= (2, 0)
-            and os.environ.get('LLM_COMPILE', '1') != '0'):
+            and os.environ.get('LLM_COMPILE') == '1'):
+        try:
+            import torch._dynamo as _dyn
+            _dyn.config.suppress_errors = True
+            _dyn.config.cache_size_limit = 128
+        except Exception:
+            pass
         try:
             model = torch.compile(model, dynamic=True)
             compiled = True
@@ -713,9 +699,6 @@ def main():
                 probe = torch.randint(0, max(2, V), (1, 16), device=DEVICE)
                 _set_mode(False)
                 _ = model(probe)
-            # EGITIM grafini da derlet: 'embed' kaybina benzer hatalar eval'da
-            # gorunmez, ilk backward sirasinda patlar. Kucuk bir forward+backward
-            # ile derleme-oncesi yakalanir, hata olursa derlenmemis modele donulur.
             _set_mode(True)
             p2 = torch.randint(0, max(2, V), (1, 16), device=DEVICE)
             out = model(p2)
