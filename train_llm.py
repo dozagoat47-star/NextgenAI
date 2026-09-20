@@ -205,9 +205,11 @@ def _cache_fp(tokenizer, kb_map_path, n_pairs, NATURAL, RAG,
     """Veri ondeklenti parmak izi: veri/tokenizer/kb-map degisince yeniden
     encode edilir; ayniysa ondeklent onbellegi (npz) kullanilir."""
     h = hashlib.md5()
-    h.update(('%d|%d|%d|%d|%d|%d|%d' % (n_pairs, NATURAL, int(RAG),
-                                         max_ctx_len, max_seq_len,
-                                         batch_size, SEED)).encode('utf-8'))
+    # 'fmt:2' -> cache format v2 (int32 + sıkıştırmalı npz). v1 cache (int64,
+    # sıkıştırmasız, 634MB) Kaggle'da ~10dk yukleniyordu; v2 cok daha kucuk.
+    h.update(('fmt:2|%d|%d|%d|%d|%d|%d|%d' % (n_pairs, NATURAL, int(RAG),
+                                              max_ctx_len, max_seq_len,
+                                              batch_size, SEED)).encode('utf-8'))
     if kb_map_path and os.path.exists(kb_map_path):
         with io.open(kb_map_path, 'rb') as f:
             h.update(f.read(2_000_000))
@@ -495,11 +497,11 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
         Xt = np.empty(len(tr), dtype=object); Mt = np.empty(len(tr), dtype=object)
         Xv = np.empty(len(va), dtype=object); Mv = np.empty(len(va), dtype=object)
         for i, (x_, m_) in enumerate(tr):
-            Xt[i] = x_; Mt[i] = m_
+            Xt[i] = x_.astype(np.int32); Mt[i] = m_
         for i, (x_, m_) in enumerate(va):
-            Xv[i] = x_; Mv[i] = m_
+            Xv[i] = x_.astype(np.int32); Mv[i] = m_
         os.makedirs(SAVE_DIR, exist_ok=True)
-        np.savez(CACHE, Xt=Xt, Mt=Mt, Xv=Xv, Mv=Mv)
+        np.savez_compressed(CACHE, Xt=Xt, Mt=Mt, Xv=Xv, Mv=Mv)
         print('veri ondeklenti yazildi:', os.path.basename(CACHE), flush=True)
     except Exception as e:
         print('ondeklent yazilamadi (devam):', e, flush=True)
