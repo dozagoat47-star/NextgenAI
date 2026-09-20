@@ -659,11 +659,21 @@ def main():
     # forward'iyla dogrulanir; basarisizsa DERLENMEMIS modele geri donulur.
     raw = model                       # duz TorchLLM yedegi (fallback)
 
-    # torch.compile varsayilan KAPALI (LLM_COMPILE=1 ile acilir): bu modul
-    # tamamen parametre/buffer tabanli (alt module yok); cloud GPU'da compile
-    # rebuild'i 'embed' gibi parametre erisimlerini dusurup
-    # AttributeError:'TorchLLM' ... no attribute 'embed' verebiliyor (2 kez).
-    # SDPA + AMP + DataParallel hiz kazancini zaten veriyor.
+    # Bu modul tamamen parametre/buffer tabanli (alt module yok) oldugundan
+    # torch.compile'in yeniden-kurulum yolu 'embed' gibi parametre erisimlerini
+    # dusurebiliyor. Param adlari/flat-layout checkpoint ve export anahtarlariyla
+    # birebir ayni kalmalidir -> mimari DEGISMEZ. Onun yerine:
+    #  - dynamo hata emniyeti (suppress_errors): trace hatasi -> o op eager
+    #  - buyuk derleme onbellegi (cache_size_limit): shape-ce${B,T} recompile
+    #    firtinasini onler
+    #  - warmup EGITIM grafini (forward+backward) derler: 'embed' benzeri bir
+    #    hata epoch dongusune girmeden YAKALANIR -> otomatik fallback, kayip yok.
+    try:
+        import torch._dynamo as _dyn
+        _dyn.config.suppress_errors = True
+        _dyn.config.cache_size_limit = 128
+    except Exception:
+        pass
 
     # .train()/.eval() sarmalari (torch.compile + DataParallel birlikte) bazi
     # torch surumlerinde RecursionError uretir (children traversal sonsuz dongu).
@@ -680,7 +690,7 @@ def main():
     dp = False
     if (DEVICE.startswith('cuda')
             and tuple(map(int, torch.__version__.split('.')[:2])) >= (2, 0)
-            and os.environ.get('LLM_COMPILE') == '1'):
+            and os.environ.get('LLM_COMPILE', '1') != '0'):
         try:
             model = torch.compile(model, dynamic=True)
             compiled = True
