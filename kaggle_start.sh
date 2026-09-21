@@ -11,6 +11,7 @@
 #   4) Ikinci hucresine:
 #         !bash kaggle_start.sh train 250
 #      (once deneme istersen:  !bash kaggle_start.sh verify   )
+#      (1 epoch suresi olcmek icin:  !bash kaggle_start.sh bench )
 #   5) Egitim sonrasi indirme hucresi (asagidaki INDIRME notuna bak).
 #
 #   Veri NOTU: train_llm MAX_PAIRS=70000 cifti natural 5 ile ~330k cifte
@@ -33,6 +34,16 @@ case "$MODE" in
     python train_llm.py --rag --kb-map knowledge_map.jsonl --natural 5 \
       --epochs "$EPOCHS" --batch-size 64 --val-every 2 2>&1 | tee kaggle_train.log
     DONE='yes'
+    ;;
+  bench)
+    echo "[1/3] 1-epoch zamanlama (cache/encode + 1 epoch, birlikte olculur)"
+    python train_llm.py --rag --kb-map knowledge_map.jsonl --natural 5 \
+      --epochs 1 --batch-size 64 --val-every 1 2>&1 | tee kaggle_bench.log
+    echo ""
+    echo "[2/3] Son egitim satiri (epoch suresi '| NN.Ns' bolumundedir):"
+    grep 'epoch ' kaggle_bench.log | tail -1
+    echo "[3/3] Toplam duvar suresi icin: Kaggle hucre cikti basliginda "
+    echo "      'Cell executed in NHmNs' degerine bak. Encode ~10dk ayri."
     ;;
   verify)
     echo "[1/3] dry-run dogrulama (GPU gerekmez, ~1 dk)"
