@@ -23,6 +23,7 @@ import requests
 from scrape_intents import split_sentences, merge_intents, INTENTS_FILE
 from corpus import Corpus
 from clean_intents import ascii_normalize, strip_foreign_scripts, is_harmful_tag
+from finetune import atomic_write_json
 
 if sys.stdout.encoding.lower() not in ('utf-8', 'utf8'):
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
@@ -285,8 +286,7 @@ def grow_once(source, count):
     print("\n  INTENTS DOSYASI GUNCELLENIYOR")
     merged, added, updated = merge_intents(INTENTS_FILE, new_intents)
 
-    with open(INTENTS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(merged, f, ensure_ascii=False, indent=2)
+    atomic_write_json(INTENTS_FILE, merged, indent=2)
 
     # Toplanan ham bilgi RAG-lite corpus'unda biriksin (sinir yok: bilgi hic
     # kaybolmasin). Ayni id'li kayit taze metinle guncellenir.
@@ -331,8 +331,7 @@ def main():
                 })
         if new_intents:
             merged, added, updated = merge_intents(INTENTS_FILE, new_intents)
-            with open(INTENTS_FILE, 'w', encoding='utf-8') as f:
-                json.dump(merged, f, ensure_ascii=False, indent=2)
+            atomic_write_json(INTENTS_FILE, merged, indent=2)
             Corpus.append_many(corpus_chunks)
             print(f"Yeni konular: {added}, Guncellenen: {updated}")
             print(f"Toplam intent sayisi: {len(merged['intents'])}")

@@ -149,6 +149,169 @@ class TestCorpusSearchRegression(unittest.TestCase):
         # Yolun tamamlanmasi (TypeError olmamasi) yeterli; sonuc None da olabilir.
         self.assertIsInstance(r, (dict, type(None)))
 
+    def test_refresh_reindexes_updated_chunks(self):
+        """A4 regresyon: append_many ayni id'li parcayi guncellerse refresh'in
+        hizli yolu lexical indexi bayat birakmamali; icerik degisen satirlar
+        tam yuklemeyle yeniden indexlenmelidir."""
+        import shutil
+
+        d = tempfile.mkdtemp()
+        p = os.path.join(d, 'corpus.jsonl')
+        base = [
+            {'id': 'alpha', 'title': 'Alpha', 'text': 'alpha eski bir konu',
+             'patterns': '', 'source': 'test'},
+            {'id': 'beta', 'title': 'Beta', 'text': 'beta ayri bir konu',
+             'patterns': '', 'source': 'test'},
+        ]
+        with io.open(p, 'w', encoding='utf-8') as f:
+            for c in base:
+                f.write(json.dumps(c, ensure_ascii=False) + '\n')
+
+        c = corpus_mod.Corpus(p)
+        c.load()
+
+        # 1) Yalnizca YENI parca eklenince hizli yol calismali (icerek ayni).
+        base.append({'id': 'gamma', 'title': 'Gama',
+                     'text': 'gamma tercume konusu', 'patterns': '', 'source': 'autogrow'})
+        with io.open(p, 'w', encoding='utf-8') as f:
+            for ch in base:
+                f.write(json.dumps(ch, ensure_ascii=False) + '\n')
+        c.refresh()
+        self.assertIn('gamma', c._lex_cols)
+
+        # 2) Ayni id'li parcaya icerik degisirse tam yukleme ile yeniden
+        #    indexlenmeli: yeni terim lex te bulunmallidir.
+        base[0] = {'id': 'alpha', 'title': 'Alpha',
+                   'text': 'alpha simdi klorofilli bir konu oldu',
+                   'patterns': '', 'source': 'autogrow'}
+        base.append({'id': 'delta', 'title': 'Delta',
+                     'text': 'delta fosil enerji konusu', 'patterns': '',
+                     'source': 'autogrow'})
+        with io.open(p, 'w', encoding='utf-8') as f:
+            for ch in base:
+                f.write(json.dumps(ch, ensure_ascii=False) + '\n')
+        c.refresh()
+        self.assertIn('klorofill', c._lex_cols,
+                      'icerik degisen parcayi lex index de mihenkleyemiyor')
+        self.assertIn('fosil', c._lex_cols)
+        self.assertEqual(c.chunks[0]['text'], base[0]['text'])
+        r = c.search('klorofilli nedir', min_score=0.0)
+        self.assertIsNotNone(r)
+        self.assertIn('Alpha', r['title'])
+        shutil.rmtree(d)
+
+
+class TestCorpusAppendMany(unittest.TestCase):
+    """A5 regresyon: append_many saf-append'te on satirlari yeniden yazmaz,
+    guncelleme satirini yerinde degistirir ve id indeksini dogru tutar."""
+
+    def _write(self, p, chunks):
+        with io.open(p, 'w', encoding='utf-8') as f:
+            for ch in chunks:
+                f.write(json.dumps(ch, ensure_ascii=False) + '\n')
+
+    def _read(self, p):
+        with io.open(p, 'r', encoding='utf-8') as f:
+            return [json.loads(l) for l in f if l.strip()]
+
+    def test_pure_append_at_eof(self):
+        import shutil
+
+        d = tempfile.mkdtemp()
+        p = os.path.join(d, 'corpus.jsonl')
+        base = [
+            {'id': 'aa', 'title': 'Aa', 'text': 'aa ilk parca',
+             'patterns': '', 'source': 'test'},
+            {'id': 'bb', 'title': 'Bb', 'text': 'bb ikinci parca',
+             'patterns': '', 'source': 'test'},
+        ]
+        self._write(p, base)
+        with io.open(p, 'rb') as fh:
+            before = fh.read()
+        n = corpus_mod.Corpus.append_many(
+            [{'id': 'cc', 'title': 'Cc', 'text': 'cc ucuncu parca',
+              'patterns': 'cc nedir', 'source': 'learned'}], path=p)
+        with io.open(p, 'rb') as fh:
+            after = fh.read()
+        self.assertEqual(n, 3)
+        # Hizli yol on satirları YENIDEN YAZMAMALI (byte-on-ek korunur).
+        self.assertTrue(after.startswith(before),
+                        "saf append oncedekilerin byte'larini bozmamali")
+        rows = self._read(p)
+        self.assertEqual([r['id'] for r in rows], ['aa', 'bb', 'cc'])
+        self.assertEqual(rows[-1]['patterns'], 'cc nedir')
+        ids = set()
+        with io.open(corpus_mod._corpus_ids_path(p), 'r',
+                     encoding='ascii') as f:
+            for line in f:
+                if line.strip():
+                    ids.add(corpus_mod._id_decode(line.strip()))
+        self.assertEqual(ids, {'aa', 'bb', 'cc'})
+        shutil.rmtree(d)
+
+    def test_update_replaces_line_in_place(self):
+        import shutil
+
+        d = tempfile.mkdtemp()
+        p = os.path.join(d, 'corpus.jsonl')
+        base = [
+            {'id': 'aa', 'title': 'Aa', 'text': 'aa ilk',
+             'patterns': '', 'source': 'test'},
+            {'id': 'bb', 'title': 'Bb', 'text': 'bb ikinci',
+             'patterns': '', 'source': 'test'},
+        ]
+        self._write(p, base)
+        n = corpus_mod.Corpus.append_many(
+            [{'id': 'aa', 'title': 'Aa', 'text': 'aa YENI icerik ile genisledi',
+              'patterns': 'aa nedir', 'source': 'learned'}], path=p)
+        self.assertEqual(n, 2)
+        rows = self._read(p)
+        self.assertEqual([r['id'] for r in rows], ['aa', 'bb'])
+        self.assertEqual(rows[0]['text'], 'aa YENI icerik ile genisledi')
+        self.assertEqual(rows[1]['text'], 'bb ikinci')   # diger satir korundu
+        with io.open(p, 'rb') as fh:
+            after = fh.read()
+        self.assertIn(b'bb ikinci', after)
+        # 'aa YENI' artik tek satir (cift kayit yok)
+        self.assertEqual(after.count(b'"id": "aa"'), 1)
+        shutil.rmtree(d)
+
+    def test_stale_index_rebuilt(self):
+        import shutil
+
+        d = tempfile.mkdtemp()
+        p = os.path.join(d, 'corpus.jsonl')
+        base = [
+            {'id': 'aa', 'title': 'Aa', 'text': 'aa ilk',
+             'patterns': '', 'source': 'test'},
+        ]
+        self._write(p, base)
+        corpus_mod.Corpus.append_many(
+            [{'id': 'bb', 'title': 'Bb', 'text': 'bb ikinci',
+              'patterns': '', 'source': 'learned'}], path=p)
+        ids_path = corpus_mod._corpus_ids_path(p)
+        self.assertTrue(os.path.exists(ids_path))
+
+        # Indexi sil (corpus degismeden): sonraki append tam taramayla
+        # yeniden kurulmali, eski id'ler yeni sanilmamali (cift satir yok).
+        os.remove(ids_path)
+        corpus_mod.Corpus.append_many(
+            [{'id': 'cc', 'title': 'Cc', 'text': 'cc ucuncu',
+              'patterns': '', 'source': 'learned'}], path=p)
+        with io.open(p, 'rb') as fh:
+            after = fh.read()
+        self.assertEqual(after.count(b'"id": "aa"'), 1)
+        self.assertEqual(after.count(b'"id": "bb"'), 1)
+        rows = self._read(p)
+        self.assertEqual([r['id'] for r in rows], ['aa', 'bb', 'cc'])
+        ids = set()
+        with io.open(ids_path, 'r', encoding='ascii') as f:
+            for line in f:
+                if line.strip():
+                    ids.add(corpus_mod._id_decode(line.strip()))
+        self.assertEqual(ids, {'aa', 'bb', 'cc'})
+        shutil.rmtree(d)
+
 
 class TestEnrichMetaIdempotency(unittest.TestCase):
     def test_intents_has_enrich_marker(self):

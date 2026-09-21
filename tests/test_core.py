@@ -172,6 +172,168 @@ class TestSeqGenLSTM(unittest.TestCase):
         self.assertIsInstance(out, str)
 
 
+class TestAtomicWriteJson(unittest.TestCase):
+    """B regresyon: kalicilik yazimi gecici dosya + os.replace ile atomiktir;
+    basarisiz yazim hedef dosyayi bozmaz ve .tmp artiklari birakmaz."""
+
+    def test_writes_and_cleans_tmp(self):
+        import os
+        import tempfile
+
+        from finetune import atomic_write_json
+        d = tempfile.mkdtemp()
+        p = os.path.join(d, 'intents.json')
+        atomic_write_json(p, {'a': 1, 'b': ['x', 'y']}, indent=2)
+        with open(p, 'r', encoding='utf-8') as f:
+            self.assertEqual(json.load(f), {'a': 1, 'b': ['x', 'y']})
+        self.assertFalse(os.path.exists(p + '.tmp'))
+
+    def test_failed_write_preserves_original(self):
+        import os
+        import tempfile
+
+        from finetune import atomic_write_json
+
+        class NotSerializable:
+            pass
+
+        d = tempfile.mkdtemp()
+        p = os.path.join(d, 'intents.json')
+        with open(p, 'w', encoding='utf-8') as f:
+            json.dump({'eski': True}, f)
+        with self.assertRaises(TypeError):
+            atomic_write_json(p, {'yeni': NotSerializable()}, indent=2)
+        with open(p, 'r', encoding='utf-8') as f:
+            self.assertEqual(json.load(f), {'eski': True})
+        self.assertFalse(os.path.exists(p + '.tmp'))
+
+
+class TestFinetuneMetadataMerge(unittest.TestCase):
+    """B regresyon: /learn ayni tag'e gelen tekrarli istek yanit havuzunu
+    komple EZMEMELI; mevcut havuz korunup yeni yanitlar eklenmelidir."""
+
+    def _bot_data(self, responses):
+        return {
+            'vocabulary': ['selam', 'nasilsin'],
+            'intent_tags': ['selamlasma'],
+            'intent_kws': {'selamlasma': ['selam']},
+            'intents': {'selamlasma': responses},
+        }
+
+    def test_existing_tag_responses_preserved_and_extended(self):
+        from brain import ChatBot
+        from finetune import _extend_metadata
+
+        bot_data = self._bot_data(['Merhaba!', 'Naber?'])
+        additions = [
+            {'tag': 'selamlasma', 'patterns': ['gunaydin'],
+             'responses': ['Gunaydin!']},
+        ]
+        nw, nt = _extend_metadata(bot_data, additions, ChatBot())
+        self.assertEqual(nt, [])
+        self.assertEqual(bot_data['intents']['selamlasma'],
+                         ['Merhaba!', 'Naber?', 'Gunaydin!'])
+        toks = ChatBot().tokenize('gunaydin')
+        self.assertTrue(toks)
+        for t in toks:
+            self.assertIn(t, bot_data['vocabulary'])
+            self.assertIn(t, bot_data['intent_kws']['selamlasma'])
+
+    def test_duplicate_and_empty_responses_do_not_erode(self):
+        from brain import ChatBot
+        from finetune import _extend_metadata
+
+        bot_data = self._bot_data(['Ana cevap'])
+        additions = [
+            {'tag': 'selamlasma', 'patterns': ['selam'],
+             'responses': ['Ana cevap', '', 'Yeni ek'], }
+        ]
+        _extend_metadata(bot_data, additions, ChatBot())
+        self.assertEqual(bot_data['intents']['selamlasma'],
+                         ['Ana cevap', 'Yeni ek'])
+
+    def test_new_tag_still_creates_responses(self):
+        from brain import ChatBot
+        from finetune import _extend_metadata
+
+        bot_data = self._bot_data(['Merhaba!'])
+        additions = [
+            {'tag': 'spor', 'patterns': ['kosu'], 'responses': ['Hayirli kosular!']},
+        ]
+        nw, nt = _extend_metadata(bot_data, additions, ChatBot())
+        self.assertEqual(nt, ['spor'])
+        self.assertEqual(bot_data['intents']['spor'], ['Hayirli kosular!'])
+
+
+class TestDeasciify(unittest.TestCase):
+    """Deasciify: ASCII model ciktisi canned yanitlardaki Turkce imlaya
+    cevrilir; bilinmeyen sozcukler ve noktalama bozulmaz."""
+
+    def _bot(self):
+        bot = ChatBot()
+        bot.intents = {
+            'selamlasma': ['Nasılsın?', 'Ben iyiyim, sen nasılsın?'],
+            'hava': ['Bugün hava çok güzel.'],
+        }
+        return bot
+
+    def test_known_words_restored(self):
+        bot = self._bot()
+        self.assertEqual(bot.deasciify('nasilsin'),
+                         'nasılsın')
+        self.assertEqual(bot.deasciify('bugun hava cok guzel'),
+                         'bugün hava çok güzel')
+
+    def test_capitalization_preserved(self):
+        bot = self._bot()
+        self.assertEqual(bot.deasciify('Nasilsin?'), 'Nasılsın?')
+        self.assertEqual(bot.deasciify('Bugun hava cok guzel.'),
+                         'Bugün hava çok güzel.')
+
+    def test_unknown_words_unchanged(self):
+        bot = self._bot()
+        self.assertEqual(bot.deasciify('Nextgen bugun son versiyon'),
+                         'Nextgen bugün son versiyon')
+
+    def test_acronyms_kept(self):
+        bot = self._bot()
+        bot.intents['hava'].append('Bugün NATO BIOSSuz konusacak AI icin')
+        self.assertEqual(bot.deasciify('NATO ve AI bugun toplanacak'),
+                         'NATO ve AI bugün toplanacak')
+
+    def test_lowercased_acronym_source_not_poisoned(self):
+        bot = self._bot()
+        # canned'ta 'AI' (kisaltma) ile, bir de onun Turkce-kucukharf bozuk
+        # aktarimi 'aı' gecer: sozluk 'ai' anahtarini uretmemeli (ASCII 'AI'
+        # oldugu gibi kalsin), 'nasilsin' yine duzeltilmeli.
+        bot.intents['selamlasma'].append('ben netgen AI yim, aı yim.')
+        bot.deasciify('bos')
+        self.assertNotIn('ai', bot._deascii_lex)
+        self.assertEqual(bot.deasciify('ben AI aı nasilsin'),
+                         'ben AI aı nasılsın')
+
+    def test_punctuation_and_case_kept(self):
+        bot = self._bot()
+        self.assertEqual(bot.deasciify('Nasilsin, BEN IYIYIM!'),
+                         'Nasılsın, BEN IYIYIM!')
+
+    def test_canned_output_is_identity(self):
+        bot = self._bot()
+        for tag in bot.intents:
+            for r in bot.intents[tag]:
+                self.assertEqual(bot.deasciify(r), r)
+
+    def test_lex_built_lazily_once(self):
+        bot = ChatBot()
+        bot.intents = {'x': ['Ayşe ılık çorba içti']}
+        self.assertIsNone(bot._deascii_lex)
+        bot.deasciify('ayse ilik corba')
+        self.assertIsNotNone(bot._deascii_lex)
+        # İ/I harfleri dogru kucuk harfe eslenir (i dedigi ı olur)
+        self.assertEqual(bot._deascii_lex['ayse'], 'ayşe')
+        self.assertEqual(bot._deascii_lex['ilik'], 'ılık')
+
+
 class TestTransformer(unittest.TestCase):
     """Transformer encoder kucuk veriyle ogrenmeli + kayit/yukleme tur tutarli."""
 
@@ -440,6 +602,184 @@ class TestTransformer(unittest.TestCase):
             ad = json.load(f)
         self.assertNotIn('astronomi', ad['new_tags'])
         shutil.rmtree(ndir)
+
+
+class TestLoraPadAlignment(unittest.TestCase):
+    """LoRA vocab off-by-one regresyonu: yeni sözcük satırları (V..V+n_v-1) ve
+    PAD indeksi (V+n_v) brain'in kullandığı düzenle birebir hizalı olmalı."""
+
+    @staticmethod
+    def _adapter(m, n_v):
+        import numpy as np
+        extra = np.random.RandomState(1).randn(n_v, m.d_model).astype(np.float32)
+        return {'rank': 4, 'alpha': 8.0, 'vocab_added': n_v, 'head_added': 0,
+                'embed_extra': extra.tolist(), 'deltas': {}}
+
+    @staticmethod
+    def _model(V=10, C=3, L=6):
+        import numpy as np
+        from transformer import TransformerNN
+        rng = np.random.RandomState(0)
+        X = rng.randint(0, V, size=(12, L))
+        for i in range(X.shape[0]):
+            X[i, rng.randint(2, L, size=2)] = V          # PAD
+        y = np.array([i % C for i in range(12)])
+        m = TransformerNN(vocab_size=V, num_intents=C, max_seq_len=L,
+                          d_model=16, num_blocks=2, num_heads=2, ff_mult=3, seed=5)
+        m.train(X, y, epochs=50, learning_rate=1e-3, batch_size=4, verbose=False)
+        return m
+
+    def test_pad_idx_and_row_layout(self):
+        import numpy as np
+        m = self._model()
+        V = m.vocab_size
+        n_v = 4
+        ad = self._adapter(m, n_v)
+        m.apply_lora(ad)
+        extra = np.asarray(ad['embed_extra'], dtype=np.float32)
+
+        # brain düzeni: yeni sözcük j -> V+j, PAD -> V+n_v
+        self.assertEqual(m._lora_pad_idx, V + n_v)
+        # taban sözcük satırları bozulmadı
+        np.testing.assert_array_equal(m._lora_embed_full[:V], m.embed[:V])
+        # yeni sözcük satırları extra sırasıyla hizalı; ilk satır SIFIR DEĞİL
+        for j in range(n_v):
+            self.assertGreater(float(np.linalg.norm(extra[j])), 1e-6)
+            np.testing.assert_array_equal(m._lora_embed_full[V + j], extra[j])
+        # PAD satırı sıfırdır (taban PAD satırı taşınır)
+        np.testing.assert_array_equal(m._lora_embed_full[V + n_v], 0.0)
+
+    def test_brain_encoding_masks_pad(self):
+        import numpy as np
+        m = self._model()
+        V = m.vocab_size
+        n_v = 3
+        m.apply_lora(self._adapter(m, n_v))
+        pad = V + n_v                                   # brain'in LoRA pad'i
+        X = np.array([[V + n_v - 1, V, 0, pad, pad, pad]], dtype=np.int64)
+        m.forward(X)
+        mask = m._cache['mask']
+        # yeni sözcük ve taban sözcük pozisyonları gerçek; PAD pozisyonları maskeli
+        self.assertEqual(mask[0, 0], 1.0)
+        self.assertEqual(mask[0, 1], 1.0)
+        self.assertEqual(mask[0, 2], 1.0)
+        self.assertTrue(np.all(mask[0, 3:] == 0.0))
+
+    def test_lora_embed_grads_slicing(self):
+        import numpy as np
+        m = self._model()
+        V = m.vocab_size
+        n_v = 3
+        m.apply_lora(self._adapter(m, n_v))
+        rng = np.random.RandomState(3)
+        X = rng.randint(0, V, size=(6, m.max_seq_len))
+        X[:, 0] = V + 1                                  # yeni sözcük
+        X[:, 1] = V + n_v                                # brain PAD indeksi
+        y = np.zeros(6, dtype=np.int64)
+        m.forward(X)
+        G = m.grads(y)
+        leg = m._cache['lora_embed_grads']
+        self.assertEqual(leg.shape, (n_v, m.d_model))
+        # taban embed gradyanı taban şeklinde kalır (V+1, d)
+        self.assertEqual(G['embed'].shape, (V + 1, m.d_model))
+
+
+class TestLoraRankAlphaHygiene(unittest.TestCase):
+    """LoRA rank/alpha sıhhati (A2/A3 regresyon): taze adaptörde rank uygulanır,
+    mevcut adaptörde korunur; etkin delta ölçeği alpha/rank ile tutarlıdır."""
+
+    @staticmethod
+    def _make_model_dir(ndir):
+        import os
+        import shutil
+
+        import numpy as np
+        from transformer import TransformerNN
+
+        if os.path.exists(ndir):
+            shutil.rmtree(ndir)
+        os.makedirs(ndir)
+        V, C, L, D, NB, NH = 40, 4, 8, 32, 2, 2
+        words = ['merhaba', 'nasilsin', 'adres', 'telefon', 'hava', 'bugun',
+                 'yemek', 'pizza', 'kitap', 'oneri', 'spor', 'kosu']
+        tags = ['selamlasma', 'iletisim', 'gida', 'spor']
+        patterns = {'selamlasma': ['merhaba nasilsin', 'selam ver'],
+                    'iletisim': ['adres telefon', 'telefon numarasi'],
+                    'gida': ['yemek pizza', 'pizza oneri'],
+                    'spor': ['spor kosu', 'kosu oneri']}
+
+        def enc(t):
+            idx = [words.index(w) for w in t.split() if w in words]
+            return idx + [V] * (L - len(idx))
+
+        X = np.array([enc(p) for tg in tags for p in patterns[tg]], dtype=np.int64)
+        y = np.array([tags.index(tg) for tg in tags for _ in patterns[tg]],
+                     dtype=np.int64)
+        m = TransformerNN(vocab_size=V, num_intents=C, max_seq_len=L, d_model=D,
+                          num_blocks=NB, num_heads=NH, ff_mult=3, seed=5)
+        m.train(X, y, epochs=120, learning_rate=1e-3, batch_size=4,
+                warmup_steps=20, verbose=False)
+        m.save(os.path.join(ndir, 'model.json'))
+        with open(os.path.join(ndir, 'bot_data.json'), 'w', encoding='utf-8') as f:
+            json.dump({'vocabulary': words, 'intent_tags': tags,
+                       'intents': {t: ['cevap ' + t] for t in tags},
+                       'intent_kws': {t: sorted(patterns[t]) for t in tags}},
+                      f, ensure_ascii=False, indent=2)
+        with open(os.path.join(ndir, 'intents.json'), 'w', encoding='utf-8') as f:
+            json.dump({'intents': [{'tag': t, 'patterns': patterns[t],
+                                    'responses': ['cevap ' + t]} for t in tags]},
+                      f, ensure_ascii=False, indent=2)
+
+    def test_rank_and_alpha_fresh_then_preserved(self):
+        import os
+        import shutil
+        import tempfile
+
+        from finetune import finetune_add
+        ndir = os.path.join(tempfile.gettempdir(), 'ng_lora_rank_test')
+        self._make_model_dir(ndir)
+        try:
+            intents_path = os.path.join(ndir, 'intents.json')
+            finetune_add(ndir, intents_path,
+                         [{'tag': 'astronomi', 'patterns': ['galaksi yildiz nedir'],
+                           'responses': ['Uzay!']}],
+                         rank=4, alpha=8.0, epochs=5, verbose=False)
+            with open(os.path.join(ndir, 'lora.json'), 'r', encoding='utf-8') as f:
+                ad = json.load(f)
+            self.assertEqual(ad['rank'], 4)
+            self.assertEqual(ad['alpha'], 8.0)
+
+            # ikinci çağrı FARKLI rank/alpha ile: mevcut adaptör KORUNUR
+            finetune_add(ndir, intents_path,
+                         [{'tag': 'plaj_voleybolu', 'patterns': ['plaj vole topu'],
+                           'responses': ['Kumda!']}],
+                         rank=16, alpha=2.0, epochs=5, verbose=False)
+            with open(os.path.join(ndir, 'lora.json'), 'r', encoding='utf-8') as f:
+                ad2 = json.load(f)
+            self.assertEqual(ad2['rank'], 4)
+            self.assertEqual(ad2['alpha'], 8.0)
+        finally:
+            shutil.rmtree(ndir)
+
+    def test_delta_scale_matches_alpha_over_rank(self):
+        import numpy as np
+        from finetune import Adapter
+        from transformer import TransformerNN
+
+        m = TransformerNN(vocab_size=20, num_intents=3, max_seq_len=6,
+                          d_model=16, num_blocks=1, num_heads=2, ff_mult=3, seed=5)
+        r, a = 4, 8.0
+        ad = Adapter(m, rank=r, alpha=a)
+        ad.extend(['y1', 'y2'], ['ntag'])
+        ad.apply()
+        scale = a / r
+        np.testing.assert_allclose(
+            m.blocks[0]['W1e'] - m.blocks[0]['W1'],
+            scale * (ad.B['b0_W1'] @ ad.A['b0_W1']), atol=1e-6)
+        np.testing.assert_allclose(
+            m.blocks[0]['attn']._eff['Wq'],
+            m.blocks[0]['attn'].Wq + scale * (ad.B['b0_Wq'] @ ad.A['b0_Wq']),
+            atol=1e-6)
 
 
 class TestSeq2Seq(unittest.TestCase):

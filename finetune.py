@@ -31,6 +31,24 @@ import numpy as np
 from brain import ChatBot
 from transformer import TransformerNN
 
+
+def atomic_write_json(path, data, indent=None):
+    """JSON'u oncelikli yazar: gecici dosyaya yazip os.replace ile ATOMİK
+    degistirir. Yarim/bozuk yazim (kill, cokme, disk dolu) hedef dosyayi asla
+    tronke etmez; app.py'nin acilista JSONDecodeError ile dusmesi onlenir.
+    """
+    tmp = path + '.tmp'
+    try:
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=indent)
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+
 DEFAULT_RANK = 8
 DEFAULT_ALPHA = 16.0
 DEFAULT_LR = 1e-3
@@ -143,8 +161,13 @@ class Adapter:
 # Yükleme / meta veri genişletme
 # ---------------------------------------------------------------------------
 
-def load_model_with_lora(model_dir):
-    """Taban model + (varsa) var olan LoRA adaptörünü yükler."""
+def load_model_with_lora(model_dir, rank=DEFAULT_RANK, alpha=DEFAULT_ALPHA):
+    """Taban model + (varsa) var olan LoRA adaptörünü yükler.
+
+    Yeni adaptör TALEP edilen rank/alpha ile kurulur; var olan adaptör ise
+    KENDİ kayıtlı rank/alpha değerleriyle yüklenir (birikimli büyüme: kayıtlı
+    deltalar yeni scale ile yeniden yorumlanmaz).
+    """
     mdl = TransformerNN(vocab_size=1, num_intents=1, max_seq_len=1)
     mdl.load(os.path.join(model_dir, 'model.json'))
     lora_path = os.path.join(model_dir, 'lora.json')
@@ -152,7 +175,7 @@ def load_model_with_lora(model_dir):
         with open(lora_path, 'r', encoding='utf-8') as f:
             ad = json.load(f)
         return mdl, Adapter.from_dict(mdl, ad)
-    return mdl, Adapter(mdl)
+    return mdl, Adapter(mdl, rank=rank, alpha=alpha)
 
 
 def _extend_metadata(bot_data, additions, bot):
@@ -175,7 +198,19 @@ def _extend_metadata(bot_data, additions, bot):
             tags.append(tag)
             kws.setdefault(tag, set())
         patterns = item.get('patterns') or []
-        intents[tag] = item.get('responses') or ['Faydalı bilgiler edindim!']
+        new_resps = [r for r in (item.get('responses') or []) if r]
+        if tag in tags:
+            # Mevcut intent: yanit havuzu KORUNUR. Tekrarlanan ogrenmede (ayni
+            # tag / /learn) havuz komple ustune yazilmaz; yeni yanitlar tekil
+            # bicimde sona eklenir (veri kaybi + havuz erimesi onlenir).
+            existing = intents.get(tag) or []
+            merged = list(existing)
+            for r in new_resps:
+                if r not in merged:
+                    merged.append(r)
+            intents[tag] = merged or ['Faydalı bilgiler edindim!']
+        else:
+            intents[tag] = new_resps or ['Faydalı bilgiler edindim!']
         for pat in patterns:
             for w in bot.tokenize(pat):
                 if w not in vocab:
@@ -294,10 +329,14 @@ def train_lora(model, adapter, X, y, epochs=DEFAULT_EPOCHS, lr=DEFAULT_LR,
             G = model.grads(yb, normalize=True)
 
             grads = {}                                 # key -> gradyan dizisi
+            # True-LoRA gradyanı: etkin delta = (alpha/rank)*(B@A) olduğundan
+            # A/B gradyanları da aynı scale ile ölçeklenir (transformer.apply_lora
+            # ile tutarlı). scale'sız bırakılan eski hali LR'i ~1/scale küçültüyordu.
+            scale = adapter.alpha / max(int(adapter.rank), 1)
             for k in adapter.A:
                 dW = G[k]
-                grads[k + '_A'] = adapter.B[k].T @ dW
-                grads[k + '_B'] = dW @ adapter.A[k].T
+                grads[k + '_A'] = scale * (adapter.B[k].T @ dW)
+                grads[k + '_B'] = scale * (dW @ adapter.A[k].T)
             if adapter.embed_extra.shape[0] > 0:
                 lhg = model._cache.get('lora_head_grads')
                 if lhg is not None:
@@ -357,9 +396,7 @@ def finetune_add(model_dir, intents_path, additions, rank=DEFAULT_RANK,
     dataset = _build_training_set(bot_data, additions, intents_data)
     texts, labels = dataset
 
-    model, adapter = load_model_with_lora(model_dir)
-    adapter.alpha = float(alpha)
-    adapter.rank = int(rank) if not adapter.A else adapter.rank
+    model, adapter = load_model_with_lora(model_dir, rank=rank, alpha=alpha)
     adapter.extend(new_words, new_tags)
 
     # Sözcük -> indeks eşlemesi (genişletilmiş vocabulary üzerinden)
@@ -378,19 +415,16 @@ def finetune_add(model_dir, intents_path, additions, rank=DEFAULT_RANK,
 
     loss, acc = train_lora(model, adapter, X, y, epochs=epochs, verbose=verbose)
 
-    # Kalıcılık
+    # Kalıcılık (atomik: yarim yazimda dosyalar bozulmaz)
     lora_path = os.path.join(model_dir, 'lora.json')
-    with open(lora_path, 'w', encoding='utf-8') as f:
-        json.dump(adapter.to_dict(), f, ensure_ascii=False)
-    with open(bot_data_path, 'w', encoding='utf-8') as f:
-        json.dump(bot_data, f, ensure_ascii=False, indent=2)
+    atomic_write_json(lora_path, adapter.to_dict())
+    atomic_write_json(bot_data_path, bot_data, indent=2)
 
     existing_tags = {i['tag'] for i in intents_data.get('intents', [])}
     for it in additions:
         if it['tag'] not in existing_tags:
             intents_data['intents'].append(it)
-    with open(intents_path, 'w', encoding='utf-8') as f:
-        json.dump(intents_data, f, ensure_ascii=False, indent=2)
+    atomic_write_json(intents_path, intents_data, indent=2)
 
     if verbose:
         print(f"LoRA kaydedildi: {lora_path} (loss {loss:.4f}, acc {acc:.2%})")
@@ -464,14 +498,11 @@ def forget_intent(model_dir, intents_path, tag, verbose=True):
     ad['bhead_extra'] = bhead[keep_h].tolist()
     ad['embed_extra'] = embed_extra[keep_w].tolist()
 
-    with open(lora_path, 'w', encoding='utf-8') as f:
-        json.dump(ad, f, ensure_ascii=False)
-    with open(bot_data_path, 'w', encoding='utf-8') as f:
-        json.dump(bot_data, f, ensure_ascii=False, indent=2)
+    atomic_write_json(lora_path, ad)
+    atomic_write_json(bot_data_path, bot_data, indent=2)
     intents_data['intents'] = [i for i in intents_data['intents']
                                if i.get('tag') != tag]
-    with open(intents_path, 'w', encoding='utf-8') as f:
-        json.dump(intents_data, f, ensure_ascii=False, indent=2)
+    atomic_write_json(intents_path, intents_data, indent=2)
 
     if verbose:
         print(f"LoRA geri alim: '{tag}' silindi "

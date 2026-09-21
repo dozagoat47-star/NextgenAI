@@ -13,6 +13,7 @@ import os
 import re
 
 from normalize import ascii_normalize as _normalize
+from bpe import turkish_lower as _tr_lower
 from transformer import TransformerNN
 
 
@@ -667,6 +668,9 @@ class ChatBot:
         # corpus fallback'i lazy yuklenir; LLM'e verilecek bilgi parcasini
         # zenginlestirmektedir (yoksa canned bilgi yaniti yeter).
         self._kb_map = None
+        # Uretilen ASCII model ciktisini gercek Turkce imlaya ceviren sozluk
+        # (lazy: ilk deasciify cagrisinda canned yanitlardan kurulur).
+        self._deascii_lex = None
         # Transformer girdisi icin token -> indeks eslemesi
         self.vocab_to_idx = {}
         self.pad_idx = 0
@@ -723,6 +727,60 @@ class ChatBot:
         Ek olarak yabanci aksanlar da sokulur: 'prevert' / 'prévert' ayni olur.
         """
         return _normalize(text)
+
+    def _build_deascii_lex(self):
+        """canned yanitlardan ASCII(key) -> Turkce(value) sozlugu kurar.
+
+        Uretici modeller (LLM/seq2seq/seqgen) ASCII uzayinda konustugundan
+        'nasilsin' gibi ciktigi gercek Turkce imla takip etmez; kayitli
+        yanitlardaki dogru imlayi ezberleyip ters yonde esleriz. Key
+        ascii_normalize(lower), value ise `turkish_lower` ile dogru kucuk
+        harfli Turkce sozcuktur (İ/I/ı ayrimi korunur).
+        """
+        lex = {}
+        acronym = set()
+        for resps in (self.intents or {}).values():
+            for r in resps:
+                for w in re.findall(r"[^\W_]+", r):
+                    key = self.ascii_normalize(w).lower()
+                    if not key:
+                        continue
+                    if len(w) >= 2 and w.isupper():
+                        acronym.add(key)    # kisaltma (AI, NATO) -> imla degismez
+                        continue
+                    low = _tr_lower(w)
+                    if key != low and key not in lex:
+                        if len(key) < 2:
+                            continue        # tek harf eslemeleri guvenilmez
+                        lex[key] = low
+        for key in acronym:
+            lex.pop(key, None)
+        self._deascii_lex = lex
+
+    def deasciify(self, text):
+        """ASCII model ciktisini sozlukten gercek Turkce imlaya cevirir.
+
+        Bilinmeyen sozcukler oldugu gibi kalir (ozel isim 'Nextgen' bozulmaz);
+        buyuk harfle baslayan sozcuk hedefli imlada da buyuk harfle baslar.
+        Noktalama/ayraclar korunur. Sözlük yoksa ilk cagrida kurulur (lazy).
+        """
+        if not text:
+            return text
+        if self._deascii_lex is None:
+            self._build_deascii_lex()
+        out = []
+        for token in re.split(r'(\W+)', text):
+            if not token or not token.isalpha():
+                out.append(token)
+                continue
+            mapped = (self._deascii_lex or {}).get(self.ascii_normalize(token).lower())
+            if mapped is None:
+                out.append(token)
+                continue
+            if token[0].isupper():
+                mapped = mapped[0].upper() + mapped[1:]
+            out.append(mapped)
+        return ''.join(out)
 
     def simple_stem(self, word):
         """Basit Turkce kelime koku bulma (stemming)"""
@@ -1362,14 +1420,14 @@ class ChatBot:
             if self._ensure_llm():
                 gen = self._best_of_llm(ctx, tag)
                 if gen:
-                    return gen
+                    return self.deasciify(gen)
             if self.seq2 is None:
                 from seq2seq import load_seq2seq
                 self.seq2 = load_seq2seq()
             if self.seq2 is not None:
                 gen = self.seq2.sample(ctx, temperature=0.6, top_k=6)
                 if self._accept_generated(gen, tag):
-                    return gen
+                    return self.deasciify(gen)
             if self.seq_enabled is None:
                 self.seq_enabled = False
                 from seqgen import load_seq
@@ -1378,7 +1436,9 @@ class ChatBot:
             if not self.seq_enabled:
                 return None
             gen = self.seq.sample(ctx, temperature=0.7, top_k=10)
-            return gen if self._accept_generated(gen, tag) else None
+            if self._accept_generated(gen, tag):
+                return self.deasciify(gen)
+            return None
         except Exception:
             return None
 
@@ -1493,7 +1553,7 @@ class ChatBot:
                 if best is None or len(gen) > best_len:
                     best, best_len = gen, len(gen)
             if best:
-                return best
+                return self.deasciify(best)
         except Exception:
             pass
         return kb

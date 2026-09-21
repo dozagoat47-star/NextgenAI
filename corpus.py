@@ -54,6 +54,92 @@ TRIGRAM_CAP_K = 500  # trigram re-rank yalnizca siradaki ilk K adayda (hiz)
 EMB_CACHE_V = 2    # onbellegin surum anahtari (yeni vektor turleri eklenince arttir)
 
 
+def _chunk_content(c):
+    """Bir parcanin aranabilir icerik imzası (id/title/text/patterns)."""
+    return (c.get('id'), c.get('title'), c.get('text'), c.get('patterns'))
+
+
+def _content_same(a, b):
+    return _chunk_content(a) == _chunk_content(b)
+
+
+def _corpus_ids_path(path):
+    """Korpus id kumesinin yan indeks yolu ('corpus.jsonl' -> 'corpus_ids.jsonl')."""
+    return os.path.splitext(path)[0] + '_ids.jsonl'
+
+
+def _id_encode(cid):
+    """Id'yi 'unicode_escape' ile satir-guvenli ASCII'ye kodlar (newline guvenli)."""
+    return cid.encode('unicode_escape').decode('ascii')
+
+
+def _id_decode(s):
+    return s.encode('ascii').decode('unicode_escape')
+
+
+def _read_id_set(path):
+    """Korpus id kumesini yan indeksten okur.
+
+    Index yalnizca korpus dosyasindan DAHA GENC ise gecerlidir (dosya
+    append_many disinda degismisse bayat sayilir). Index yok/bayat ise
+    None doner; cagiran taraf tam taramaya dusmelidir.
+    """
+    ids_path = _corpus_ids_path(path)
+    try:
+        if not os.path.exists(path) or not os.path.exists(ids_path):
+            return None
+        if os.path.getmtime(path) > os.path.getmtime(ids_path):
+            return None
+        ids = set()
+        with open(ids_path, 'r', encoding='ascii') as f:
+            for line in f:
+                s = line.rstrip('\n')
+                if s:
+                    ids.add(_id_decode(s))
+        if not ids:
+            # Bos index guvenilmez: korpus bos degilse (yeni seed vb.) tam taramaya dus.
+            with open(path, 'r', encoding='utf-8') as f:
+                if bool(f.readline().strip()):
+                    return None
+        return ids
+    except OSError:
+        return None
+
+
+def _scan_ids(path):
+    """Korpus dosyasini tek gecisle tarayip id kumesini cikarir (yedek yol)."""
+    ids = set()
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    cid = json.loads(line).get('id')
+                except json.JSONDecodeError:
+                    continue
+                if cid:
+                    ids.add(cid)
+    except OSError:
+        pass
+    return ids
+
+
+def _write_id_set(path, ids):
+    """Id indeksini tam yeniden yazar (guncelleme/yedek tarama sonrasi)."""
+    with open(_corpus_ids_path(path), 'w', encoding='ascii') as f:
+        for cid in sorted(ids):
+            f.write(_id_encode(cid) + '\n')
+
+
+def _append_id_set(path, ids):
+    """Yeni id'leri indekse ekler (saf append hizli yolunda)."""
+    with open(_corpus_ids_path(path), 'a', encoding='ascii') as f:
+        for cid in sorted(ids):
+            f.write(_id_encode(cid) + '\n')
+
+
 class Corpus:
     """JSONL tabanli, bellek ici IDF+cosine vektör deposu (RAG-lite)."""
 
@@ -863,26 +949,20 @@ class Corpus:
         return True
 
     @staticmethod
-    def append_many(chunks):
-        """Yeni bilgi parcalarini corpus.jsonl'a ekler (ayni id guncellenir)."""
-        records = {}
-        if os.path.exists(CORPUS_FILE):
-            with open(CORPUS_FILE, 'r', encoding='utf-8') as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        rec = json.loads(line)
-                        records[rec.get('id')] = rec
-                    except json.JSONDecodeError:
-                        continue
+    def append_many(chunks, path=CORPUS_FILE):
+        """Bilgi parcalarini corpus.jsonl'a yazar (ayni id guncellenir).
 
+        Yeni id'ler dosya SONUNA eklenir (61 MB'lık dosya yeniden yazilmaz);
+        mevcut id'ler guncelleniyorsa yalnizca o satirlar degistirilir, onunun
+        byte'lari oldugu gibi korunur. Id kumesi '<dizin>_ids.jsonl' yan
+        indeksinden hizli okunur; index bayatsa dosya tek gecisle taranir.
+        """
+        updated = {}
         for ch in chunks:
             cid = ch.get('id')
             if not cid:
                 continue
-            records[cid] = {
+            updated[cid] = {
                 'id': cid,
                 'title': ch.get('title', ''),
                 'text': ch.get('text', ''),
@@ -890,12 +970,71 @@ class Corpus:
                 'source': ch.get('source', 'autogrow'),
                 'added_at': datetime.datetime.utcnow().isoformat(),
             }
+        if not updated:
+            return 0
 
-        with open(CORPUS_FILE, 'w', encoding='utf-8') as f:
-            for rec in records.values():
-                f.write(json.dumps(rec, ensure_ascii=False) + '\n')
-        print(f"[CORPUS] corpus.jsonl guncellendi: {len(records)} parca.")
-        return len(records)
+        exist = set()
+        index_ok = False
+        if os.path.exists(path):
+            index_ids = _read_id_set(path)
+            if index_ids is not None:
+                exist, index_ok = index_ids, True
+            else:
+                exist = _scan_ids(path)
+
+        new_ids = [cid for cid in updated if cid not in exist]
+        updates = {cid: rec for cid, rec in updated.items() if cid in exist}
+
+        # Dosya sonuna yazilacaksa satir sonuyla bitip bitmedigini kontrol et.
+        file_nl = True
+        if os.path.exists(path):
+            with open(path, 'rb') as f:
+                f.seek(0, 2)
+                if f.tell() > 0:
+                    f.seek(-1, 2)
+                    file_nl = f.read(1) == b'\n'
+
+        if not updates:
+            # HIZLI YOL (sik gecen ogrenme akisi): yalnizca sona ekle.
+            with open(path, 'a', encoding='utf-8') as f:
+                if not file_nl:
+                    f.write('\n')
+                for cid in new_ids:
+                    f.write(json.dumps(updated[cid], ensure_ascii=False) + '\n')
+            if index_ok:
+                # Index dogruydu: yeni id'leri satir sonuna eklemek yeterli.
+                if new_ids:
+                    _append_id_set(path, new_ids)
+            else:
+                # Index bayat/eksikti: tam taramadan gelen kumeyi yeniden yaz.
+                _write_id_set(path, exist | set(new_ids))
+        else:
+            # NADIR YOL (mevcut parca yeniden ogrenildi): degisen satirlari
+            # yerinde guncelle, digerlerini oldugu gibi koru.
+            with open(path, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+            with open(path, 'w', encoding='utf-8') as f:
+                for line in lines:
+                    s = line.strip()
+                    if not s:
+                        continue
+                    try:
+                        cid = json.loads(s).get('id')
+                    except json.JSONDecodeError:
+                        f.write(line)
+                        continue
+                    if cid in updates:
+                        f.write(json.dumps(updates[cid], ensure_ascii=False) + '\n')
+                    else:
+                        f.write(line)
+            if new_ids:
+                _write_id_set(path, exist | set(new_ids))
+            else:
+                _write_id_set(path, exist)
+
+        total = len(exist) + len(new_ids)
+        print(f"[CORPUS] corpus.jsonl guncellendi: {total} parca.")
+        return total
 
     def refresh(self):
         """append_many sonrasi bellekteki indexi gunceller.
@@ -929,10 +1068,16 @@ class Corpus:
         old_ids = [c.get('id', '') for c in self.chunks]
         new_ids = [c.get('id', '') for c in new_chunks]
         if new_n > old_n and new_ids[:old_n] == old_ids:
-            self._append_chunks(new_chunks[old_n:], new_chunks)
-            print(f"[CORPUS] Artimli guncelleme: +{new_n - old_n} parca "
-                  f"({new_n} toplam).")
-            return True
+            # HIZLI YOL yalnizca onceki satirlarin ICERIGi de degismediyse
+            # guvenlidir: append_many ayni id'li parcanin text/patterns'ini
+            # guncelleyebilir; o durumda lexical index (df/lex_tf/vectors/
+            # pattern) bayat kalir ve yeni icerik aramalarda bulunamaz.
+            if all(_content_same(new_chunks[i], self.chunks[i])
+                   for i in range(old_n)):
+                self._append_chunks(new_chunks[old_n:], new_chunks)
+                print(f"[CORPUS] Artimli guncelleme: +{new_n - old_n} parca "
+                      f"({new_n} toplam).")
+                return True
 
         # Icerik degisimi / cikarma / siralama -> guvenli tam yukleme.
         self.load()

@@ -149,6 +149,7 @@ class MultiHeadAttention:
 
         p = softmax(logits, axis=-1) * row            # PAD sorgu satırları 0
 
+        self._cache_s = p                             # dropout ÖNCESİ softmax
         dropout_mask = None
         if training and p_drop > 0:
             keep = np.float32(1.0 - p_drop)
@@ -186,10 +187,13 @@ class MultiHeadAttention:
         p_used = p
         if dropout_mask is not None:
             dattn = dattn * dropout_mask
-            p_used = p * dropout_mask
         dVh = p_used.transpose(0, 1, 3, 2) @ doit
 
-        dl = p * (dattn - (dattn * p).sum(axis=-1, keepdims=True))  # softmax geri
+        # Softmax geri: dropout ÖNCESİ (s) ile, dropout aktifken maskelenmiş
+        # dattn ile çarpılır. p zaten maskeli olduğundan p_used'e maske
+        # ikinci kez uygulanmaz (V-gradyanı aksi halde 1/keep ile fazla ölçeklenir).
+        s = getattr(self, '_cache_s', p)
+        dl = s * (dattn - (dattn * s).sum(axis=-1, keepdims=True))  # softmax geri
 
         dQh = dl @ Kh * self.rsqrt
         dKh = dl.transpose(0, 1, 3, 2) @ Qh * self.rsqrt
@@ -279,9 +283,13 @@ class TransformerNN:
         if n_v > 0:
             extra = _f32(np.asarray(adapter.get('embed_extra'), dtype=np.float32))
             assert extra.shape[0] == n_v and extra.shape[1] == self.d_model
+            # Yeni sözcük satırları taban sözcükleri (0..V-1) ile taban PAD satırı
+            # (V) arasına girer: yeni sözcük j -> indeks V+j (brain ile aynı),
+            # PAD -> V+n_v (taban PAD satırı zaten sıfırdır).
             self._lora_embed_full = np.concatenate(
-                [self.embed, extra, np.zeros((1, self.d_model), np.float32)], axis=0)
-            self._lora_pad_idx = self.embed.shape[0] + n_v
+                [self.embed[:self.vocab_size], extra, self.embed[self.vocab_size:]],
+                axis=0)
+            self._lora_pad_idx = self.vocab_size + n_v
         n_h = int(adapter.get('head_added', 0))
         if n_h > 0:
             self._lora_head_w = _f32(np.asarray(adapter.get('whead_extra'),
@@ -424,11 +432,14 @@ class TransformerNN:
         E = embed[X] * mask_                      # PAD satırları 0
         x = E + self.pos[None, :L, :] * mask_
 
+        emb_drop = None
         if apply_dropout and self.dropout > 0:
             keep = np.float32(1.0 - self.dropout)
-            x = x * ((rng.rand(B, L, self.d_model) < keep).astype(np.float32) / keep)
+            emb_drop = ((rng.rand(B, L, self.d_model) < keep).astype(np.float32) / keep)
+            x = x * emb_drop
 
-        caches = {'mask': mask, 'mask_': mask_, 'inputs': X, 'blocks': []}
+        caches = {'mask': mask, 'mask_': mask_, 'inputs': X,
+                  'emb_drop': emb_drop, 'blocks': []}
 
         for blk in self.blocks:
             c = {}
@@ -526,12 +537,17 @@ class TransformerNN:
                 grads[f'b{bi}_{name}'] = g
 
         embed = self._lora_embed_full if self._lora_embed_full is not None else self.embed
+        emb_drop = self._cache.get('emb_drop')
+        grad_x = dx * emb_drop if emb_drop is not None else dx
         dE = np.zeros_like(embed)
-        np.add.at(dE, self._cache['inputs'], dx * mask_)
+        np.add.at(dE, self._cache['inputs'], grad_x * mask_)
         if self._lora_embed_full is not None:
-            base_v = self.embed.shape[0]
-            grads['embed'] = dE[:base_v]
-            self._cache['lora_embed_grads'] = dE[base_v:-1]  # yeni sözcük satırları
+            # Taban embed gradyanı (PAD satırı boş kalır); extra satırlar
+            # V..V+n_v-1 aralığındadır (brain sözcük indeksleriyle hizalı).
+            base_grad = np.zeros_like(self.embed)
+            base_grad[:self.vocab_size] = dE[:self.vocab_size]
+            grads['embed'] = base_grad
+            self._cache['lora_embed_grads'] = dE[self.vocab_size:-1]  # yeni sözcük satırları
         else:
             grads['embed'] = dE
         return grads
