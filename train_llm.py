@@ -32,6 +32,12 @@ Veri boyu: MAX_PAIRS=70000 ham cift N5 ile ~330k cift -> epoch basina sure eski
 (60k cift) 60/gore ~5.5x artar; erken durdurma (patience) devrede -> genelde
 cok daha azda durur, asiriya kacmaz. Sure endiseleniyorsan --epochs 80 --patience 12.
 
+ERKEN DURDURMA: val ACC uzerinden calisir (ACC_IMP=2e-3; en iyi acc'yi bu
+kadar asmayan her val epoch'u 'iyilesme yok' sayar). Val acc'nin plato bolgesi
+(orn. 0.908 <-> 0.921 dalgalanma) sayaci doldurur ve patience sonrasi eğitim
+DURUR; kayip bazli ckpt-secimi degismez. --patience degeri ile hiz duyarliligi
+(orn. --patience 12 -> sert, --patience 40 -> rahat).
+
 Kapasite flag'leri: --d-model --num-blocks --num-heads --ff-mult
   --max-ctx-len --max-seq-len --batch-size --lr-base. Varsayilani d=256'dir;
   eski (d=128) model dosyalari veri ogesi tasidigi icin geriye donuk yuklenir.
@@ -88,8 +94,11 @@ LR_BASE = 1e-3
 LR_MIN = 0.1
 WARMUP = 200
 PATIENCE = 20
-VAL_IMP = 5e-4   # erken-durdurma iyilesme toleransi: val ancak bu kadar altina
-# duserse 'iyilesti' sayilir (gurultulu dalgalanmalar sayaci tetiklemesin)
+VAL_IMP = 5e-4   # ckpt-secimi iyilesme toleransi: val kaybi bu kadar altina
+# duserse 'iyilesti' sayilir (best_state / en iyi kayipta dondurulur).
+ACC_IMP = 2e-3   # ERKEN-DURDURMA toleransi: val acc eski rekoru bu kadar asmiyor
+# ise 'iyilestme yok' sayilir. Kabul: acc plato bolgesinde dalgalansa da
+# (orn. 0.908 <-> 0.921) sayac oku tikir ve patience dolar -> DURUR.
 GRAD_CLIP = 5.0
 CKPT_FREQ = 1   # her epoch kaydedilir -> Colab kesilse bile max ~1 epoch kayip, resume aninda
 MAX_PAIRS = 70000   # ham ciftlerin TAMAMI kullanilir (intents.json: ~68.654); eski 20k kirpiyordu
@@ -697,6 +706,7 @@ def main():
 
     best_state = None
     best_val = 1e9
+    best_acc = 0.0
     bad = 0
     start_ep = 0
     step = 0
@@ -724,9 +734,11 @@ def main():
             model.load_state_dict(cp['model'])
             opt.load_state_dict(cp['opt'])
             best_val, best_state, start_ep, step = cp['best_val'], cp['best_state'], cp['epoch'], cp['step']
+            best_acc = cp.get('best_acc', 0.0)
             best_state = {k: v.detach().cpu().clone() for k, v in best_state.items()}
             print('Devam: epoch', start_ep, '| step', step,
-                  '| best val:', round(best_val, 4), flush=True)
+                  '| best val:', round(best_val, 4),
+                  '| best acc:', round(best_acc, 3), flush=True)
 
     # ---- coklu GPU sarmaci (DataParallel) -------------------------------------
     # torch.compile VARSAYILAN KAPALI: bu parametre/buffer tabanli modulde cloud
@@ -859,19 +871,23 @@ def main():
 
         if not do_val:
             bad = 0
-        elif vl < best_val - VAL_IMP:
-            best_val = vl
-            best_state = {k: v.detach().cpu().clone() for k, v in base.state_dict().items()}
+        elif va_acc > best_acc + ACC_IMP:
+            # gercek dogruluk iyilesmesi -> sayac sifirlanir
             bad = 0
+            best_acc = va_acc
+            if vl < best_val - VAL_IMP:
+                best_val = vl
+                best_state = {k: v.detach().cpu().clone() for k, v in base.state_dict().items()}
         else:
             bad += 1
             if bad >= patience:
-                print(f'[llm] Erken durdurma. Best val: {best_val:.4f}', flush=True)
+                print(f'[llm] Erken durdurma. Best val: {best_val:.4f} | best acc: {best_acc:.3f}',
+                      flush=True)
                 done = True
         if ep % CKPT_FREQ == 0 or done:
             torch.save({'epoch': ep, 'step': step, 'model': best_state,
                         'opt': opt.state_dict(), 'best_val': best_val,
-                        'best_state': best_state,
+                        'best_state': best_state, 'best_acc': best_acc,
                         'arch': {'d_model': dm, 'num_blocks': nb, 'num_heads': nh,
                                  'ff_mult': ff, 'max_seq_len': mxs, 'V': V},
                         'data': data_fp}, CKPT)
@@ -882,6 +898,9 @@ def main():
     print('\nToplam egitim suresi: %.1f dk' % ((time.time() - t0_all) / 60), flush=True)
 
     # ---------------- export (numpy inference ile uyumlu compact NPZ format)
+    if best_state is None:
+        # uc durum: acc hic (0.0) ile rekor kirmadan erken durma -> son hal kullan
+        best_state = {k: v.detach().cpu().clone() for k, v in base.state_dict().items()}
     base.load_state_dict(best_state)
     _set_mode(False)
     data = {
