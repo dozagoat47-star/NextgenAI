@@ -189,12 +189,15 @@ def _measure(query, gold, generated, knowledge, stopwords):
 
 
 def sample_report(model, items, temperature=0.7, top_k=10, rep_penalty=0.3,
-                  seed=7, stopwords=STOPWORDS, max_len=None):
+                  seed=7, stopwords=STOPWORDS, max_len=None,
+                  knowledge_bias=0.0):
     """items: (sorgu, gold) ya da (sorgu, gold, bilgi) ucizlileri.
 
     model.sample(context, temperature=..., top_k=..., knowledge=...,
     rep_penalty=...) imzasini destekleyen herhangi bir nesne olabilir (llm.LLM
     birebir uyumlu). Ayni seed -> birebir ayni rapor (regresyon tekrarlanabilir).
+    knowledge_bias>0 ise llm.sample'in bilgi-cekimine (knowledge_bias) beyaz
+    aktarilir -> RAG konu dokunusu etkisi olculebilir.
     """
     np.random.seed(seed)
     random.seed(seed)
@@ -208,7 +211,9 @@ def sample_report(model, items, temperature=0.7, top_k=10, rep_penalty=0.3,
         try:
             out = model.sample(query, temperature=temperature, top_k=top_k,
                                knowledge=knowledge, rep_penalty=rep_penalty,
-                               **({'max_len': max_len} if max_len else {}))
+                               **({'max_len': max_len} if max_len else {}),
+                               **({'knowledge_bias': knowledge_bias}
+                                  if knowledge_bias else {}))
         except TypeError:
             out = model.sample(query, temperature=temperature, top_k=top_k,
                                knowledge=knowledge, rep_penalty=rep_penalty)
@@ -298,6 +303,9 @@ def main():
                     help='birincil decoding konfiguresetlerini karsilastir')
     ap.add_argument('--out', default=None, metavar='PATH',
                     help='rapor JSON dosyasi (varsayilan: yazilmaz)')
+    ap.add_argument('--knowledge-bias', type=float, default=0.0,
+                    help='llm.sample konu cekimi bonusu (1.2 onerilen; '
+                         '0.0 = kapali, egitimli taban cizgisi)')
     args = ap.parse_args()
 
     model = load_llm()
@@ -312,20 +320,21 @@ def main():
             f'max_ctx={model.max_ctx_len} max_seq={model.max_seq_len} '
             f'{"bpe" if model.tokenizer else "char"}')
 
-    def run(temperature, top_k, rep_penalty):
+    def run(temperature, top_k, rep_penalty, kb):
         rows = sample_report(model, items, temperature=temperature,
                              top_k=top_k, rep_penalty=rep_penalty,
-                             seed=args.seed, max_len=args.max_len)
+                             seed=args.seed, max_len=args.max_len,
+                             knowledge_bias=kb)
         return aggregate_report(rows), rows
 
     if args.sweep:
-        configs = [(0.6, 6, 0.3), (0.7, 10, 0.4), (0.7, 10, 0.3),
-                   (0.85, 14, 0.3)]
+        configs = [(0.6, 6, 0.3, 0.0), (0.7, 10, 0.4, 0.0),
+                   (0.7, 10, 0.4, 1.2), (0.7, 10, 0.3, 1.2)]
         out_rows = {}
         print(f'MODEL: {info}\n')
-        for temperature, top_k, rp in configs:
-            agg, rows = run(temperature, top_k, rp)
-            label = (f'config t={temperature} k={top_k} rep={rp} '
+        for temperature, top_k, rp, kb in configs:
+            agg, rows = run(temperature, top_k, rp, kb)
+            label = (f'config t={temperature} k={top_k} rep={rp} kb={kb} '
                      f'score={agg["gen_index"]:.3f} | kop={agg["copy_bleu"]:.3f} '
                      f'| konu={agg["topic_mean"]:.3f} | akic={agg["fluency"]:.3f}')
             print('== ' + label)
@@ -333,8 +342,10 @@ def main():
     else:
         print(f'MODEL: {info}')
         print(f'CONFIG: temperature={args.temperature} top_k={args.top_k} '
-              f'rep_penalty={args.rep_penalty} seed={args.seed}\n')
-        agg, rows = run(args.temperature, args.top_k, args.rep_penalty)
+              f'rep_penalty={args.rep_penalty} seed={args.seed} '
+              f'knowledge_bias={args.knowledge_bias}\n')
+        agg, rows = run(args.temperature, args.top_k, args.rep_penalty,
+                        args.knowledge_bias)
         print_report('SONUC', agg)
         worst = sorted(rows, key=lambda r: r['gen_index'])[:5]
         print('-- en dusuk 5 ornek --')

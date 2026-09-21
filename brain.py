@@ -683,6 +683,11 @@ class ChatBot:
         #    ayirt edici sayilmasi icin gereken min IDF agirlikli skor.
         self.confidence_threshold = 0.40
         self.knowledge_threshold = 1.5
+        # LLM bilgi koullandirmasinda 'konu cekimi' (knowledge_bias): bilgi
+        # parcasinda gecen icerik kelimelerinin logit bonusu -> uretim bilgiye
+        # daha cok dokunur (baslangicta guclu, sona dogru sonecek sekilde).
+        # 0.0 = kapali (eski davranis).
+        self.knowledge_bias = 1.2
 
     def is_negation_word(self, word, stem=None):
         """Tek bir sozcugun olumsuzluk tasiyip tasimadigini dondurur.
@@ -1547,7 +1552,8 @@ class ChatBot:
             for _ in range(max(1, int(tries))):
                 gen = self.llm.sample(query, temperature=0.7, top_k=10,
                                       knowledge=knowledge[:500],
-                                      rep_penalty=0.4)
+                                      rep_penalty=0.4,
+                                      knowledge_bias=self.knowledge_bias)
                 if not self._accept_kb_rephrase(gen, kb):
                     continue
                 if best is None or len(gen) > best_len:

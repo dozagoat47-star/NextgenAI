@@ -219,6 +219,19 @@ class LLM:
             return ids if ids else [default]
         return [self.c2i.get(ch, default)]
 
+    def _content_tokens(self, token_ids):
+        """Bilgi metninin ICERIK token id'lerini dondurur (konu cekimi).
+
+        Bilgide gecen tek/iki harfli alt sozcukler (ek, baglac) elenir;
+        anlamli sozcuklere karsilik gelen token'lar (decode uzunlugu >= 3)
+        kalir. Bos ya da yetersizse [] doner -> cekim devre disi kalir.
+        """
+        if self.tokenizer is not None:
+            return list(set(i for i in token_ids
+                            if len(self.tokenizer.decode([i])) >= 3))
+        return list(set(i for i in token_ids
+                        if len(self.i2c.get(i, '')) >= 3))
+
     # ------------------------------------------------------------ ORNEKLEME
     def _sample_next(self, logits, temperature, top_k, banned):
         probs = softmax(logits, axis=-1)
@@ -235,7 +248,7 @@ class LLM:
         return int(np.random.choice(pool, p=ps))
 
     def sample(self, context, temperature=0.7, top_k=10, max_len=None,
-               knowledge=None, rep_penalty=0.3):
+               knowledge=None, rep_penalty=0.3, knowledge_bias=0.0):
         """Sorgu -> karakter karakter yanit uret (EOS'a ya da max_len'e kadar).
 
         Baslangic sekansi:
@@ -247,6 +260,13 @@ class LLM:
 
         rep_penalty: daha once uretilmis token'lardan sonra logit dusurur
         (0.0 = ceza yok; 0.3 = dengeli cesitlilik).
+
+        knowledge_bias > 0 iken bilgide gecen icerik kelimelerinin token'larina
+        hafif additif logit bonusu uygulanir -> 'konu cekimi'. Bonus uretimin
+        basinda tam, sona dogru dogrusal sonecek sekilde azalir (lincer cekim):
+        ilk token'lar bağlama konu olarak 'dokunur', ilerleyen kapanista tekrar/
+        kopya riski artmaz. Bilgi yoksa ya da bilgi icerik token'i yoksa etki
+        yoktur (0.0 = kapali, davranis degissmez).
         """
         max_len = max_len or 96
         ids = self._enc(context, self.max_ctx_len)
@@ -259,19 +279,26 @@ class LLM:
         kb_budget = max(8, self.max_seq_len - self.max_ctx_len - 8)
 
         dec = [BOS] + list(ids[:self.max_ctx_len]) + [SEP]
+        boost_ids = []
         if knowledge:
             kmid = self._enc(knowledge, kb_budget)
             if kmid:
                 dec += list(kmid[:kb_budget]) + [SEP]
+                if knowledge_bias > 0:
+                    boost_ids = self._content_tokens(kmid)
         banned = {PAD, BOS}
         out_ids = []
         seen_ngrams = set()
         generated = set()
-        for _ in range(max_len):
+        for step in range(max_len):
             logits = self.forward(np.array([dec], np.int64))[0, -1]
             if rep_penalty and generated:
                 for idx in generated:
                     logits[idx] -= rep_penalty
+            if boost_ids:
+                strength = knowledge_bias * (1.0 - step / max_len)
+                if strength > 0:
+                    logits[boost_ids] += strength
             idx = self._sample_next(logits, temperature, top_k, banned)
             if idx == EOS or idx == SEP:
                 break
