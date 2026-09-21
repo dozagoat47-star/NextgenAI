@@ -31,7 +31,7 @@ EPOCHS="${2:-250}"
 case "$MODE" in
   train)
     echo "[3/4] RAG egitimi basliyor (epochs=$EPOCHS) -- llm_model.json uretecek"
-    python train_llm.py --rag --kb-map knowledge_map.jsonl --natural 3 --epochs "$EPOCHS" 2>&1 | tee saturn_train.log
+    python train_llm.py --rag --kb-map knowledge_map.jsonl --natural 3 --epochs "$EPOCHS" --batch-size 64 --val-every 2 2>&1 | tee saturn_train.log
     ;;
   *)
     echo "[3/4] dry-run dogrulama"

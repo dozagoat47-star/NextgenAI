@@ -31,7 +31,7 @@ case "$MODE" in
   train)
     echo "[1/3] RAG egitim (natural 5, epochs=$EPOCHS) -> llm_model.json"
     python train_llm.py --rag --kb-map knowledge_map.jsonl --natural 5 \
-      --epochs "$EPOCHS" 2>&1 | tee kaggle_train.log
+      --epochs "$EPOCHS" --batch-size 64 --val-every 2 2>&1 | tee kaggle_train.log
     DONE='yes'
     ;;
   verify)

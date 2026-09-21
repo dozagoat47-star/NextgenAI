@@ -14,11 +14,20 @@ Kullanim (yerel dogrulama icin torch gerektirmez):
   python train_llm.py --dry-run [--rag] [--natural K]   # veri hattini dogrula
   SMOKE=1 python train_llm.py                            # 2 adim CPU hiz testi
 
+Hiz (Kaggle T4 2x):
+  - DINAMIK batch: her sekans PAD kuyrugu budanarak gercek uzunluga kirpilir
+    ve benzer uzunluklar kume halinde paketlenir -> transformator yalnizca
+    gerekli uzunlukta cosar. Verinin cogu max_seq'ten kisa oldugu icin islem
+    ~1.5-2x hizlanir (600sn -> ~300sn/epoch deneyimi).
+  - --batch-size 64 (artik varsayilan), --val-every 2 ile val gecisleri
+    yarilanir. Kucuk modelde DataParallel senkron ucreti batch'i asabilir;
+    tek GPU denemek icin: LLM_DP_OFF=1 python train_llm.py ...
+
 Kaggle'da egitim (GPU notebook):
   python train_llm.py --rag --natural 5 --kb-map knowledge_map.jsonl   # oneri (d=256)
   python train_llm.py --rag --natural 5 --kb-map knowledge_map.jsonl --d-model 384 --num-blocks 6
   python train_llm.py --rag --natural 3 --kb-map knowledge_map.jsonl --max-ctx-len 48 --max-seq-len 192
-  python train_llm.py --epochs 400 --patience 40 --batch-size 64
+  python train_llm.py --epochs 400 --patience 40 --batch-size 64 --val-every 2
 Veri boyu: MAX_PAIRS=70000 ham cift N5 ile ~330k cift -> epoch basina sure eski
 (60k cift) 60/gore ~5.5x artar; erken durdurma (patience) devrede -> genelde
 cok daha azda durur, asiriya kacmaz. Sure endiseleniyorsan --epochs 80 --patience 12.
@@ -74,7 +83,7 @@ NUM_BLOCKS = 4
 NUM_HEADS = 8
 FF_MULT = 4
 DROPOUT = 0.10
-BATCH_SIZE = 48
+BATCH_SIZE = 64
 LR_BASE = 1e-3
 LR_MIN = 0.1
 WARMUP = 200
@@ -205,12 +214,14 @@ def _cache_fp(tokenizer, kb_map_path, n_pairs, NATURAL, RAG,
     """Veri ondeklenti parmak izi: veri/tokenizer/kb-map degisince yeniden
     encode edilir; ayniysa ondeklent onbellegi (npz) kullanilir."""
     h = hashlib.md5()
-    # 'fmt:3' -> v3 cache: duz (flat) duz arrays, pickle YOK. v1/v2 object-array
-    # npz'leri Kaggle'da 10 dk'lik yukleme takilmalari yapiyordu; v3 tek seferde
-    # okunur. format degisince eski cache gecersiz -> ilk koşuda 1 kez encode.
-    h.update(('fmt:3|%d|%d|%d|%d|%d|%d|%d' % (n_pairs, NATURAL, int(RAG),
-                                              max_ctx_len, max_seq_len,
-                                              batch_size, SEED)).encode('utf-8'))
+    # 'fmt:4' -> v4 cache: duz (flat) duz arrays, pickle YOK, PAD kuyrugu
+    # budanmis (dinamik uzunluklu batch). v1-v3 object-array/160-PAD npz'leri
+    # Kaggle'da 10 dk'lik yukleme takilmalari yapiyordu; v3 tek seferde
+    # okunurdu, v4 ayni duz okuyu + daha kucuk tensorde cosar. format
+    # degisince eski cache gecersiz -> ilk koşuda 1 kez encode.
+    h.update(('fmt:4|%d|%d|%d|%d|%d|%d|%d' % (n_pairs, NATURAL, int(RAG),
+                                               max_ctx_len, max_seq_len,
+                                               batch_size, SEED)).encode('utf-8'))
     if kb_map_path and os.path.exists(kb_map_path):
         with io.open(kb_map_path, 'rb') as f:
             h.update(f.read(2_000_000))
@@ -237,6 +248,71 @@ def _mp_init(dummy_, ctx_map_):
 def _mp_enc(item):
     ctx, resp = item
     return encode_llm(_mp_dummy, ctx, resp, context=_mp_ctx.get(ctx))
+
+
+def _pack_encoded(enc_all, B):
+    """[(seq, mask)] -> uzunluk-kirpimli, sirali-kumeli batch listesi.
+
+    encode_llm her sekansi max_seq'e PAD'ler; burada PAD kuyrugu budanarak
+    GERCEK uzunluk bulunur ve benzer uzunluktaki sekanslar ayni batch'e
+    paketlenir. Transformator boylece yalnizca gerekli uzunlukta cosar
+    (PAD pozisyonlari zaten maskesiz; kesme matematigi DEGISTIRMEZ).
+
+    Dondurulen her batch (B, T) numpy; T = icindeki en uzun icerik. Toplam
+    maske toplami (= egitim kaybinin gorecekleri) birebir korunur.
+    """
+    items = []
+    for seq, mask in enc_all:
+        seq = np.asarray(seq)
+        mask = np.asarray(mask, dtype=np.float32)
+        L = int(np.argmax(seq == PAD)) if (seq == PAD).any() \
+            else int(seq.shape[0])
+        L = max(1, L)
+        items.append((L, seq[:L].copy(), mask[:L].copy()))
+    items.sort(key=lambda it: it[0])
+    if not items:
+        return []
+    batches = []
+    for s in range(0, len(items), B):
+        block = items[s:s + B]
+        T = block[-1][0]
+        X = np.zeros((len(block), T), np.int64)
+        M = np.zeros((len(block), T), np.float32)
+        for r, (_, x, m) in enumerate(block):
+            X[r, :x.shape[0]] = x
+            M[r, :m.shape[0]] = m
+        batches.append((X, M))
+    return batches
+
+
+def make_batches(pairs_, B, dummy, ctx_map):
+    """(sorgu, yanit) listesini DINAMIK (uzunluk-budanmis) batch'lere cevirir.
+
+    Ilk-encode cok cekirdekli (fork -> Kaggle/Colab) ya da sirali; cikti
+    sira korundugu icin ondeklent deterministiktir. Paketleme _pack_encoded
+    ile PAD kuyruklari budanarak + benzer uzunluguna gore kumelenerek yapilir.
+    """
+    items = sorted(pairs_, key=lambda pr: len(pr[0]))
+    enc_all = None
+    if (sys.platform.startswith('linux') and len(items) >= 20000
+            and os.environ.get('LLM_MP_OFF') is None):
+        try:
+            import multiprocessing as mp
+            nw = max(2, min(4, os.cpu_count() or 2))
+            with mp.get_context('fork').Pool(
+                    nw, initializer=_mp_init, initargs=(dummy, ctx_map)) as p:
+                enc_all = p.map(_mp_enc, items, chunksize=4096)
+            print('BPE-encode %d cift (%.1fM token) %d cekirdekle' % (
+                len(items), len(items) * 0.16, nw), flush=True)
+        except Exception as e:
+            enc_all = None
+            print('paralel encode atlandi (sirali):', str(e)[:120], flush=True)
+    if enc_all is None:
+        enc_all = []
+        for ctx, resp in items:
+            enc_all.append(encode_llm(dummy, ctx, resp,
+                                      context=ctx_map.get(ctx)))
+    return _pack_encoded(enc_all, B)
 
 
 def masked_acc(logits, tgt, mask):
@@ -440,7 +516,7 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
         try:
             print('ondeklent yukleniyor: %s (%.0f MB) ...' % (
                 os.path.basename(CACHE), os.path.getsize(CACHE) / 1e6), flush=True)
-            # v3: DUZ diziler (pickle/object-array YOK) -> tek seferde okunur.
+            # v4: DUZ diziler (pickle/object-array YOK) -> tek seferde okunur.
             with np.load(CACHE) as z:
                 Xg, Mg = z['Xtr'], z['Mtr']
                 Xvg, Mv = z['Xva'], z['Mva']
@@ -457,55 +533,18 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
         except Exception as e:
             print('ondeklent yuklenemedi, yeniden encode:', e, flush=True)
 
-    def make_batches(pairs_, B):
-        items = sorted(pairs_, key=lambda pr: len(pr[0]))
-        # Cok cekirdekli ilk-encode (Kaggle/Colab: 2-4 CPU). Sonuc SIRAYLA
-        # dondugu gorundugu icin cikti birebir ayni -> ondeklent gecerli.
-        enc_all = None
-        if (sys.platform.startswith('linux') and len(items) >= 20000
-                and os.environ.get('LLM_MP_OFF') is None):
-            try:
-                import multiprocessing as mp
-                nw = max(2, min(4, os.cpu_count() or 2))
-                with mp.get_context('fork').Pool(
-                        nw, initializer=_mp_init, initargs=(dummy, ctx_map)) as p:
-                    enc_all = p.map(_mp_enc, items, chunksize=4096)
-                print('BPE-encode %d cift (%.1fM token) %d cekirdekle' % (
-                    len(items), len(items) * 0.16, nw), flush=True)
-            except Exception as e:
-                enc_all = None
-                print('paralel encode atlandi (sirali):', str(e)[:120], flush=True)
-        if enc_all is not None:
-            batches = []
-            for i in range(0, len(enc_all), B):
-                seqs = [e[0] for e in enc_all[i:i + B]]
-                masks = [e[1] for e in enc_all[i:i + B]]
-                batches.append((np.stack(seqs), np.stack(masks)))
-            return batches
-        batches = []
-        for i in range(0, len(items), B):
-            block = items[i:i + B]
-            seqs, masks = [], []
-            for ctx, resp in block:
-                seq, smask = encode_llm(dummy, ctx, resp,
-                                        context=ctx_map.get(ctx))
-                seqs.append(seq)
-                masks.append(smask)
-            X = np.stack(seqs)
-            M = np.stack(masks)
-            batches.append((X, M))
-        return batches
-
-    tr = make_batches(tr_pairs, batch_size)
-    va = make_batches(va_pairs, batch_size)
+    # Dinamik batch'ler (PAD kuyrugu budanir, benzer uzunluklar kumelenir)
+    # modul-duzey make_batches ile kurulur (birim test edilebilir).
+    tr = make_batches(tr_pairs, batch_size, dummy, ctx_map)
+    va = make_batches(va_pairs, batch_size, dummy, ctx_map)
     print('train batch:', len(tr), '| val batch:', len(va), flush=True)
     print('ornek cift:', (clean_chars(tr_pairs[0][0], 30),
                           clean_chars(tr_pairs[0][1], 30)), flush=True)
     try:
-        # v3: pickle YOK. Tum batch'ler sabit (Bmax, T0)-boyutlu TEK duz diziye
-        # pad'lenir; gercek (B,T) olculeri sh_tr/sh_va ile saklanir. Pad ile
-        # gelen kuyruk pozisyonlarinin maskesi 0 -> loss'a KATILMAZ, egitim
-        # matematigi birebir ayni. Boyut -> maske tek seferde okunur.
+        # v4: pickle YOK. Tum batch'ler (Bmax, T0)_cadde TEK duz diziye pad'lenir;
+        # gercek (B,T) olculeri sh_tr/sh_va ile saklanir. Dinamik budama sonrasi
+        # T0 artisma gore cosan max gercek uzunluk duzeyi; pad-kuyruk maskesi 0
+        # -> loss'a KATILMAZ, egitim matematigi birebir ayni.
         Bmax = batch_size
         T0 = max(x.shape[1] for x, _ in tr)
         T0v = max(x.shape[1] for x, _ in va)
@@ -526,7 +565,7 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
         os.makedirs(SAVE_DIR, exist_ok=True)
         np.savez_compressed(CACHE, Xtr=Xtr, Mtr=Mtr, Xva=Xva, Mva=Mva,
                             sh_tr=sh_tr, sh_va=sh_va)
-        print('ondeklent yazildi (v3):', os.path.basename(CACHE),
+        print('ondeklent yazildi (v4):', os.path.basename(CACHE),
               '| T0=%d T0v=%d | toplam %.0f MB' % (
                   T0, T0v, os.path.getsize(CACHE) / 1e6), flush=True)
     except Exception as e:
@@ -561,6 +600,9 @@ def main():
                     help='toplam sekans uzunlugu (secenek: 192)')
     ap.add_argument('--batch-size', type=int, default=BATCH_SIZE)
     ap.add_argument('--lr-base', type=float, default=LR_BASE)
+    ap.add_argument('--val-every', type=int, default=1,
+                    help='val gecisini her N epochda bir yap (2 -> val maliyeti '
+                         'yarilanir, epoch suresi kisalir)')
     ap.add_argument('--export-dir', default=None,
                     help='llm_model.json + _weights.npz ciktisi (varsayilan: SAVE_DIR)')
     ap.add_argument('--fresh', action='store_true',
@@ -570,6 +612,7 @@ def main():
     RAG = args.rag
     NATURAL = args.natural
     patience = args.patience
+    val_every = max(1, args.val_every)
     dm, nb, nh, ff = args.d_model, args.num_blocks, args.num_heads, args.ff_mult
     mxc, mxs = args.max_ctx_len, args.max_seq_len
     bs, lr_base = args.batch_size, args.lr_base
@@ -579,8 +622,9 @@ def main():
     os.makedirs(export_dir, exist_ok=True)
 
     print('CONFIG: d_model=%d blocks=%d heads=%d ff_mult=%d '
-          'max_ctx=%d max_seq=%d batch=%d lr=%.1e export=%s' % (
-              dm, nb, nh, ff, mxc, mxs, bs, lr_base, export_dir), flush=True)
+          'max_ctx=%d max_seq=%d batch=%d val_every=%d lr=%.1e export=%s' % (
+              dm, nb, nh, ff, mxc, mxs, bs, val_every, lr_base, export_dir),
+          flush=True)
 
     if args.dry_run:
         d = prepare_data(RAG, NATURAL=NATURAL, tokenizer=load_tokenizer(),
@@ -659,7 +703,7 @@ def main():
     tot_steps = EPOCHS * len(trX)
     # veri parmak izi: cift sayisi + natural + uzunluklar -> veri degisince
     # eski checkpoint otomatik atlanir (eski veriyle egitilmis devam etmez).
-    data_fp = '%d-%d-%d-%d' % (len(trX), NATURAL, mxc, mxs)
+    data_fp = '%d-%d-%d-%d-b4' % (len(trX), NATURAL, mxc, mxs)
 
     if args.fresh:
         print('Uyari: --fresh verildi, mevcut checkpoint yok sayilir '
@@ -794,18 +838,28 @@ def main():
         tl /= len(trX)
 
         _set_mode(False)
-        vl = va_acc = 0.0
-        with torch.no_grad():
-            for x, m in zip(vaX, vaM):
-                lg = model(x)
-                vl += llm_loss(lg, x, m).item()
-                va_acc += masked_acc(lg, x, m)
-        vl /= len(vaX)
-        va_acc /= len(vaX)
-        print(f'epoch {ep:3d}/{EPOCHS} | train {tl:.4f} | val {vl:.4f} | acc {va_acc:.3f} | '
-              f'{time.time()-t0:.1f}s | lr {cur:.5f}', flush=True)
+        # --val-every N: val gecisi yalnizca her N epochda bir yapilir
+        # (val, train-isleminin yarisi kadar tutar; N>1 epoch suresini kisaltir).
+        do_val = (ep % val_every == 0 or start_ep == 0 and ep == 1)
+        if do_val:
+            vl = va_acc = 0.0
+            with torch.no_grad():
+                for x, m in zip(vaX, vaM):
+                    lg = model(x)
+                    vl += llm_loss(lg, x, m).item()
+                    va_acc += masked_acc(lg, x, m)
+            vl /= len(vaX)
+            va_acc /= len(vaX)
+            print(f'epoch {ep:3d}/{EPOCHS} | train {tl:.4f} | val {vl:.4f} | acc {va_acc:.3f} | '
+                  f'{time.time()-t0:.1f}s | lr {cur:.5f}', flush=True)
+        else:
+            vl = best_val
+            print(f'epoch {ep:3d}/{EPOCHS} | train {tl:.4f} | (val atlandi) | '
+                  f'{time.time()-t0:.1f}s | lr {cur:.5f}', flush=True)
 
-        if vl < best_val - VAL_IMP:
+        if not do_val:
+            bad = 0
+        elif vl < best_val - VAL_IMP:
             best_val = vl
             best_state = {k: v.detach().cpu().clone() for k, v in base.state_dict().items()}
             bad = 0
