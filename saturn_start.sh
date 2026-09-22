@@ -28,14 +28,20 @@ python -c "import numpy; print('numpy', numpy.__version__)"
 MODE="${1:-verify}"
 EPOCHS="${2:-250}"
 
+CGARG=''
+if [ -f chatgrow_sohbet.jsonl ]; then
+  echo "[3/4] ChatGrow verisi bulundu, egitim hattina eklenecek."
+  CGARG='--chatgrow chatgrow_sohbet.jsonl'
+fi
+
 case "$MODE" in
   train)
     echo "[3/4] RAG egitimi basliyor (epochs=$EPOCHS) -- llm_model.json uretecek"
-    python train_llm.py --rag --kb-map knowledge_map.jsonl --natural 3 --epochs "$EPOCHS" --batch-size 64 --val-every 2 2>&1 | tee saturn_train.log
+    python train_llm.py --rag --kb-map knowledge_map.jsonl --natural 3 --epochs "$EPOCHS" --batch-size 64 --val-every 2 $CGARG 2>&1 | tee saturn_train.log
     ;;
   *)
     echo "[3/4] dry-run dogrulama"
-    python train_llm.py --dry-run --rag --kb-map knowledge_map.jsonl
+    python train_llm.py --dry-run --rag --kb-map knowledge_map.jsonl $CGARG
     ;;
 esac
 

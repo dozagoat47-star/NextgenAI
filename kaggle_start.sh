@@ -27,17 +27,23 @@ cd /kaggle/working/NextgenAI
 MODE="${1:-verify}"
 EPOCHS="${2:-250}"
 
+CGARG=''
+if [ -f chatgrow_sohbet.jsonl ]; then
+  echo "[0/3] ChatGrow verisi bulundu, egitim hattina eklenecek."
+  CGARG='--chatgrow chatgrow_sohbet.jsonl'
+fi
+
 DONE=''
 case "$MODE" in
   train)
     echo "[1/3] RAG egitim (natural 5, epochs=$EPOCHS) -> llm_model.json"
-    python train_llm.py --rag --kb-map knowledge_map.jsonl --natural 5 \
+    python train_llm.py --rag --kb-map knowledge_map.jsonl --natural 5 $CGARG \
       --epochs "$EPOCHS" --batch-size 64 --val-every 2 2>&1 | tee kaggle_train.log
     DONE='yes'
     ;;
   bench)
     echo "[1/3] 1-epoch zamanlama (cache/encode + 1 epoch, birlikte olculur)"
-    python train_llm.py --rag --kb-map knowledge_map.jsonl --natural 5 \
+    python train_llm.py --rag --kb-map knowledge_map.jsonl --natural 5 $CGARG \
       --epochs 1 --batch-size 64 --val-every 1 2>&1 | tee kaggle_bench.log
     echo ""
     echo "[2/3] Son egitim satiri (epoch suresi '| NN.Ns' bolumundedir):"
@@ -47,7 +53,7 @@ case "$MODE" in
     ;;
   verify)
     echo "[1/3] dry-run dogrulama (GPU gerekmez, ~1 dk)"
-    python train_llm.py --dry-run --rag --kb-map knowledge_map.jsonl
+    python train_llm.py --dry-run --rag --kb-map knowledge_map.jsonl $CGARG
     echo "[2/3] OK - ilk-kelime hizalama ve RAG hatti hazir."
     echo "[3/3] Tam egitim icin:  !bash kaggle_start.sh train 250"
     ;;

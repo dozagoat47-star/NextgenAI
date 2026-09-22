@@ -434,9 +434,51 @@ def build_kb_lut(path, ctx_chars=CTX_CHARS):
     return lut
 
 
+def load_chatgrow_pairs(path, ctx_len=CTX_CHARS, resp_len=70, max_pairs=20000):
+    """chatgrow.py/seed cikisi -> (sorgu, yanit) ciftleri.
+
+    Kayit bicimi: {"query": ..., "answer": [..]} (answer tek dize de olabilir).
+    ctx/yanit, intents hattiyla AYNI normalizasyondan gecer (clean_chars:
+    ascii + kucuk harf + kisaltma) -> train/eval/llm_inference uzayi birebir.
+    Her sorgu, her yanitla bir cift olur; shisha sabit tohumla karistirilir.
+    """
+    pairs = []
+    if not os.path.exists(path):
+        return pairs
+    with io.open(path, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except ValueError:
+                continue
+            q = rec.get('query') or rec.get('soru')
+            ans = rec.get('answer') or rec.get('answers')
+            if isinstance(ans, str):
+                ans = [ans]
+            if not q or not ans:
+                continue
+            ctx = clean_chars(q, ctx_len)
+            if len(ctx) < 6:
+                continue
+            seen = set()
+            for a in ans:
+                r = clean_chars(a, resp_len)
+                if len(r) < 6 or r in seen:
+                    continue
+                seen.add(r)
+                pairs.append((ctx, r))
+    rng = random.Random(11)
+    rng.shuffle(pairs)
+    return pairs[:max_pairs]
+
+
 def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
                  FIRST_WORD_STABILIZE=True, max_ctx_len=MAX_CTX_LEN,
-                 max_seq_len=MAX_SEQ_LEN, batch_size=BATCH_SIZE):
+                 max_seq_len=MAX_SEQ_LEN, batch_size=BATCH_SIZE,
+                 chatgrow_path=None):
     """Veri + RAG hattini HAZIRLAR (yalnizca numpy; torch gerektirmez).
     --dry-run bu fonksiyonu calistirip dogrular; egitim de ayni yolu kullanir.
 
@@ -457,6 +499,14 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
     assert os.path.exists(INTENTS), f'intents.json bulunamadi: {INTENTS}'
     pairs = load_pairs(INTENTS, max_pairs=MAX_PAIRS, use_query=True,
                        ctx_len=CTX_CHARS)
+    if chatgrow_path:
+        cg = load_chatgrow_pairs(chatgrow_path)
+        if cg:
+            print('chatgrow sohbet cifti: %d (kaynak: %s)' %
+                  (len(cg), chatgrow_path), flush=True)
+            pairs = pairs + cg
+        else:
+            print('chatgrow kaynak bos ya da yok: %s' % chatgrow_path, flush=True)
     pairs = [(ctx, rr) for ctx, r in pairs if (rr := refine_resp(r)) is not None]
     if FIRST_WORD_STABILIZE:
         n_before = len(pairs)
@@ -623,6 +673,9 @@ def main():
                          'bu haritadan alir (deterministik, --rag ile birlikte)')
     ap.add_argument('--natural', type=int, default=0, metavar='K',
                     help='her cevabin K dogal varyantiyla veriyi buyut (orijinal dahil)')
+    ap.add_argument('--chatgrow', default=None, metavar='PATH',
+                    help='chatgrow.py ciktisi chatgrow_sohbet.jsonl; gercek '
+                         'sohbet ciftlerini (sorgu->yanit) egitim verisine ekler')
     ap.add_argument('--dry-run', action='store_true',
                     help='torch olmadan veri/RAG hattini dogrula ve cik')
     ap.add_argument('--patience', type=int, default=PATIENCE,
@@ -667,7 +720,7 @@ def main():
     if args.dry_run:
         d = prepare_data(RAG, NATURAL=NATURAL, tokenizer=load_tokenizer(),
                          kb_map_path=args.kb_map, max_ctx_len=mxc, max_seq_len=mxs,
-                         batch_size=bs)
+                         batch_size=bs, chatgrow_path=args.chatgrow)
         ex = next((c for c in d['ctx_map'].values() if c), None)
         print('DRY-RUN OK: train batch', len(d['tr']), '| val batch',
               len(d['va']), '| tokenizer', d['tokenizer'].vocab_size
@@ -690,7 +743,7 @@ def main():
     # fork tabanli cok-cekirdekli BPE-encode bu sayede guvenli)
     d = prepare_data(RAG, NATURAL=NATURAL, tokenizer=load_tokenizer(),
                      kb_map_path=args.kb_map, max_ctx_len=mxc, max_seq_len=mxs,
-                     batch_size=bs)
+                     batch_size=bs, chatgrow_path=args.chatgrow)
     vocab = d['vocab']
     tok = d['tokenizer']
     V = tok.vocab_size if tok is not None else len(vocab)
