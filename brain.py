@@ -1293,6 +1293,17 @@ class ChatBot:
                 return True
         return False
 
+    def _is_knowledge_question(self, text):
+        """Tanim/olgu sorusu mu? ("X nedir", "X ne demek", "X hakkinda bilgi",
+        "X kimdir", "X nerede"...) Bilgi intent'leri bu sablonlarla uretilir;
+        siniflandirici chat tag'ine kaptirdiginda bile bilgi oncelik kazanir."""
+        t = self.ascii_normalize(text).lower()
+        return any(m in t for m in (
+            'nedir', 'ne demek', 'ne demektir', 'hakkinda bilgi', 'hakkinda bil',
+            'kimdir', 'kimlerdir', 'nerede', 'neredir', 'ne zaman', 'anlami nedir',
+            'acilimi', 'tarihcesi', 'tarihi nedir', 'konusu nedir'))
+
+
     def _negation_reply(self, content):
         """Olumsuz icerikli girisler icin semptatik (destekleyici) yanit uretir."""
         topic = ""
@@ -1381,6 +1392,17 @@ class ChatBot:
         if negated and neg_content:
             return self._negation_reply(neg_content)
 
+        # BILGI ONCELIGI: tanim/olgu sorusu ("X nedir", "X hakkinda bilgi", "X
+        # kimdir"...) ise once bilgi retrieval denenir. Sınıflandırıcı bilgi
+        # sorusunu chat tag'ine kaptirdiginda bile ("galaksi nedir" -> teknoloji)
+        # ansiklopedik yanit ezilmeden doner. Retrieval bos donerse normal akis
+        # (sohbet siniflandirmasi) devam eder.
+        if self._is_knowledge_question(user_input):
+            kbt = self._select_knowledge(
+                resp_words, exclude=neg_content if negated else None)
+            if kbt:
+                return self._try_kb_rephrase(user_input, kbt)
+
         # ANAHTAR KELIME OVERRIDE bilgi intentine ulasti: canned bilgi yaniti
         # (LLM varsa bilgi parcasindan yeniden kurulur -> kopya degil).
         if chosen_tag not in self.intent_tags:
@@ -1431,7 +1453,7 @@ class ChatBot:
                 self.seq2 = load_seq2seq()
             if self.seq2 is not None:
                 gen = self.seq2.sample(ctx, temperature=0.6, top_k=6)
-                if self._accept_generated(gen, tag):
+                if self._accept_generated(gen, tag, query=ctx):
                     return self.deasciify(gen)
             if self.seq_enabled is None:
                 self.seq_enabled = False
@@ -1441,7 +1463,7 @@ class ChatBot:
             if not self.seq_enabled:
                 return None
             gen = self.seq.sample(ctx, temperature=0.7, top_k=10)
-            if self._accept_generated(gen, tag):
+            if self._accept_generated(gen, tag, query=ctx):
                 return self.deasciify(gen)
             return None
         except Exception:
@@ -1459,7 +1481,7 @@ class ChatBot:
         for _ in range(max(1, int(tries))):
             gen = self.llm.sample(query, temperature=0.6, top_k=6,
                                   rep_penalty=0.4)
-            if not self._accept_generated(gen, tag):
+            if not self._accept_generated(gen, tag, query=query):
                 continue
             if best is None or len(gen) > best_len:
                 best, best_len = gen, len(gen)
@@ -1574,7 +1596,7 @@ class ChatBot:
             pass
         return kb
 
-    def _accept_generated(self, gen, tag):
+    def _accept_generated(self, gen, tag, query=None):
         """Uretilen varyanti kalite kapisindan gecirir (ozgunluk odakli).
 
         Rule-check:
@@ -1584,6 +1606,12 @@ class ChatBot:
             (kopya reddedilir). Kayitli kanonlar sadece boyle asilir -> akil
             yurutme/yeni cumle kurmaya alan acilir.
           - yapisan tekrar (her yeni token ayni) elenir.
+          - SORGU KONUSU: query 3+ icerik kelimesi tasiyorsa uretim o kelimelerden
+            en az birini gecmeli. Siniflandirici yanlis intent'e dustuğünde bile
+            ("bugun kararsizim pizza mi yesem..." -> hava_durumu) model konu-disi
+            metne ziplamasin; bu sart saglanmazsa aday reddedilir (guvenli canned).
+            Kisa/duygusal sorgular (2 icerik kelimesi) kapisiz kalir: empatik
+            yanitlar sorudaki kelimeleri tekrar etmek zorunda degildir.
         """
         if not gen or len(gen) < 12 or len(gen) > 260:
             return False
@@ -1607,6 +1635,13 @@ class ChatBot:
         overlap = len(inter) / float(len(gen_set))
         if overlap < 0.25:
             return False
+        # SORGU KONUSU: 3+ icerik kelimeli soruda uretim sorudaki konuya
+        # dokunmali. Siniflandirici kaymasi durumunda bile konu-disi aday
+        # reddedilir ve guvenli canned fallback'e dusulur.
+        if query is not None:
+            qkws = {t for t in self.tokenize(query) if t not in STOPWORDS}
+            if len(qkws) >= 3 and not (gen_set & qkws):
+                return False
         # ozgunluk: canned disinda en az %15 yeni sozcuk (kopyaya hayir)
         novel = gen_set - canned
         if len(novel) / float(len(gen_set)) < 0.15:

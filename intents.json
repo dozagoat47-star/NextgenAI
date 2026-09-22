@@ -19218,6 +19218,40 @@
         "buyuk hayaller, kucuk adimlarla baslar; ilk adimini bugun at. umarım yardımcı olmuştur.",
         "buyuk hayaller, kucuk; ayrıca adimlarla baslar; ilk adimini bugun at."
       ]
+    },
+    {
+      "tag": "kararsiz",
+      "patterns": [
+        "kararsizim",
+        "kararsizlik yasiyorum",
+        "kararsiz kaldim",
+        "karar veremiyorum",
+        "karar vermekte zorlaniyorum",
+        "ikisi arasinda kaldim",
+        "ikilemde kaldim",
+        "hangisini secmeliyim",
+        "hangisini seceyim",
+        "pizza mi yesem hamburger mi yesem",
+        "pizza mi yoksa hamburger mi",
+        "hamburger mi yoksa pizza mi",
+        "futbol mu oynayayim kod mu yazayim",
+        "futbol mu oynamaliyim yoksa kod mu yazmaliyim",
+        "dizi mi izleyeyim film mi izleyeyim",
+        "kitap mi okuyayim film mi izleyeyim",
+        "evde mi kalayim disari mi cikayim",
+        "yemek mi yapayim disari mi cikayim",
+        "eve mi gideyim disari mi cikayim",
+        "tatilde dinleneyim mi gezeyim mi"
+      ],
+      "responses": [
+        "Kararsiz olmak cok normal; iki secenegi kagida yaz, artilar-eksileri karsilastir, karar kendiliginden netlesir.",
+        "Zor secimlerde kucuk bir deney: bugun birini sec, yarin digerini. Ikisinin de tadini cikar.",
+        "Iki secenek de degerli gorunuyor. Sana daha iyi hissettireni sec; pisman olmazsin.",
+        "Kararsiz kalmak dogal. Kucuk bir liste yap: enerji, keyif, zaman. Puanli oyle karar ver.",
+        "Canin ne istiyorsa ona yonelin; sezgilerin cogu zaman dogruyu soyler, bir ici sinav yap.",
+        "Madeni para atmanin faydasi sek degil: para havadayken icinden istedigini gorursun.",
+        "Secimler seni zenginlestirir; yanlis cevap yok, sadece yol vardir. Kendine guven."
+      ]
     }
   ],
   "_meta": {

@@ -1291,5 +1291,79 @@ class TestTwoLayerArchitecture(unittest.TestCase):
         shutil.rmtree(ndir)
 
 
+class TestTopicGateAndKnowledge(unittest.TestCase):
+    """Kararsiz intent + sorgu-konu kapisi + bilgi onceligi (adim3+ fix)."""
+
+    def _bot(self, tag, patterns, canned):
+        from brain import ChatBot
+        bot = ChatBot()
+        bot.intents = {tag: canned}
+        bot.intent_tags = [tag]
+        bot.intent_kws = {tag: set(bot.tokenize(' '.join(patterns)))}
+        return bot
+
+    def test_accept_generated_needs_query_topic_for_choice(self):
+        """Uzun secim sorusunda konu-disi uretim kapidan GEÇMEZ."""
+        bot = self._bot('kararsiz',
+                        ['kararsizim pizza hamburger secim yapamam'],
+                        ['pizza guzel bir secim olabilir',
+                         'hamburger de iyi bir secenek olur'])
+        tok_gen = 'benim isim ama sevgi dolu hayvanlardir'
+        self.assertFalse(bot._accept_generated(
+            tok_gen, 'kararsiz',
+            query='bugun kararsizim pizza mi yesem yoksa hamburger mi'))
+
+    def test_accept_generated_passes_when_query_topic_touched(self):
+        """Seyim sorusunda iyi aday sorudaki konuya dokunuyorsa GECER."""
+        bot = self._bot('kararsiz',
+                        ['kararsizim pizza hamburger secim'],
+                        ['pizza guzel bir secim olabilir',
+                         'hamburger de iyi bir secenek olur'])
+        gen = 'pizza bugun guzel bir secim olabilir canim'
+        self.assertTrue(bot._accept_generated(
+            gen, 'kararsiz',
+            query='bugun kararsizim pizza mi yesem yoksa hamburger mi'))
+
+    def test_short_emotion_skips_topic_gate(self):
+        """Kisa duygusal sorgu (2 icerik kelimesi) kapisizdir: empatik yanit
+        sorudaki kelimeleri ezberlemek zorunda degildir."""
+        bot = self._bot('uzuntu',
+                        ['canim sikkin yorgunum'],
+                        ['herkesin kotu gunleri olur', 'bu da gecer inan'])
+        gen = 'herkesin bazen kotu gunleri olur ama bu da gecer'
+        self.assertTrue(bot._accept_generated(
+            gen, 'uzuntu', query='canim sikkin'))
+
+    def test_is_knowledge_question(self):
+        bot = ChatBot()
+        self.assertTrue(bot._is_knowledge_question('galaksi nedir'))
+        self.assertTrue(bot._is_knowledge_question('benefse ne demek'))
+        self.assertTrue(bot._is_knowledge_question('mustafa kemal hakkinda bilgi ver'))
+        self.assertFalse(bot._is_knowledge_question('bugun cok mutluyum'))
+        self.assertFalse(bot._is_knowledge_question('tesekkur ederim'))
+
+    def test_kararsiz_intent_registered_as_conversational(self):
+        """intents.json'da kararsiz mevcut ve siniflandiriciya ogretilen
+        (conversational) kumeye giriyor."""
+        bot = ChatBot()
+        data = bot.load_intents(os.path.join(BASE, 'intents.json'))
+        self.assertIn('kararsiz', bot.intent_tags)
+        data = bot.conversational_data(data)
+        self.assertIn('kararsiz', bot.intent_tags)
+
+    def test_definition_reaches_knowledge(self):
+        """Tanim sorulari (X nedir/ne demek) bilgi retrieval ile yanitlanir;
+        siniflandirici chat tag'ine kapsa bile bilgi onceligi calisir."""
+        bot = ChatBot()
+        data = bot.load_intents(os.path.join(BASE, 'intents.json'))
+        bot.conversational_data(data)
+        self.assertTrue(bot._is_knowledge_question('benefse nedir'))
+        kb = bot._select_knowledge(bot.tokenize('benefse nedir'))
+        self.assertIsNotNone(kb, 'benefse bilgi intenti retrieval ile bulunmali')
+        in_any = any(kb in resp for tag, resp in bot.intents.items()
+                     if tag not in bot.intent_tags)
+        self.assertTrue(in_any, 'KB yaniti bir bilgi intentinin yanit bankasindan olmali')
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
