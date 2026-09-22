@@ -81,8 +81,12 @@ def enrich_responses(intents, k=3):
     return added
 
 
-def build_knowledge_map(intents, limit=2000):
-    """Bilgi intent desenleri icin corpus'tan bilgi parcalari eslestirir."""
+def build_knowledge_map(intents, limit=6000, kb_text_chars=300):
+    """Bilgi intent desenleri icin corpus'tan bilgi parcalari eslestirir.
+
+    kb_text_chars=300: bilgi parcasi metni bu karakterle sinirlanir
+    (train_llm.KB_TEXT_CHARS ile ayni) -> LLM 192 token sekansinda daha
+    zengin bilgi kosullandirmasi gorur."""
     from corpus import Corpus
     corpus = Corpus()
     corpus.load()
@@ -107,7 +111,7 @@ def build_knowledge_map(intents, limit=2000):
                 skipped += 1
                 continue
             text = ((chunk.get('title') or '') + '. ' +
-                    (chunk.get('text') or ''))[:200]
+                    (chunk.get('text') or ''))[:kb_text_chars]
             if len(text.strip()) < 20:
                 skipped += 1
                 continue
@@ -157,8 +161,9 @@ def main():
     ap.add_argument('--out', default=PATH)
     ap.add_argument('--kb-map', default=KB_MAP_PATH,
                     help='knowledge_map cikis yolu (bos dize = uretme)')
-    ap.add_argument('--kb-limit', type=int, default=2000,
-                    help='knowledge_map kac desen eslesmesi uretilecek (hiz)')
+    ap.add_argument('--kb-limit', type=int, default=6000,
+                    help='knowledge_map kac desen eslesmesi uretilecek (hiz; '
+                         '4400 uzeri tum bilgi desenlerini kapsar)')
     args = ap.parse_args()
 
     data = _load_data(PATH)

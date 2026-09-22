@@ -34,7 +34,7 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE)
 
 from llm import load_llm
-from train_llm import INTENTS, MAX_PAIRS, refine_resp
+from train_llm import (INTENTS, MAX_PAIRS, CTX_CHARS, build_kb_lut, refine_resp)
 from seqgen import load_pairs
 
 KB_MAP = os.path.join(BASE, 'knowledge_map.jsonl')
@@ -266,19 +266,13 @@ def print_report(title, agg):
 
 
 def _load_items(rag, limit):
-    pairs = load_pairs(INTENTS, max_pairs=MAX_PAIRS, use_query=True)
+    pairs = load_pairs(INTENTS, max_pairs=MAX_PAIRS, use_query=True,
+                       ctx_len=CTX_CHARS)
     pairs = [(ctx, rr) for ctx, r in pairs if (rr := refine_resp(r)) is not None]
     kb_pre = {}
     if rag and os.path.exists(KB_MAP):
-        with io.open(KB_MAP, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                row = json.loads(line)
-                if row.get('ctx') and row.get('text'):
-                    kb_pre[row['ctx']] = row['text']
-        print(f'kb-map yuklendi: {len(kb_pre)} desen', flush=True)
+        kb_pre = build_kb_lut(KB_MAP)
+        print(f'kb-map yuklendi (normalize-ctx): {len(kb_pre)} desen', flush=True)
     items = []
     for ctx, gold in pairs:
         k = kb_pre.get(ctx)

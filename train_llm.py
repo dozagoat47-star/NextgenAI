@@ -102,8 +102,15 @@ ACC_IMP = 2e-3   # ERKEN-DURDURMA toleransi: val acc eski rekoru bu kadar asmiyo
 GRAD_CLIP = 5.0
 CKPT_FREQ = 1   # her epoch kaydedilir -> Colab kesilse bile max ~1 epoch kayip, resume aninda
 MAX_PAIRS = 70000   # ham ciftlerin TAMAMI kullanilir (intents.json: ~68.654); eski 20k kirpiyordu
-MAX_CTX_LEN = 40
-MAX_SEQ_LEN = 160
+MAX_CTX_LEN = 48    # sorgu icin token butcesi (Adim 3: 40 -> 48)
+MAX_SEQ_LEN = 192   # toplam sekans uzunlugu (Adim 3: 160 -> 192)
+CTX_CHARS = 64      # sorgu icin KARAKTER butcesi: load_pairs ctx_len + kb LUT anahtar
+#                    # uzunlugu. 40-char kesim 689 pattern'i kirpiyordu (data kaybi);
+#                    # 64'te yalnizca 31 uzun pattern kesilir. kb anahtari da AYNI
+#                    # kesim uzunluguyla uretilir -> RAG isabeti 65% -> 76%.
+KB_TEXT_CHARS = 300 # kb parcasindan kullanilacak karakter sayisi (200 -> 300;
+#                    # seq 192, kb butce ~136 token -> zengin bilgi koullandirmasi,
+#                    # inference'ta brain'in ilettigi ~500 karaktere yaklasir).
 SEED = 7
 
 SAVE_DIR = os.environ.get('SAVE_DIR', BASE)
@@ -228,9 +235,10 @@ def _cache_fp(tokenizer, kb_map_path, n_pairs, NATURAL, RAG,
     # Kaggle'da 10 dk'lik yukleme takilmalari yapiyordu; v3 tek seferde
     # okunurdu, v4 ayni duz okuyu + daha kucuk tensorde cosar. format
     # degisince eski cache gecersiz -> ilk koşuda 1 kez encode.
-    h.update(('fmt:4|%d|%d|%d|%d|%d|%d|%d' % (n_pairs, NATURAL, int(RAG),
+    h.update(('fmt:4|%d|%d|%d|%d|%d|%d|%d|%d' % (n_pairs, NATURAL, int(RAG),
                                                max_ctx_len, max_seq_len,
-                                               batch_size, SEED)).encode('utf-8'))
+                                               batch_size, SEED,
+                                               CTX_CHARS)).encode('utf-8'))
     if kb_map_path and os.path.exists(kb_map_path):
         with io.open(kb_map_path, 'rb') as f:
             h.update(f.read(2_000_000))
@@ -403,6 +411,29 @@ def stabilize_first_words(pairs, seed=SEED):
     return pairs
 
 
+def build_kb_lut(path, ctx_chars=CTX_CHARS):
+    """knowledge_map.jsonl -> {egitim-ctx: bilgi} sozlugu.
+
+    Dosyadaki 'ctx' anahtari bpe.clean_text (Turkce imlali) uzayindadir;
+    EGITIM ctx'si ise seqgen.clean_chars (ASCII + kesik). Dogrudan esleme
+    Turkce harf iceren/kirpilan desenlerde kaciyordu (RAG isabeti %65). Lut
+    anahtarlari da ayni clean_chars(ctx, CTX_CHARS) ile uretilir -> train/
+    eval/kb anahtar uzayi BIREBIR eslesir. Dosyanin kendisi degismez (brain
+    ham sorguyla dosya anahtarina vurmaya devam eder; ascii fallback orada).
+    """
+    lut = {}
+    if not os.path.exists(path):
+        return lut
+    with io.open(path, 'r', encoding='utf-8') as f:
+        for line in f:
+            row = json.loads(line)
+            if row.get('ctx') and row.get('text'):
+                key = clean_chars(row['ctx'], ctx_chars)
+                if key:
+                    lut[key] = row['text']
+    return lut
+
+
 def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
                  FIRST_WORD_STABILIZE=True, max_ctx_len=MAX_CTX_LEN,
                  max_seq_len=MAX_SEQ_LEN, batch_size=BATCH_SIZE):
@@ -415,13 +446,17 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
 
     kb_map_path verilirse (enrich_intents.py uretimi knowledge_map.jsonl)
     desen->bilgi parcasini CANLI corpus.search yerine ezberlenmis haritadan
-    alir: deterministik (RAG hit orani %100'la simrek istedigimiz bilgi
-    intent'leri icin guvenli) ve corplar shisha yapisirken hizlidir.
+    alir: deterministik (RAG hit oranini %100'e surdugumuz bilgi intent'leri
+    icin guvenli) ve corpus shisha yayilirken hizlidir. Harita anahtarlari
+    build_kb_lut ile EGITIM ctx'siyle AYNI uzayda (clean_chars, CTX_CHARS)
+    normalize edildigi icin isabet %65 -> %76 olur; bilgi metni ise
+    KB_TEXT_CHARS (300) karakterle sinirli.
 
     tokenizer (BPETokenizer) verilirse BPE modu kullanilir (subword vocab);
     yoksa eski karakter sozlugu (build_llm_vocab) kullanilir."""
     assert os.path.exists(INTENTS), f'intents.json bulunamadi: {INTENTS}'
-    pairs = load_pairs(INTENTS, max_pairs=MAX_PAIRS, use_query=True)
+    pairs = load_pairs(INTENTS, max_pairs=MAX_PAIRS, use_query=True,
+                       ctx_len=CTX_CHARS)
     pairs = [(ctx, rr) for ctx, r in pairs if (rr := refine_resp(r)) is not None]
     if FIRST_WORD_STABILIZE:
         n_before = len(pairs)
@@ -464,15 +499,9 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
     kb_pre = {}
     use_corpus = False
     if kb_map_path and os.path.exists(kb_map_path):
-        with io.open(kb_map_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                row = json.loads(line)
-                if row.get('ctx') and row.get('text'):
-                    kb_pre[row['ctx']] = row['text']
-        print('kb-map yuklendi (desen):', len(kb_pre), flush=True)
+        kb_pre = build_kb_lut(kb_map_path)
+        print('kb-map yuklendi (normalize-ctx: %d desen)' %
+              len(kb_pre), flush=True)
     if RAG:
         if kb_pre:
             # Harita deterministiktir: corpus'a hic dokunmadan desen->bilgi
@@ -501,7 +530,7 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
             if not chunk:
                 return None
             text = ((chunk.get('title') or '') + '. ' +
-                    (chunk.get('text') or ''))[:200]
+                    (chunk.get('text') or ''))[:KB_TEXT_CHARS]
             return text if len(text.strip()) >= 20 else None
         except Exception:
             return None
@@ -713,7 +742,7 @@ def main():
     tot_steps = EPOCHS * len(trX)
     # veri parmak izi: cift sayisi + natural + uzunluklar -> veri degisince
     # eski checkpoint otomatik atlanir (eski veriyle egitilmis devam etmez).
-    data_fp = '%d-%d-%d-%d-b4' % (len(trX), NATURAL, mxc, mxs)
+    data_fp = '%d-%d-%d-%d-b4-c%d' % (len(trX), NATURAL, mxc, mxs, CTX_CHARS)
 
     if args.fresh:
         print('Uyari: --fresh verildi, mevcut checkpoint yok sayilir '

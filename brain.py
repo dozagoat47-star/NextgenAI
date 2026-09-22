@@ -1488,6 +1488,7 @@ class ChatBot:
         """
         try:
             if self._kb_map is None:
+                from seqgen import clean_chars
                 kmap = {}
                 p = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                  'knowledge_map.jsonl')
@@ -1501,11 +1502,20 @@ class ChatBot:
                             if row.get('ctx') and row.get('text'):
                                 kmap[row['ctx']] = row['text']
                 self._kb_map = kmap or {}
+                # dosya anahtarlari Turkce imlali uzayda; LLM context'i ise
+                # ASCII+kesik (clean_chars). Kullanicinin ASCII yazisini da
+                # bilgiye baglamak icin ayni uzayda ikinci lut olustur.
+                self._kb_ascii = {clean_chars(c, 64): t
+                                  for c, t in (kmap or {}).items()}
             if self._kb_map:
                 qn = query.strip().lower()
                 # 1a) hedef bilgi intent'inin desenleriyle esles
                 if qn in self._kb_map:
                     return self._kb_map[qn]
+                # 1a') ASCII/kesim uzayinda esles ("nasilsin" ~ "nasılsın")
+                aq = clean_chars(qn, 64)
+                if aq and aq in self._kb_ascii:
+                    return self._kb_ascii[aq]
                 # 1b) desenlerin normallesmis haliyle kesis (cok desenli tutarli)
                 best, bs = None, 0.0
                 qset = set(qn.split()) - {'nedir', 'kimdir', 'kactir', 'nerede',
