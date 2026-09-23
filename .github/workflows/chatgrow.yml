@@ -35,8 +35,8 @@ jobs:
 
       - name: Birleşik sohbet dosyasını güncelle
         run: |
-          python chatgrow_birlesik.py chatgrow_sohbet.jsonl \
-            chatgrow_discourse_pardus.jsonl \
+          python chatgrow_birlesik.py chatgrow_discourse_pardus.jsonl \
+            --fallback chatgrow_sohbet.jsonl \
             --out chatgrow_birlesik.jsonl
 
       - name: Commit and push if changed

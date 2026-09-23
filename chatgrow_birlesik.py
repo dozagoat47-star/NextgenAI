@@ -82,19 +82,34 @@ def main(argv=None):
     ap.add_argument('inputs', nargs='+', metavar='KAYNAK.jsonl',
                     help='birleştirilecek chatgrow dosyaları (sıralı, '
                          'önceki öncelikli)')
+    ap.add_argument('--fallback', metavar='SEED.jsonl', default=None,
+                    help='YEDEK: canlı kaynaklar 0 çift üretirse (forum '
+                         'kapalı/limitli) eğitim boş kalmasın diye bu '
+                         'kaynaktan doldurur. Canlı kaynak >= 1 çift '
+                         'üretirse BURASI HİÇ KULLANILMAZ.')
     ap.add_argument('--out', default='chatgrow_birlesik.jsonl')
     ap.add_argument('--limit', type=int, default=None,
                     help='en fazla N çift yaz (opsiyonel)')
     args = ap.parse_args(argv)
 
-    sources = [(p, read_jsonl(p)) for p in args.inputs]
-    merged = merge([r for _, r in sources], args.limit)
-    n = write_jsonl(merged, args.out)
+    # 1) ONCELIKLI: canli kaynaklar (Discourse/Reddit). Seed BURAYA KARISMAZ.
+    live = merge([read_jsonl(p) for p in args.inputs], args.limit)
 
-    print(f"[1/2] GIRILER: " +
-          ', '.join(f"{p}= {len(r)} cift" for p, r in sources))
-    print(f"[2/2] {args.out}: {n} cift "
-          f"(tekrar dusen: {sum(len(r) for _, r in sources) - n})")
+    # 2) YALNIZCA canli 0 cift uretirse (forum kapali/limitli) seed DEvreye girer.
+    used_fallback = False
+    if not live and args.fallback:
+        live = merge([read_jsonl(args.fallback)], args.limit)
+        used_fallback = True
+
+    n = write_jsonl(live, args.out)
+    live_desc = (f'{args.fallback} (YEDEK-dolgu)' if used_fallback
+                 else 'canli kaynak(lar)')
+
+    print(f"[1/2] ANA KAYNAK: {live_desc} = {n} cift")
+    if used_fallback:
+        print(f"[1/2] NOT: canli kaynaklar 0 cift; egitim bos kalmasin diye "
+              f"seed kullanildi")
+    print(f"[2/2] {args.out}: {n} cift yazildi")
     return 0 if n else 1
 
 
