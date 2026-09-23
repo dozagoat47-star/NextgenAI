@@ -308,27 +308,44 @@ def make_batches(pairs_, B, dummy, ctx_map):
     Ilk-encode cok cekirdekli (fork -> Kaggle/Colab) ya da sirali; cikti
     sira korundugu icin ondeklent deterministiktir. Paketleme _pack_encoded
     ile PAD kuyruklari budanarak + benzer uzunluguna gore kumelenerek yapilir.
+    Her 25k cift'te ilerleme satiri basilir -> Kaggle'da encode'un hic
+    "takilmis" gorunmemesi ve kullanicinin sureyi gormesi saglanir.
     """
     items = sorted(pairs_, key=lambda pr: len(pr[0]))
+    n = len(items)
+    est = n / 6000.0   # ~6k cift/sn pul (4 cekirdek, BPE); 'dakika' birimi
+    print(f'BPE-encode basliyor: {n} cift (~{est:.1f} dk, tek sefer; '
+          f'sonra onbellegi kullanilir)', flush=True)
+    t0e = time.time()
     enc_all = None
-    if (sys.platform.startswith('linux') and len(items) >= 20000
+    if (sys.platform.startswith('linux') and n >= 20000
             and os.environ.get('LLM_MP_OFF') is None):
         try:
             import multiprocessing as mp
             nw = max(2, min(4, os.cpu_count() or 2))
             with mp.get_context('fork').Pool(
                     nw, initializer=_mp_init, initargs=(dummy, ctx_map)) as p:
-                enc_all = p.map(_mp_enc, items, chunksize=4096)
-            print('BPE-encode %d cift (%.1fM token) %d cekirdekle' % (
-                len(items), len(items) * 0.16, nw), flush=True)
+                enc_all = [None] * n
+                done = 0
+                for i, r in enumerate(p.imap(_mp_enc, items, chunksize=4096)):
+                    enc_all[i] = r
+                    done += 1
+                    if done % 25000 == 0 or done == n:
+                        print(f'  encode: {done}/{n} (%.0fs)' % (time.time() - t0e),
+                              flush=True)
+            print('BPE-encode %d cift (%.1fM token) %d cekirdekle %.0fs' % (
+                n, n * 0.16, nw, time.time() - t0e), flush=True)
         except Exception as e:
             enc_all = None
             print('paralel encode atlandi (sirali):', str(e)[:120], flush=True)
     if enc_all is None:
         enc_all = []
-        for ctx, resp in items:
+        for j, (ctx, resp) in enumerate(items):
             enc_all.append(encode_llm(dummy, ctx, resp,
                                       context=ctx_map.get(ctx)))
+            if (j + 1) % 25000 == 0 or (j + 1) == n:
+                print(f'  encode: {j + 1}/{n} (%.0fs)' % (time.time() - t0e),
+                      flush=True)
     return _pack_encoded(enc_all, B)
 
 
@@ -434,42 +451,53 @@ def build_kb_lut(path, ctx_chars=CTX_CHARS):
     return lut
 
 
-def load_chatgrow_pairs(path, ctx_len=CTX_CHARS, resp_len=70, max_pairs=20000):
-    """chatgrow.py/seed cikisi -> (sorgu, yanit) ciftleri.
+def load_chatgrow_pairs(path, ctx_len=CTX_CHARS, resp_len=140, max_pairs=20000):
+    """chatgrow.py/seed ciktisi -> (sorgu, yanit) ciftleri.
+
+    path: tek dosya yolu ya da dosya yollari listesi. Birden cok dosya
+    (sohbet + discourse + birlesik) sirayla okunur; ayni (ctx, resp) cifti
+    TEK kez eklenir -> birlesik dosya discourse ile ayni satirlari iceriyor
+    olsa bile veri tekrarlanmaz (tohum 11'e bagli karistirma sonrasinda bile
+    deterministik).
 
     Kayit bicimi: {"query": ..., "answer": [..]} (answer tek dize de olabilir).
     ctx/yanit, intents hattiyla AYNI normalizasyondan gecer (clean_chars:
     ascii + kucuk harf + kisaltma) -> train/eval/llm_inference uzayi birebir.
     Her sorgu, her yanitla bir cift olur; shisha sabit tohumla karistirilir.
     """
+    paths = [path] if isinstance(path, str) else list(path)
+    seen = set()
     pairs = []
-    if not os.path.exists(path):
-        return pairs
-    with io.open(path, 'r', encoding='utf-8') as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                rec = json.loads(line)
-            except ValueError:
-                continue
-            q = rec.get('query') or rec.get('soru')
-            ans = rec.get('answer') or rec.get('answers')
-            if isinstance(ans, str):
-                ans = [ans]
-            if not q or not ans:
-                continue
-            ctx = clean_chars(q, ctx_len)
-            if len(ctx) < 6:
-                continue
-            seen = set()
-            for a in ans:
-                r = clean_chars(a, resp_len)
-                if len(r) < 6 or r in seen:
+    for p in paths:
+        if not os.path.exists(p):
+            continue
+        with io.open(p, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
                     continue
-                seen.add(r)
-                pairs.append((ctx, r))
+                try:
+                    rec = json.loads(line)
+                except ValueError:
+                    continue
+                q = rec.get('query') or rec.get('soru')
+                ans = rec.get('answer') or rec.get('answers')
+                if isinstance(ans, str):
+                    ans = [ans]
+                if not q or not ans:
+                    continue
+                ctx = clean_chars(q, ctx_len)
+                if len(ctx) < 6:
+                    continue
+                for a in ans:
+                    r = clean_chars(a, resp_len)
+                    if len(r) < 6:
+                        continue
+                    key = (ctx, r)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    pairs.append(key)
     rng = random.Random(11)
     rng.shuffle(pairs)
     return pairs[:max_pairs]
@@ -478,13 +506,18 @@ def load_chatgrow_pairs(path, ctx_len=CTX_CHARS, resp_len=70, max_pairs=20000):
 def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
                  FIRST_WORD_STABILIZE=True, max_ctx_len=MAX_CTX_LEN,
                  max_seq_len=MAX_SEQ_LEN, batch_size=BATCH_SIZE,
-                 chatgrow_path=None):
+                 chatgrow_path=None, limit_pairs=0):
     """Veri + RAG hattini HAZIRLAR (yalnizca numpy; torch gerektirmez).
     --dry-run bu fonksiyonu calistirip dogrular; egitim de ayni yolu kullanir.
 
     NATURAL > 0 ise her (sorgu, yanit) cifti, yanitin dogal varyantlariyla
     cogaltilir (naturalize_pairs): model ayni icerigi pek cok dogal sekilde
     ifade etmeyi ogrenip kopya-yerine-canli-sohbet icin veri kazanir.
+
+    limit_pairs > 0 (dry-run/verify) ise naturalize SONRASI ciftler bu
+    sayiya budanir -> 10 dk'lik TAM BPE-encode YAPILMAZ ve onbellek
+    yazilmaz (dogrulama ~1-2 dk surer; gercek egitim encode'u bench/train'de
+    bir kez yapilir, oradaki cache sonraki calistirmalarda kullanilir).
 
     kb_map_path verilirse (enrich_intents.py uretimi knowledge_map.jsonl)
     desen->bilgi parcasini CANLI corpus.search yerine ezberlenmis haritadan
@@ -501,12 +534,14 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
                        ctx_len=CTX_CHARS)
     if chatgrow_path:
         cg = load_chatgrow_pairs(chatgrow_path)
+        src = chatgrow_path if isinstance(chatgrow_path, str) \
+            else ', '.join(chatgrow_path)
         if cg:
             print('chatgrow sohbet cifti: %d (kaynak: %s)' %
-                  (len(cg), chatgrow_path), flush=True)
+                  (len(cg), src), flush=True)
             pairs = pairs + cg
         else:
-            print('chatgrow kaynak bos ya da yok: %s' % chatgrow_path, flush=True)
+            print('chatgrow kaynak bos ya da yok: %s' % src, flush=True)
     pairs = [(ctx, rr) for ctx, r in pairs if (rr := refine_resp(r)) is not None]
     if FIRST_WORD_STABILIZE:
         n_before = len(pairs)
@@ -519,6 +554,15 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
         pairs = naturalize_pairs(pairs, k=NATURAL)
         print(f'dogal varyant: {n_before} -> {len(pairs)} cift'
               f' (varyant: {NATURAL})', flush=True)
+    if limit_pairs > 0 and len(pairs) > limit_pairs:
+        # dry-run/verify: TAM encode YOK. Toplamdan DETERMINISTIK (SEED)
+        # ornekle -> pipeline dogrulamasinin suresi ~1-2 dk kalir.
+        rng = np.random.RandomState(SEED)
+        pick = rng.choice(len(pairs), limit_pairs, replace=False)
+        pick.sort()
+        pairs = [pairs[i] for i in pick]
+        print('verify ornekleme: %d cift (limit-pairs %d, tam encode degil)'
+              % (len(pairs), limit_pairs), flush=True)
     print('egitim cifti (sorgu, yanit):', len(pairs), flush=True)
 
     vocab = None
@@ -600,6 +644,14 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
     fp = _cache_fp(tokenizer, kb_map_path, len(pairs), NATURAL, RAG,
                    max_ctx_len, max_seq_len, batch_size, vocab)
     CACHE = os.path.join(SAVE_DIR, 'llm_data_%s.npz' % fp)
+    if limit_pairs > 0:
+        # verify/dry-run: TAM encode YOK. Cache YUKLENMEZ ve YAZILMAZ
+        # (gercek egitim onbellegi farkli fp ile bench/train'de olusur).
+        tr = make_batches(tr_pairs, batch_size, dummy, ctx_map)
+        va = make_batches(va_pairs, batch_size, dummy, ctx_map)
+        print('train batch:', len(tr), '| val batch:', len(va), flush=True)
+        return {'vocab': vocab, 'tokenizer': tokenizer,
+                'tr': tr, 'va': va, 'ctx_map': ctx_map}
     if os.path.exists(CACHE):
         try:
             print('ondeklent yukleniyor: %s (%.0f MB) ...' % (
@@ -673,9 +725,15 @@ def main():
                          'bu haritadan alir (deterministik, --rag ile birlikte)')
     ap.add_argument('--natural', type=int, default=0, metavar='K',
                     help='her cevabin K dogal varyantiyla veriyi buyut (orijinal dahil)')
-    ap.add_argument('--chatgrow', default=None, metavar='PATH',
+    ap.add_argument('--chatgrow', default=None, nargs='+', metavar='PATH',
                     help='chatgrow.py ciktisi chatgrow_sohbet.jsonl; gercek '
-                         'sohbet ciftlerini (sorgu->yanit) egitim verisine ekler')
+                         'sohbet ciftlerini (sorgu->yanit) egitim verisine '
+                         'ekler. BIRDEN COK dosya: --chatgrow a.jsonl b.jsonl '
+                         '(tekrar eden ciftler otomatik elenir)')
+    ap.add_argument('--limit-pairs', type=int, default=0, metavar='N',
+                    help='>0 ise naturalize SONRASI ciftler N de budanir; '
+                         'dry-run/verify icin: TAM encode atlanir (~1-2 dk), '
+                         'onbellek yazilmaz. Eg<itimde kullanilmaz.')
     ap.add_argument('--dry-run', action='store_true',
                     help='torch olmadan veri/RAG hattini dogrula ve cik')
     ap.add_argument('--patience', type=int, default=PATIENCE,
@@ -720,7 +778,8 @@ def main():
     if args.dry_run:
         d = prepare_data(RAG, NATURAL=NATURAL, tokenizer=load_tokenizer(),
                          kb_map_path=args.kb_map, max_ctx_len=mxc, max_seq_len=mxs,
-                         batch_size=bs, chatgrow_path=args.chatgrow)
+                         batch_size=bs, chatgrow_path=args.chatgrow,
+                         limit_pairs=args.limit_pairs)
         ex = next((c for c in d['ctx_map'].values() if c), None)
         print('DRY-RUN OK: train batch', len(d['tr']), '| val batch',
               len(d['va']), '| tokenizer', d['tokenizer'].vocab_size
@@ -951,21 +1010,25 @@ def main():
             print(f'epoch {ep:3d}/{EPOCHS} | train {tl:.4f} | (val atlandi) | '
                   f'{time.time()-t0:.1f}s | lr {cur:.5f}', flush=True)
 
-        if not do_val:
-            bad = 0
-        elif va_acc > best_acc + ACC_IMP:
-            # gercek dogruluk iyilesmesi -> sayac sifirlanir
-            bad = 0
-            best_acc = va_acc
-            if vl < best_val - VAL_IMP:
-                best_val = vl
-                best_state = {k: v.detach().cpu().clone() for k, v in base.state_dict().items()}
-        else:
-            bad += 1
-            if bad >= patience:
-                print(f'[llm] Erken durdurma. Best val: {best_val:.4f} | best acc: {best_acc:.3f}',
-                      flush=True)
-                done = True
+        # EARLY-STOP: patience sayaci YALNIZCA val epoch'larinda
+        # artar/sifirlanir. --val-every 2 ile atlanan epochlarda sayac
+        # DEGISMEZ (eskiden `if not do_val: bad = 0` sayaci sifirliyordu ->
+        # patience hic dolmuyor, egitim kesintisiz 250 epoch surebiliyordu).
+        if do_val:
+            if va_acc > best_acc + ACC_IMP:
+                # gercek dogruluk iyilesmesi -> sayac sifirlanir
+                bad = 0
+                best_acc = va_acc
+                if vl < best_val - VAL_IMP:
+                    best_val = vl
+                    best_state = {k: v.detach().cpu().clone()
+                                  for k, v in base.state_dict().items()}
+            else:
+                bad += 1
+                if bad >= patience:
+                    print(f'[llm] Erken durdurma. Best val: {best_val:.4f} '
+                          f'| best acc: {best_acc:.3f}', flush=True)
+                    done = True
         if ep % CKPT_FREQ == 0 or done:
             torch.save({'epoch': ep, 'step': step, 'model': best_state,
                         'opt': opt.state_dict(), 'best_val': best_val,

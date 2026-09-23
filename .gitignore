@@ -14,3 +14,5 @@ corpus_embedding*
 *.err
 prof.txt
 prof_dump
+llm_data_*.npz
+llm_ckpt.pt

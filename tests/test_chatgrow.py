@@ -163,6 +163,26 @@ class TestLoadChatgrowPairs(unittest.TestCase):
         self.assertEqual(pairs[0][0], 'cok sicak bugun hava')
         self.assertNotIn('\u00e7', pairs[0][1].lower())
 
+    def test_accepts_list_of_files(self):
+        a = self._write([{'query': 'kahve iciyorum', 'answer': 'Afiyet olsun'}])
+        b = self._write([{'query': 'uyku geldi', 'answer': 'Bi yatilabilir'}])
+        pairs = load_chatgrow_pairs([a, b])
+        self.assertEqual(len(pairs), 2)
+
+    def test_dedupes_pair_across_files(self):
+        # Birlesik dosya, discourse/sohbet ile ayni satirlari iceriyor ->
+        # ayni (ctx, resp) TEK kez eklenmeli (seed 11 ile sifrelenmis shuffle
+        # SONRASI sayi sabit ve deterministik olmali).
+        row = {'query': 'hangi takimi tutuyorsun', 'answer': 'Gomlekten anlamam'}
+        a = self._write([dict(row), dict(row)])
+        b = self._write([dict(row)])
+        self.assertEqual(len(load_chatgrow_pairs([a, b])), 1)
+
+    def test_missing_files_in_list_are_skipped(self):
+        a = self._write([{'query': 'ne yapsam', 'answer': 'Icinden geleni'}])
+        self.assertEqual(len(load_chatgrow_pairs(['yok_dosya_a.jsonl', a,
+                                                   'yok_dosya_b.jsonl'])), 1)
+
 
 class TestModuleHygiene(unittest.TestCase):
 
