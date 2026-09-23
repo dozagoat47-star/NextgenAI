@@ -10,7 +10,8 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from chatgrow import (clean_line, ascii_normalize, DEFAULT_SUBREDDITS,
-                      build_chats)
+                      build_chats, build_discourse_chats, discourse_get,
+                      html_to_text)
 from train_llm import load_chatgrow_pairs
 
 
@@ -170,6 +171,94 @@ class TestModuleHygiene(unittest.TestCase):
 
     def test_clean_key_normalizer(self):
         self.assertEqual(ascii_normalize('Bugün Çok'.lower()), 'bugun cok')
+
+
+class TestHtmlToText(unittest.TestCase):
+
+    def test_strips_tags_and_entities(self):
+        self.assertEqual(html_to_text('<p>Merhaba &amp; hoş geldin</p>'),
+                         'Merhaba & hoş geldin')
+
+    def test_removes_script_blocks(self):
+        html = '<script>var x = 1;</script><p>Metin</p>'
+        self.assertNotIn('script', html_to_text(html))
+
+    def test_empty_input(self):
+        self.assertEqual(html_to_text(None), '')
+        self.assertEqual(html_to_text(''), '')
+
+    def test_strips_shortcode_emojis(self):
+        self.assertEqual(html_to_text('<p>:earthafrica: Naber?</p>'), 'Naber?')
+
+
+class TestBuildDiscourseChats(unittest.TestCase):
+    """discourse_get mock'lanir; network yoktur."""
+
+    TOPICS = {
+        'topic_list': {'topics': [
+            {'id': 11, 'title': 'Sıcak havada ne yapmalı?', 'posts_count': 3},
+            {'id': 12, 'title': 'Tek mesajlı konu', 'posts_count': 1},
+        ]},
+    }
+    POSTS_11 = {'post_stream': {'posts': [
+        {'post_number': 1, 'username': 'Ali',
+         'cooked': '<p>Hava çok sıcak, elektrikler kesilebilir.</p>'},
+        {'post_number': 2, 'username': 'System',
+         'cooked': '<p>Otomatik kayıt, önemsiz.</p>'},
+        {'post_number': 3, 'username': 'Zeynep',
+         'cooked': '<p>Pencereleri kapatıp panjur kullanın.</p>'},
+        {'post_number': 4, 'username': 'Mehmet',
+         'cooked': '<p>Ayrıca soğuk duş işe yarıyor.</p>'},
+    ]}}
+    POSTS_12 = {'post_stream': {'posts': [
+        {'post_number': 1, 'username': 'Veli',
+         'cooked': '<p>Yalnız tek mesaj var.</p>'},
+    ]}}
+
+    def _fake_get(self, base, path, params=None, retries=3):
+        if path == '/c/genel-sohbet/l/latest.json':
+            return self.TOPICS
+        if path == '/t/11.json':
+            return self.POSTS_11
+        if path == '/t/12.json':
+            return self.POSTS_12
+        return None
+
+    def test_builds_pairs_and_skips_system(self):
+        chatgrow_mod = sys.modules['chatgrow']
+        orig = chatgrow_mod.discourse_get
+        chatgrow_mod.discourse_get = self._fake_get
+        try:
+            chats = build_discourse_chats('https://forum.ornek.org', 'genel-sohbet', 5)
+        finally:
+            chatgrow_mod.discourse_get = orig
+        self.assertEqual(len(chats), 1)
+        c = chats[0]
+        self.assertEqual(c['source'], 'discourse')
+        self.assertEqual(c['topic_id'], 11)
+        # System otomatik iletisi (2) elenmeli; kalan iki yanit duzeltilmeli
+        self.assertEqual(len(c['answer']), 2)
+        self.assertIn('panjur', ascii_normalize(c['answer'][0].lower()))
+        self.assertIn('soguk dus', ascii_normalize(c['answer'][1].lower()))
+        self.assertNotIn('otomatik', c['query'])
+
+    def test_empty_listing(self):
+        chatgrow_mod = sys.modules['chatgrow']
+        orig = chatgrow_mod.discourse_get
+        chatgrow_mod.discourse_get = lambda *a, **k: None
+        try:
+            self.assertEqual(build_discourse_chats('https://x.org', '', 5), [])
+        finally:
+            chatgrow_mod.discourse_get = orig
+
+    def test_dry_run_requires_forum(self):
+        from chatgrow import main as gm
+        saved = sys.argv
+        sys.argv = ['chatgrow.py', '--source', 'discourse', '--dry-run']
+        try:
+            self.assertEqual(gm(), 1)
+        finally:
+            sys.argv = saved
 
 
 if __name__ == '__main__':
