@@ -34,7 +34,7 @@ if compgen -G 'chatgrow_*.jsonl' > /dev/null; then
   CGARG="--chatgrow $(ls chatgrow_*.jsonl | tr '\n' ' ')"
 fi
 
-DPARGS="${LLM_CAP:+--d-model $LLM_CAP} ${LLM_BLOCKS:+--num-blocks $LLM_BLOCKS}"
+DPARGS="--d-model ${LLM_CAP:-384} --num-blocks ${LLM_BLOCKS:-6}"
 
 case "$MODE" in
   train)

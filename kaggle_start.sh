@@ -33,8 +33,9 @@ if compgen -G 'chatgrow_*.jsonl' > /dev/null; then
   CGARG="--chatgrow $(ls chatgrow_*.jsonl | tr '\n' ' ')"
 fi
 
-# Kapasite (varsayilan d=384 / 6 blok ~22.9M; env ile asilabilir)
-DPARGS="${LLM_CAP:+--d-model $LLM_CAP} ${LLM_BLOCKS:+--num-blocks $LLM_BLOCKS}"
+# Kapasite: varsayilan d=384 / 6 blok (~22.9M). Env ile asilabilir:
+#   LLM_CAP=256 LLM_BLOCKS=4 bash kaggle_start.sh train ...
+DPARGS="--d-model ${LLM_CAP:-384} --num-blocks ${LLM_BLOCKS:-6}"
 
 DONE=''
 case "$MODE" in
