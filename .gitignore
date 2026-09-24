@@ -16,3 +16,11 @@ prof.txt
 prof_dump
 llm_data_*.npz
 llm_ckpt.pt
+
+# chatgrow dogrulama / test artiklari
+_test_*.jsonl
+_dbg_*
+_verify_task.ps1
+chatgrow_kitap_mini.jsonl
+eval_llm_report_*.json
+.sisyphus/
