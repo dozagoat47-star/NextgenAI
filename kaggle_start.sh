@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # Kaggle Notebook (P100/T4x2 GPU, haftada 30 sa ucretsiz) - Nextgen LLM egitimi.
 #
 # Kullanimi (Kaggle'da):
@@ -42,13 +42,13 @@ case "$MODE" in
   train)
     echo "[1/3] RAG egitim (natural 5, epochs=$EPOCHS, d=384/6 blok) -> llm_model.json"
     python train_llm.py --rag --kb-map knowledge_map.jsonl --natural 5 $CGARG \
-      --epochs "$EPOCHS" --batch-size 64 --val-every 2 $DPARGS 2>&1 | tee kaggle_train.log
+      --epochs "$EPOCHS" --batch-size 128 --val-every 2 $DPARGS 2>&1 | tee kaggle_train.log
     DONE='yes'
     ;;
   bench)
     echo "[1/3] 1-epoch zamanlama (cache/encode + 1 epoch, birlikte olculur)"
     python train_llm.py --rag --kb-map knowledge_map.jsonl --natural 5 $CGARG \
-      --epochs 1 --batch-size 64 --val-every 1 $DPARGS 2>&1 | tee kaggle_bench.log
+      --epochs 1 --batch-size 128 --val-every 1 $DPARGS 2>&1 | tee kaggle_bench.log
     echo ""
     echo "[2/3] Son egitim satiri (epoch suresi '| NN.Ns' bolumundedir):"
     grep 'epoch ' kaggle_bench.log | tail -1
@@ -59,7 +59,7 @@ case "$MODE" in
     echo "[1/3] dry-run dogrulama (GPU gerekmez, ~1-2 dk; TAM encode YAPILMAZ)"
     echo "      Ayni veri bayraklari -> onbellek parmak izi bench/train ile ayni."
     python train_llm.py --dry-run --rag --kb-map knowledge_map.jsonl --natural 5 \
-      --batch-size 64 --limit-pairs 4000 $CGARG $DPARGS
+      --batch-size 128 --limit-pairs 4000 $CGARG $DPARGS
     echo "[2/3] OK - ilk-kelime hizalama ve RAG hatti hazir."
     echo "[3/3] Tam egitim icin:  !bash kaggle_start.sh train 250"
     ;;
@@ -86,3 +86,4 @@ if [ -n "$DONE" ]; then
   echo "  sekmesinden 'Download All' ile iner; veya dosya adlariyla aratip tek tek."
   echo "  Iki dosya birlikte model/ klasorune kopyalanir (llm_model.json + llm_model_weights.npz)."
 fi
+

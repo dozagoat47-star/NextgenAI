@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # Saturn Cloud (Jupyter Server / Terminal) nextgen_llm egitimi baslaticisi.
 #
 # Kullanim:
@@ -39,15 +39,16 @@ DPARGS="--d-model ${LLM_CAP:-384} --num-blocks ${LLM_BLOCKS:-6}"
 case "$MODE" in
   train)
     echo "[3/4] RAG egitimi basliyor (epochs=$EPOCHS) -- llm_model.json uretecek"
-    python train_llm.py --rag --kb-map knowledge_map.jsonl --natural 3 --epochs "$EPOCHS" --batch-size 64 --val-every 2 $CGARG $DPARGS 2>&1 | tee saturn_train.log
+    python train_llm.py --rag --kb-map knowledge_map.jsonl --natural 3 --epochs "$EPOCHS" --batch-size 128 --val-every 2 $CGARG $DPARGS 2>&1 | tee saturn_train.log
     ;;
   *)
     echo "[3/4] dry-run dogrulama"
     python train_llm.py --dry-run --rag --kb-map knowledge_map.jsonl --natural 3 \
-      --batch-size 64 --limit-pairs 4000 $CGARG $DPARGS
+      --batch-size 128 --limit-pairs 4000 $CGARG $DPARGS
     ;;
 esac
 
 echo "[4/4] Bitti."
 echo "Egitim tamamlandiysa: model/llm_model.json -> bilgisayarina indir"
 echo "  (Saturn Cloud dosya paneli / notebook'tan indirme yapilabilir)."
+
