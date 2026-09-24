@@ -35,7 +35,7 @@ fi
 
 # Kapasite: varsayilan d=384 / 6 blok (~22.9M). Env ile asilabilir:
 #   LLM_CAP=256 LLM_BLOCKS=4 bash kaggle_start.sh train ...
-DPARGS="--d-model ${LLM_CAP:-384} --num-blocks ${LLM_BLOCKS:-6}"
+DPARGS="--d-model ${LLM_CAP:-384} --num-blocks ${LLM_BLOCKS:-6} --max-seq-len ${LLM_SEQ:-128}"
 
 DONE=''
 case "$MODE" in

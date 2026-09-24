@@ -34,7 +34,7 @@ if compgen -G 'chatgrow_*.jsonl' > /dev/null; then
   CGARG="--chatgrow $(ls chatgrow_*.jsonl | tr '\n' ' ')"
 fi
 
-DPARGS="--d-model ${LLM_CAP:-384} --num-blocks ${LLM_BLOCKS:-6}"
+DPARGS="--d-model ${LLM_CAP:-384} --num-blocks ${LLM_BLOCKS:-6} --max-seq-len ${LLM_SEQ:-128}"
 
 case "$MODE" in
   train)
@@ -51,4 +51,5 @@ esac
 echo "[4/4] Bitti."
 echo "Egitim tamamlandiysa: model/llm_model.json -> bilgisayarina indir"
 echo "  (Saturn Cloud dosya paneli / notebook'tan indirme yapilabilir)."
+
 
