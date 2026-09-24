@@ -48,7 +48,7 @@ case "$MODE" in
   bench)
     echo "[1/3] 1-epoch zamanlama (cache/encode + 1 epoch, birlikte olculur)"
     python train_llm.py --rag --kb-map knowledge_map.jsonl --natural 5 $CGARG \
-      --epochs 1 --batch-size 128 --val-every 1 $DPARGS 2>&1 | tee kaggle_bench.log
+      --epochs 1 --batch-size 128 --val-every 1 --fresh $DPARGS 2>&1 | tee kaggle_bench.log
     echo ""
     echo "[2/3] Son egitim satiri (epoch suresi '| NN.Ns' bolumundedir):"
     grep 'epoch ' kaggle_bench.log | tail -1
