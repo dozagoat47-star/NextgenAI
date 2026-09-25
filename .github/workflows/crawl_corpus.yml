@@ -1,0 +1,44 @@
+name: Crawl Corpus (mc4)
+
+on:
+  schedule:
+    - cron: '35 3 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: main-writers
+  cancel-in-progress: false
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install pyarrow
+
+      - name: Process crawl text into corpus
+        run: python build_crawl_corpus.py
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "dozagoat47-star"
+          git config user.email "dozagoat47-star@users.noreply.github.com"
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            git commit -m "crawl: mC4-TR metinleri corpus'a eklendi [skip ci]"
+            git pull --rebase origin main
+            git push -q
+            echo "Crawl chunks committed and pushed."
+          else
+            echo "No changes - corpus target already reached."
+          fi
