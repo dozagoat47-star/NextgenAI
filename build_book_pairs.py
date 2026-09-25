@@ -319,6 +319,10 @@ def main(argv=None):
     pairs = dedupe_pairs(all_pairs, seed=args.seed)
     rng.shuffle(pairs)
     pairs = pairs[:args.max_pairs]
+    if not pairs:
+        print('[kitap] hic cift uretilemedi; cikti dosyasi olusturulmadi '
+              '(0-byte dosya kaggle/egitim globunu kirletirdi)', flush=True)
+        return []
     with io.open(args.out, 'w', encoding='utf-8') as f:
         for ctx, resp in pairs:
             f.write(json.dumps({'query': ctx, 'answer': [resp]},
