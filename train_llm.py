@@ -32,11 +32,11 @@ Veri boyu: MAX_PAIRS=70000 ham cift N5 ile ~330k cift -> epoch basina sure eski
 (60k cift) 60/gore ~5.5x artar; erken durdurma (patience) devrede -> genelde
 cok daha azda durur, asiriya kacmaz. Sure endiseleniyorsan --epochs 80 --patience 12.
 
-ERKEN DURDURMA: val ACC uzerinden calisir (ACC_IMP=2e-3; en iyi acc'yi bu
-kadar asmayan her val epoch'u 'iyilesme yok' sayar). Val acc'nin plato bolgesi
-(orn. 0.908 <-> 0.921 dalgalanma) sayaci doldurur ve patience sonrasi eğitim
-DURUR; kayip bazli ckpt-secimi degismez. --patience degeri ile hiz duyarliligi
-(orn. --patience 12 -> sert, --patience 40 -> rahat).
+ERKEN DURDURMA: val LOSS uzerinden calisir (VAL_IMP=5e-4; en iyi val
+kaybini bu kadar altina cekemeyen her val epoch'u 'iyilesme yok' sayar).
+Val kaybi yukselmeye basladiginda sayac dolar ve patience sonrasi eğitim
+DURUR; en iyi val kaybindaki agirliklarla kapanir. --patience duyarliligi
+ayarlar (orn. --patience 6 -> sert, --patience 20 -> rahat).
 
 Kapasite flag'leri: --d-model --num-blocks --num-heads --ff-mult
   --max-ctx-len --max-seq-len --batch-size --lr-base. Varsayilani d=256'dir;
@@ -93,12 +93,12 @@ BATCH_SIZE = 64
 LR_BASE = 1e-3
 LR_MIN = 0.1
 WARMUP = 200
-PATIENCE = 20
-VAL_IMP = 5e-4   # ckpt-secimi iyilesme toleransi: val kaybi bu kadar altina
-# duserse 'iyilesti' sayilir (best_state / en iyi kayipta dondurulur).
-ACC_IMP = 2e-3   # ERKEN-DURDURMA toleransi: val acc eski rekoru bu kadar asmiyor
-# ise 'iyilestme yok' sayilir. Kabul: acc plato bolgesinde dalgalansa da
-# (orn. 0.908 <-> 0.921) sayac oku tikir ve patience dolar -> DURUR.
+PATIENCE = 6      # erken durdurma (val loss tabanli): val kaybi VAL_IMP
+#                  # kadar altina inemeyen art arda ~bu kadar val epoch'ta
+#                  # DURUR -> val yukselmeye basladiginda plato yakalanir.
+VAL_IMP = 5e-4   # ckpt-secimi + ERKEN-DURDURMA toleransi: val kaybi eski
+# rekorun bu kadar altina inemiyorsa 'iyilestme yok' sayilir (best_state /
+# en iyi kayipta dondurulur; patience uzerinde kalirsa egitim durur).
 GRAD_CLIP = 5.0
 CKPT_FREQ = 1   # her epoch kaydedilir -> Colab kesilse bile max ~1 epoch kayip, resume aninda
 MAX_PAIRS = 70000   # ham ciftlerin TAMAMI kullanilir (intents.json: ~68.654); eski 20k kirpiyordu
@@ -1010,24 +1010,25 @@ def main():
             print(f'epoch {ep:3d}/{EPOCHS} | train {tl:.4f} | (val atlandi) | '
                   f'{time.time()-t0:.1f}s | lr {cur:.5f}', flush=True)
 
-        # EARLY-STOP: patience sayaci YALNIZCA val epoch'larinda
-        # artar/sifirlanir. --val-every 2 ile atlanan epochlarda sayac
-        # DEGISMEZ (eskiden `if not do_val: bad = 0` sayaci sifirliyordu ->
-        # patience hic dolmuyor, egitim kesintisiz 250 epoch surebiliyordu).
+        # EARLY-STOP: val LOSS tabanli. Patience sayaci YALNIZCA val
+        # epoch'larinda artar/sifirlanir. En iyi val kaybini VAL_IMP kadar
+        # asmayan her val epochu 'iyilesme yok' sayar -> val yukselmeye
+        # basladiginda sayac dolar ve egitim rekor kayipta durur.
+        # --val-every 2 ile atlanan epochlarda sayac DEGISMEZ.
         if do_val:
-            if va_acc > best_acc + ACC_IMP:
-                # gercek dogruluk iyilesmesi -> sayac sifirlanir
+            if vl < best_val - VAL_IMP:
+                # gercek kayip iyilesmesi -> sayac sifirlanir, rekor guncellenir
                 bad = 0
+                best_val = vl
                 best_acc = va_acc
-                if vl < best_val - VAL_IMP:
-                    best_val = vl
-                    best_state = {k: v.detach().cpu().clone()
-                                  for k, v in base.state_dict().items()}
+                best_state = {k: v.detach().cpu().clone()
+                              for k, v in base.state_dict().items()}
             else:
                 bad += 1
                 if bad >= patience:
-                    print(f'[llm] Erken durdurma. Best val: {best_val:.4f} '
-                          f'| best acc: {best_acc:.3f}', flush=True)
+                    print(f'[llm] Erken durdurma: val loss yukselmeye basladi '
+                          f'(son {bad} val epoch iyilesme yok). En iyi val: '
+                          f'{best_val:.4f} | best acc: {best_acc:.3f}', flush=True)
                     done = True
         if ep % CKPT_FREQ == 0 or done:
             torch.save({'epoch': ep, 'step': step, 'model': best_state,
