@@ -307,6 +307,7 @@ class Corpus:
         boylece korpus icerigi degismedigi surece tokenizasyon + trigram +
         ters index derlemesi (dakikalarca suren kisim) atlanir.
         """
+        self._idx_cache_sig = None
         if not os.path.exists(self._idx_cache):
             return False
         sig = self._idx_digest()
@@ -327,12 +328,15 @@ class Corpus:
         self.loaded = True
         # _doc_tf, _doc_counts'un ayni listesidir (cache'te tek kopya).
         self._doc_tf = self._doc_counts
+        self._idx_cache_sig = sig
         return True
 
     def _save_index_cache(self):
         """Mevcut index yapisini onbellege yazar (sonraki yukleme hizli)."""
         sig = self._idx_digest()
         if sig is None:
+            return
+        if getattr(self, '_idx_cache_sig', None) == sig:
             return
         st = {
             'chunks': self.chunks,
@@ -357,6 +361,7 @@ class Corpus:
             with open(self._idx_cache, 'wb') as f:
                 pickle.dump({'v': IDX_CACHE_V, 'sig': sig, 'st': st},
                             f, protocol=pickle.HIGHEST_PROTOCOL)
+            self._idx_cache_sig = sig
         except (OSError, TypeError, pickle.PickleError):
             pass
 
@@ -467,6 +472,8 @@ class Corpus:
         self.loaded = True
         self._ensure_embeddings()
         self._save_index_cache()
+        _write_id_set(self.path,
+                      {c.get('id') for c in self.chunks if c.get('id')})
         print(f"[CORPUS] {len(self.chunks)} bilgi parcasi yuklendi ({len(self.idf)} kelime).")
         return self.chunks
 
