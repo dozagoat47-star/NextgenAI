@@ -20,6 +20,15 @@ jobs:
       - name: Install dependencies
         run: pip install numpy requests
 
+      - name: Cache corpus embeddings + index
+        uses: actions/cache@v4
+        with:
+          path: |
+            corpus_embedding.npz
+            corpus_embedding_meta.json
+            corpus_index.pkl
+          key: corpus-${{ hashFiles('corpus.jsonl') }}-${{ hashFiles('corpus.py') }}
+
       - name: Import smoke check
         run: |
           python -c "import brain, corpus, generator, seqgen"

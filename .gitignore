@@ -11,6 +11,7 @@ scraped_intents.json
 train_out.txt
 train_err.txt
 corpus_embedding*
+corpus_index*
 *.err
 prof.txt
 prof_dump

@@ -84,20 +84,36 @@ def _norm_cat(c):
 _API = 'https://tr.wikisource.org/w/api.php'
 
 
-def api(params):
-    import urllib.parse, urllib.request
+def api(params, _retries=6):
+    """Wikisource Action API cagrisi; 429/5xx'e karsi backoff'lu tekrar dener.
+
+    Kategori taramasi ardisik bircok istek attigi icin Wikisource'in istek
+    sinirine (429) takilmak siktir; kisa beklemeler yetersiz kalir. 429/5xx
+    durumunda katlanarak artan bekleme (5,10,20,40,80 sn) uygulanir; diger
+    ag/anomali hatalarinda 2x-artan bekleme. Tum denemeler tukenirse son
+    hatayla raise edilir.
+    """
+    import urllib.error, urllib.parse, urllib.request
     params = dict(params, format='json')
     url = _API + '?' + urllib.parse.urlencode(params)
     req = urllib.request.Request(url, headers={'User-Agent': 'moz-5.0'})
-    for attempt in range(4):
+    last = None
+    for attempt in range(_retries):
         try:
             with urllib.request.urlopen(req, timeout=60) as r:
                 return json.load(r)
-        except Exception:
-            if attempt == 3:
-                raise
+        except urllib.error.HTTPError as e:
+            last = e
+            if e.code == 429 or e.code >= 500:
+                print(f'  [api] HTTP {e.code} (deneme {attempt + 1}/{_retries}), '
+                      f'{5 * 2 ** attempt + 1} sn bekleniyor...', flush=True)
+                time.sleep(5 * (2 ** attempt) + 1)
+                continue
+            raise                  # 4xx vb. — tekrar denemek anlamsiz
+        except Exception as e:
+            last = e
             time.sleep(2 * (attempt + 1))
-    raise RuntimeError('tekrar denemeden sonra api erisilemedi')
+    raise last or RuntimeError('tekrar denemeden sonra api erisilemedi')
 
 
 def resolve_category(query):
@@ -255,14 +271,24 @@ def main(argv=None):
     by_header = []
     resolved = {}
     for c in cats:
-        real = resolve_category(c)
+        try:
+            real = resolve_category(c)
+        except Exception as e:
+            print(f'!! kategori cozulemedi: {c}: {e}', flush=True)
+            continue
         if real:
             resolved[c] = real
             per = max(1, min(args.per_cat, args.max_pairs // max(len(resolved), 1)))
-            pages = list_category_pages(real, limit=per)
+            try:
+                pages = list_category_pages(real, limit=per)
+            except Exception as e:
+                print(f'!! kategori sayfalari cekilemedi: {c}: {e}', flush=True)
+                continue
             by_header.append((real, pages))
         else:
             print(f'!! kategori {"bulunamadi"}: {c}', flush=True)
+    if not by_header:
+        print('!! hicbir kategori cekilemedi; kitap cifti uretilemedi.', flush=True)
 
     rng = random.Random(args.seed)
     all_pairs = []

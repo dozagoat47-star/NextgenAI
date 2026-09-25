@@ -15,6 +15,7 @@ kullanilir (gercek zamanli RAG). Internete gitmeden once buradan bakilir.
 import os
 import json
 import math
+import pickle
 import re
 import datetime
 import hashlib
@@ -27,6 +28,50 @@ CORPUS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'corpus.j
 CORPUS_MIN_SCORE = 0.25
 TITLE_BOOST = 2.0
 SNIPPET_MAX_LEN = 600
+IDX_CACHE_V = 2  # agirlikli index onbelleginin format surumu
+
+class CsrIndex:
+    """Term -> (doc ndarray, val ndarray) ters indeksi (kompakt CSR depo).
+
+    Bircok dokumanin her terimi icin ayri dikt/ndarray tutmak yerine sirali
+    terim listesi + terim baslangic ofsetleri + duz (doc, val) dizileri
+    kullanir: bellek ve (onbellegi acarkenki) pickle suresi acisindan cok
+    daha hafiftir. API'si eski 'sozluk' ile aynidir: get(w) -> (idx, vals)
+    veya None; 'in' ile varlik sorgulanabilir.
+    """
+    __slots__ = ('terms', 'start', 'doc', 'val')
+
+    def __init__(self, terms=(), start=None, doc=None, val=None):
+        self.terms = terms
+        self.start = start if start is not None else np.array([0], np.int64)
+        self.doc = doc if doc is not None else np.empty(0, np.int64)
+        self.val = val if val is not None else np.empty(0, np.float32)
+
+    def _pos(self, w):
+        terms = self.terms
+        lo, hi = 0, len(terms)
+        while lo < hi:
+            mid = (lo + hi) >> 1
+            if terms[mid] < w:
+                lo = mid + 1
+            else:
+                hi = mid
+        return lo
+
+    def get(self, w):
+        lo = self._pos(w)
+        if lo < len(self.terms) and self.terms[lo] == w:
+            s = int(self.start[lo])
+            e = int(self.start[lo + 1])
+            return self.doc[s:e], self.val[s:e]
+        return None
+
+    def __contains__(self, w):
+        lo = self._pos(w)
+        return lo < len(self.terms) and self.terms[lo] == w
+
+    def __len__(self):
+        return len(self.terms)
 
 # EMBEDDING VEKTOR DEPOSU (numpy-only LSA/SVD)
 # Onbellek yollari oz-ornek bazinda (self._emb_file/_emb_meta) tutulur;
@@ -157,9 +202,10 @@ class Corpus:
         stem = os.path.splitext(path)[0]
         self._emb_file = stem + '_embedding.npz'
         self._emb_meta = stem + '_embedding_meta.json'
+        self._idx_cache = stem + '_index.pkl'  # agirlikli index onbellegi
         # Embedding depolari (None = kullanilmiyor, eski IDF yoluna dusulur)
         self._doc_counts = []
-        self._lex_cols = {}      # term -> (numpy doc_idx[], numpy val[]) inverted index
+        self._lex_cols = CsrIndex()      # term -> (doc_idx[], val[]) CSR ters indeks
         self._slug_idx = {}      # slug -> dokuman indeksi (hizli baslik eslesme)
         self._slug_tri_idx = {}  # trigram -> dokuman indeks kumesi
         self.emb = None          # {'docvecs': (d x k) float32, 'V': (k x v), ...}
@@ -169,7 +215,7 @@ class Corpus:
         self._doc_tf = []        # her dokumanin term->ham frekans sozlugu
         self._doc_len = []       # her dokumanin frekans toplami (baslik 2x)
         self._doc_len_arr = None # numpy float32 (dokuman basina uzunluk)
-        self._lex_tf = {}        # term -> (doc_idx[], tf[]) inverted index
+        self._lex_tf = CsrIndex()        # term -> (doc_idx[], tf[]) CSR ters indeks
         self._bm25_idf = {}      # term -> BM25 idf
         self._avgdl = 1.0
         # PPMI+SVD kelime vektor deposu
@@ -207,8 +253,125 @@ class Corpus:
             return frozenset()
         return frozenset(s[i:i + 3] for i in range(len(s) - 2))
 
+    @staticmethod
+    def _build_csr(counts_list):
+        """Dokuman basina {term: agirlik} listesini CsrIndex'e cevirir.
+
+        Terimler alfabetik siralanir; her terimin dokuman ve agirlik degeri
+        duz dizilerde ard arda tutulur (per-term ndarray objesi yok).
+        """
+        pairs = []
+        for i, cnts in enumerate(counts_list):
+            if cnts:
+                for w, v in cnts.items():
+                    pairs.append((w, i, v))
+        if not pairs:
+            return CsrIndex()
+        pairs.sort(key=lambda t: t[0])
+        terms = []
+        starts = []
+        docs = np.empty(len(pairs), np.int64)
+        vals = np.empty(len(pairs), np.float32)
+        k = 0
+        last = None
+        for w, i, v in pairs:
+            if w != last:
+                terms.append(w)
+                starts.append(k)
+                last = w
+            docs[k] = i
+            vals[k] = v
+            k += 1
+        starts.append(len(pairs))
+        return CsrIndex(terms, np.array(starts, np.int64), docs, vals)
+
+    def _idx_digest(self):
+        """Korpus dosyasinin hizli icerik imzasi (mtime + boyut + blake2b-8)."""
+        if not os.path.exists(self.path):
+            return None
+        st = os.stat(self.path)
+        h = hashlib.blake2b(digest_size=8)
+        with open(self.path, 'rb') as f:
+            while True:
+                buf = f.read(1 << 20)
+                if not buf:
+                    break
+                h.update(buf)
+        return {'mtime': st.st_mtime_ns, 'size': st.st_size,
+                'b2': h.hexdigest()}
+
+    def _load_index_cache(self):
+        """Onbellegi yukler; dosya yok/guncel degilse False (tam yuklemeye dusulur).
+
+        State, load() ile uretilebilecek tum agirlikli index yapisini tasir;
+        boylece korpus icerigi degismedigi surece tokenizasyon + trigram +
+        ters index derlemesi (dakikalarca suren kisim) atlanir.
+        """
+        if not os.path.exists(self._idx_cache):
+            return False
+        sig = self._idx_digest()
+        if sig is None:
+            return False
+        try:
+            with open(self._idx_cache, 'rb') as f:
+                state = pickle.load(f)
+        except Exception:
+            return False
+        if state.get('v') != IDX_CACHE_V or state.get('sig') != sig:
+            return False
+        st = state.get('st')
+        if not isinstance(st, dict):
+            return False
+        for k, v in st.items():
+            setattr(self, k, v)
+        self.loaded = True
+        # _doc_tf, _doc_counts'un ayni listesidir (cache'te tek kopya).
+        self._doc_tf = self._doc_counts
+        return True
+
+    def _save_index_cache(self):
+        """Mevcut index yapisini onbellege yazar (sonraki yukleme hizli)."""
+        sig = self._idx_digest()
+        if sig is None:
+            return
+        st = {
+            'chunks': self.chunks,
+            'idf': self.idf,
+            '_df': self._df,
+            'vectors': self.vectors,
+            '_doc_counts': self._doc_counts,
+            '_lex_cols': self._lex_cols,
+            '_lex_tf': self._lex_tf,
+            '_doc_len': self._doc_len,
+            '_doc_len_arr': self._doc_len_arr,
+            '_bm25_idf': self._bm25_idf,
+            '_avgdl': self._avgdl,
+            '_slugs': self._slugs,
+            '_slug_idx': self._slug_idx,
+            '_slug_tri_idx': self._slug_tri_idx,
+            '_doc_tri': self._doc_tri,
+            '_pat_idx': self._pat_idx,
+            '_pat_sets': self._pat_sets,
+        }
+        try:
+            with open(self._idx_cache, 'wb') as f:
+                pickle.dump({'v': IDX_CACHE_V, 'sig': sig, 'st': st},
+                            f, protocol=pickle.HIGHEST_PROTOCOL)
+        except (OSError, TypeError, pickle.PickleError):
+            pass
+
     def load(self):
-        """corpus.jsonl dosyasini yukler ve vektörleri insa eder."""
+        """corpus.jsonl dosyasini yukler ve vektörleri insa eder.
+
+        Agirlikli index (df/idf/BM25/lex/vektor/trigram/kalip) ilk kurulumda
+        '_index.pkl' onbellegine yazilir; corpus icerigi degismezse sonraki
+        yuklemelerde yeniden derlenmez (dakikalar -> saniyeler).
+        """
+        if self._load_index_cache():
+            self._ensure_embeddings()
+            print(f"[CORPUS] {len(self.chunks)} bilgi parcasi (onbelleg) yuklendi "
+                  f"({len(self.idf)} kelime).")
+            return self.chunks
         self.chunks = []
         if os.path.exists(self.path):
             with open(self.path, 'r', encoding='utf-8') as f:
@@ -238,11 +401,12 @@ class Corpus:
         self._bm25_idf = {w: math.log(1.0 + (n - cnt + 0.5) / (cnt + 0.5))
                           for w, cnt in df.items()}
 
-        # BM25 frekans sayaclari (baslik kelimeleri 2x agirlikli)
+        # BM25 frekans sayaclari (baslik kelimeleri 2x agirlikli).
+        # _doc_tf ve _doc_counts ayni sozluktur (TITLE_BM25_WEIGHT ==
+        # TITLE_BOOST == 2.0); iki kopya bellek tutmasin diye tek liste
+        # kullanilir.
         self._doc_tf = []
         self._doc_len = []
-        self._lex_tf = {}
-        tf_pairs = {}
         for i in range(n):
             counts = {}
             for w in title_tokens[i]:
@@ -252,21 +416,14 @@ class Corpus:
             doc_i = sum(counts.values()) or 1.0
             self._doc_tf.append(counts)
             self._doc_len.append(doc_i)
-            for w, cnt in counts.items():
-                tf_pairs.setdefault(w, []).append((i, cnt))
-        for w, pairs in tf_pairs.items():
-            idx = np.array([p[0] for p in pairs], np.int64)
-            tf = np.array([p[1] for p in pairs], np.float32)
-            self._lex_tf[w] = (idx, tf)
+        self._doc_counts = self._doc_tf
         self._doc_len_arr = np.array(self._doc_len, np.float32)
         self._avgdl = max(1.0, float(np.mean(self._doc_len_arr))) if n else 1.0
 
-        self._doc_counts = []
         self._slugs = []
         self._slug_idx = {}     # slug -> dokuman indeksi (tam eslesme bonusu)
         self._slug_tri_idx = {} # trigram -> dokuman indeks kumesi (kismi eslesme)
         self.vectors = []
-        col_pairs = {}
         for i, c in enumerate(self.chunks):
             slug = self._slug(c.get('title', ''))
             self._slugs.append(slug)
@@ -274,26 +431,18 @@ class Corpus:
                 self._slug_idx.setdefault(slug, i)
                 for tr in self._trigrams(slug):
                     self._slug_tri_idx.setdefault(tr, set()).add(i)
-            counts = {}
-            for w in title_tokens[i]:
-                counts[w] = counts.get(w, 0) + TITLE_BOOST
-            for w in text_tokens[i]:
-                counts[w] = counts.get(w, 0) + 1.0
-            self._doc_counts.append(counts)
+            counts = self._doc_tf[i]
 
             vec = {w: (0.5 + cnt) * self.idf.get(w, 0.0) for w, cnt in counts.items()}
             norm = math.sqrt(sum(v * v for v in vec.values()))
             if norm > 0:
                 vec = {w: v / norm for w, v in vec.items()}
-                for w, val in vec.items():
-                    col_pairs.setdefault(w, []).append((i, val))
             self.vectors.append(vec if norm > 0 else {})
 
-        # Inverted index: term sensorünü vektorize lexic tarama icin ac
-        for w, pairs in col_pairs.items():
-            idx = np.array([p[0] for p in pairs], np.int64)
-            vals = np.array([p[1] for p in pairs], np.float32)
-            self._lex_cols[w] = (idx, vals)
+        # Inverted indexler (karma -> duz CSR): lexic/BM25 taramalarinda
+        # term bazli O(kelime) arama icin.
+        self._lex_tf = Corpus._build_csr(self._doc_tf)
+        self._lex_cols = Corpus._build_csr(self.vectors)
 
         # Char-trigram kumeleri (normalize metin uzerinden, bosluksuz)
         self._doc_tri = []
@@ -317,6 +466,7 @@ class Corpus:
 
         self.loaded = True
         self._ensure_embeddings()
+        self._save_index_cache()
         print(f"[CORPUS] {len(self.chunks)} bilgi parcasi yuklendi ({len(self.idf)} kelime).")
         return self.chunks
 
@@ -1117,30 +1267,13 @@ class Corpus:
                 counts[w] = counts.get(w, 0) + 1.0
             doc_i = sum(counts.values()) or 1.0
 
-            self._doc_tf.append(counts)
+            self._doc_tf.append(counts)   # _doc_counts ile ayni liste (alias)
             self._doc_len.append(doc_i)
-            for w, cnt in counts.items():
-                row = self._lex_tf.get(w)
-                if row is None:
-                    self._lex_tf[w] = (np.array([i], np.int64),
-                                       np.array([cnt], np.float32))
-                else:
-                    self._lex_tf[w] = (np.concatenate([row[0], np.array([i], np.int64)]),
-                                       np.concatenate([row[1], np.array([cnt], np.float32)]))
 
-            self._doc_counts.append(dict(counts))
             vec = {w: (0.5 + cnt) * self.idf.get(w, 0.0) for w, cnt in counts.items()}
             norm = math.sqrt(sum(v * v for v in vec.values()))
             if norm > 0:
                 vec = {w: v / norm for w, v in vec.items()}
-                for w, val in vec.items():
-                    row = self._lex_cols.get(w)
-                    if row is None:
-                        self._lex_cols[w] = (np.array([i], np.int64),
-                                             np.array([val], np.float32))
-                    else:
-                        self._lex_cols[w] = (np.concatenate([row[0], np.array([i], np.int64)]),
-                                             np.concatenate([row[1], np.array([val], np.float32)]))
             self.vectors.append(vec if norm > 0 else {})
 
             slug = self._slug(c.get('title', ''))
@@ -1163,7 +1296,11 @@ class Corpus:
         self.chunks = full_chunks
         self._doc_len_arr = np.array(self._doc_len, np.float32)
         self._avgdl = max(1.0, float(np.mean(self._doc_len_arr))) if n else 1.0
+        self._doc_counts = self._doc_tf
+        self._lex_tf = Corpus._build_csr(self._doc_tf)
+        self._lex_cols = Corpus._build_csr(self.vectors)
 
         # 3) Embedding deposu: degisen/yeni satirlari fold-in ile guncelle
         self._ensure_embeddings()
+        self._save_index_cache()
         return self.loaded

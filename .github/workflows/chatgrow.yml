@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: chatgrow-feed
+  group: main-writers
   cancel-in-progress: false
 
 jobs:

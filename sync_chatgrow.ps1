@@ -33,31 +33,86 @@ Write-Host "== calisti: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') =="
 
 # --- 1) Hugging Face tr-turkish continuation ciftleri -----------------------
 $hf_out = Join-Path $root "chatgrow_hf_$(Get-Date -Format 'yyyyMMdd_HHmm').jsonl"
+$hf_ok = $false
 Write-Host "[1/4] HF cekiliyor: $hf_out"
-& $Python -X utf8 -u fetch_hf_turkish.py --out $hf_out --max-pairs 1200 --seed $Seed
-if ($LASTEXITCODE -ne 0) { throw "fetch_hf_turkish.py hata: $LASTEXITCODE" }
+try {
+    & $Python -X utf8 -u fetch_hf_turkish.py --out $hf_out --max-pairs 1200 --seed $Seed
+    if ($LASTEXITCODE -ne 0) {
+        throw "fetch_hf_turkish.py rc=$LASTEXITCODE"
+    }
+    $hf_ok = $true
+    Write-Host "  OK: $hf_out"
+} catch {
+    Write-Host "  !! HF basarisiz: $($_.Exception.Message)" -ForegroundColor Red
+}
 
 # --- 2) Wikisource tr kitap/masal continuation ciftleri ----------------------
 $book_out = Join-Path $root "chatgrow_kitap_$(Get-Date -Format 'yyyyMMdd_HHmm').jsonl"
+$book_ok = $false
 Write-Host "[2/4] kitap cekiliyor: $book_out"
-& $Python -X utf8 -u build_book_pairs.py --out $book_out --max-pairs 1200 `
-    --per-cat 1600 --ctx-len 300 --resp-len 300 --seed $Seed
-if ($LASTEXITCODE -ne 0) { throw "build_book_pairs.py hata: $LASTEXITCODE" }
+try {
+    & $Python -X utf8 -u build_book_pairs.py --out $book_out --max-pairs 1200 `
+        --per-cat 1600 --ctx-len 300 --resp-len 300 --seed $Seed
+    if ($LASTEXITCODE -ne 0) {
+        throw "build_book_pairs.py rc=$LASTEXITCODE"
+    }
+    $book_ok = $true
+    Write-Host "  OK: $book_out"
+} catch {
+    Write-Host "  !! kitap basarisiz: $($_.Exception.Message)" -ForegroundColor Red
+}
 
-# --- 3) doğrulama: her iki JSONL en az 1 cift içermeli ----------------------
-$rows_hf  = (Get-Content $hf_out   | Measure-Object -Line).Lines
-$rows_book = (Get-Content $book_out | Measure-Object -Line).Lines
-Write-Host "[3/4] satirlar: HF=$rows_hf kitap=$rows_book"
-if ($rows_hf -lt 1 -or $rows_book -lt 1) { throw "JSONL'ler bos: $hf_out / $book_out" }
+# --- 3) doğrulama: her başarılı JSONL en az 1 çift içermeli ------------------
+$new_rows = [ordered]@{}
+if ($hf_ok -and (Test-Path -LiteralPath $hf_out)) {
+    $rows = (Get-Content $hf_out | Measure-Object -Line).Lines
+    if ($rows -lt 1) { throw "HF JSONL bos: $hf_out" }
+    $new_rows[$hf_out] = $rows
+}
+if ($book_ok -and (Test-Path -LiteralPath $book_out)) {
+    $rows = (Get-Content $book_out | Measure-Object -Line).Lines
+    if ($rows -lt 1) { throw "kitap JSONL bos: $book_out" }
+    $new_rows[$book_out] = $rows
+}
+foreach ($f in $new_rows.Keys) {
+    Write-Host "[3/4] satir: $f = $($new_rows[$f])"
+}
+if ($new_rows.Count -eq 0) {
+    Write-Host "  !! hic yeni JSONL uretilemedi; commit atlaniyor" -ForegroundColor Red
+    throw "chatgrow sync: HF ve kitap uretimi basarisiz"
+}
 
 # --- 4) git add+commit+push --------------------------------------------------
 if (Get-Command git -ErrorAction SilentlyContinue) {
     & git add chatgrow_*.jsonl
-    & git commit -m "chatgrow: HF+kitap continuation verileri tazele (HH:MM $Seed)" 2>&1 |
-        Out-Null
-    & git push origin HEAD 2>&1 | Out-Null
-    Write-Host "[4/4] commit+push tamam"
+    # Yalnizca gercekten degisen/eklenen dosya varsa commit (bos commit onlenir).
+    if (& git diff --cached --quiet) {
+        Write-Host "[4/4] degisiklik yok; push atlaniyor"
+    } else {
+        & git commit -m "chatgrow: HF+kitap continuation verileri tazele (HH:MM $Seed)" 2>&1 |
+            Out-Null
+        & git push origin HEAD 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            # Remote main ilerlemis olabilir: rebase alip yeniden dene.
+            Write-Host "  push redirecti (rc=$LASTEXITCODE); fetch + rebase + yeniden push..." -ForegroundColor Yellow
+            & git fetch origin 2>&1 | Out-Null
+            & git rebase origin/main 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                & git rebase --abort 2>&1 | Out-Null
+                Write-Host "  !! rebase cakisti; push atlandi (sonraki kosu halleder)" -ForegroundColor Red
+            } else {
+                & git push origin HEAD 2>&1 | Out-Null
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Host "[4/4] !! push basarisiz (rc=$LASTEXITCODE); commit yerelde" -ForegroundColor Red
+                } else {
+                    Write-Host "[4/4] commit+push tamam"
+                }
+            }
+        } else {
+            Write-Host "[4/4] commit+push tamam"
+        }
+    }
 } else {
-    Write-Host "[4/4] git yok; JSONL hazir (push atlanıyor): $hf_out, $book_out"
+    Write-Host "[4/4] git yok; JSONL hazir (push atlaniyor)"
 }
 Write-Host "SYNC TAMAM"

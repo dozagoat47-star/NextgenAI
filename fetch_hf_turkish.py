@@ -297,10 +297,12 @@ def main(argv=None):
         print(f'[{s}] {len(kept)} cift (budama+kopya sonrasi)', flush=True)
         pairs.extend(kept)
 
-    # uluslararası tekrar-dedupe + karıştır
+    # uluslararası tekrar-dedupe + karıştır + max-pairs kırp
     out = dedupe_pairs(pairs, seed=args.seed)
     rng = random.Random(args.seed)
     rng.shuffle(out)
+    if args.max_pairs:
+        out = out[:args.max_pairs]
     with io.open(args.out, 'w', encoding='utf-8') as f:
         for ctx, resp in out:
             f.write(json.dumps({'query': ctx, 'answer': [resp]},

@@ -354,6 +354,56 @@ class LLM:
             d['vocab'] = self.vocab
         return d
 
+    def _validate_params(self):
+        """params'i JSON header ile karsilastirir; uyumsuzlukta net hata.
+
+        Yanlis weights dosyasi eslendiginde (or. d=384 agirliklar d=256
+        header'a), uzun sure sessizce yanlis uretim yerine ilk yuklemede
+        rapor verir. pos_enc params'ta opsiyoneldir (bazi kayitlar tasimaz).
+        """
+        p = self.params
+        d, ff, N, V = self.d_model, self.ff_dim, self.num_blocks, self.V
+        missing, wrong = [], []
+
+        def _chk(name, expected):
+            if name not in p:
+                missing.append(name)
+            elif tuple(np.asarray(p[name]).shape) != expected:
+                wrong.append((name, tuple(np.asarray(p[name]).shape), expected))
+
+        _chk('embed', (V, d))
+        for i in range(N):
+            for n in ('Wq', 'Wk', 'Wv', 'Wo'):
+                _chk(f'b{i}_{n}', (d, d))
+                _chk(f'b{i}_b{n[1:]}', (1, d))
+            _chk(f'b{i}_ln1_g', (1, d))
+            _chk(f'b{i}_ln1_b', (1, d))
+            _chk(f'b{i}_W1', (d, ff))
+            _chk(f'b{i}_b1', (1, ff))
+            _chk(f'b{i}_W2', (ff, d))
+            _chk(f'b{i}_b2', (1, d))
+            _chk(f'b{i}_ln2_g', (1, d))
+            _chk(f'b{i}_ln2_b', (1, d))
+        _chk('out_ln_g', (1, d))
+        _chk('out_ln_b', (1, d))
+        _chk('head', (d, V))
+        _chk('head_b', (1, V))
+        if 'pos_enc' in p:
+            _chk('pos_enc', (self.max_seq_len, d))
+
+        if not missing and not wrong:
+            return self
+        lines = []
+        if missing:
+            lines.append('Eksik agirliklar: ' + ', '.join(sorted(missing)))
+        for name, got, exp in wrong:
+            lines.append(f'{name}: sekil {got} ama beklenen {exp}')
+        raise ValueError(
+            '[llm] JSON header ile agirliklar uyumsuz '
+            f'(d={d} ff={ff} blok={N} V={V} max_seq={self.max_seq_len}). '
+            'Yanlis *_weights.npz dosyasi eslenmis olabilir.\n'
+            + '\n'.join(lines))
+
     def from_dict(self, data, weights_path=None):
         tok = data.get('tokenizer')
         if tok:
@@ -374,21 +424,34 @@ class LLM:
         self.d_model = int(data['d_model'])
         self.num_blocks = int(data['num_blocks'])
         self.num_heads = int(data['num_heads'])
+        assert self.d_model % self.num_heads == 0, (
+            f"[llm] d_model={self.d_model} num_heads={self.num_heads} ile "
+            f"bolunmez (head_dim tanimsiz)")
         self.head_dim = self.d_model // self.num_heads
         self.ff_dim = int(data['ff_mult']) * self.d_model
         self.max_ctx_len = int(data.get('max_ctx_len', 40))
         self.max_seq_len = int(data.get('max_seq_len', 160))
         self.rsqrt = np.float32(1.0 / math.sqrt(self.head_dim))
         # Yeni format: ağırlıklar ayrı bir NPZ dosyasında (compact header).
-        # weights_path verilmişse NPZ'den, verilmemişse eski inline 'params' gövdesinden
-        # (geriye dönük uyumluluk) yüklenir.
+        # weights_path verilmişse NPZ'den, verilmemişse eski inline 'params'
+        # gövdesinden (geriye dönük uyumluluk) yüklenir.
         if weights_path and os.path.exists(weights_path):
             with np.load(weights_path) as _npz:
                 self.params = {k: _f32(np.asarray(_npz[k], dtype=np.float32))
                                for k in _npz.files}
-        else:
+        elif data.get('params'):
             self.params = {k: _f32(v) for k, v in data['params'].items()}
+        elif weights_path:
+            raise FileNotFoundError(
+                f"[llm] weights dosyasi bulunamadi: {weights_path} "
+                f"(JSON weights_file={data.get('weights_file')!r}, "
+                f"inline 'params' da yok)")
+        else:
+            raise ValueError(
+                "[llm] weights_path verilmedi ve JSON'da inline 'params' yok; "
+                "model yuklenemez.")
         self.pos_enc = self._sinusoidal(self.max_seq_len)
+        self._validate_params()
         return self
 
 
@@ -465,9 +528,7 @@ def load_llm(path=MODEL_PATH):
     weights_path = None
     wf = data.get('weights_file')
     if wf:
-        cand = os.path.join(os.path.dirname(os.path.abspath(path)), wf)
-        if os.path.exists(cand):
-            weights_path = cand
+        weights_path = os.path.join(os.path.dirname(os.path.abspath(path)), wf)
     return LLM(['<PAD>', '<BOS>', '<SEP>', '<EOS>']).from_dict(
         data, weights_path=weights_path)
 
