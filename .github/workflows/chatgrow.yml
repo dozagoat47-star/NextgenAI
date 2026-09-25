@@ -33,12 +33,6 @@ jobs:
             --forum https://forum.pardus.org.tr \
             --limit 60 --out chatgrow_discourse_pardus.jsonl
 
-      - name: Birleşik sohbet dosyasını güncelle
-        run: |
-          python chatgrow_birlesik.py chatgrow_discourse_pardus.jsonl \
-            --fallback chatgrow_sohbet.jsonl \
-            --out chatgrow_birlesik.jsonl
-
       - name: Commit and push if changed
         run: |
           git config user.name "dozagoat47-star"

@@ -26,6 +26,22 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $root
 
+# Yeni uretim, mevcut bir dosyayla ayni icerikteyse repo'ya 0-degerli kopya
+# sokmamak icin atilir (HF/kitap kaynaklari deterministik -> her koşu ayni).
+$script:dedup_count = 0
+function Test-OzdesIcerik {
+    param([string]$Path, [string]$Desen)
+    if (-not (Test-Path -LiteralPath $Path)) { return $false }
+    $yen = (Get-FileHash -LiteralPath $Path -Algorithm MD5).Hash
+    foreach ($eski in (Get-ChildItem -LiteralPath $root -Filter $Desen -File -ErrorAction SilentlyContinue)) {
+        if ($eski.FullName -eq $Path) { continue }
+        if ((Get-FileHash -LiteralPath $eski.FullName -Algorithm MD5).Hash -eq $yen) {
+            return $true
+        }
+    }
+    return $false
+}
+
 # Task Scheduler SYSTEM kullaniciyla calisir -> ciktiyi log dosyasina yaz
 $log = Join-Path $root 'chatgrow_sync.log'
 Start-Transcript -Path $log -Append -Force | Out-Null
@@ -42,6 +58,12 @@ try {
     }
     $hf_ok = $true
     Write-Host "  OK: $hf_out"
+    if (Test-OzdesIcerik -Path $hf_out -Desen 'chatgrow_hf_*.jsonl') {
+        Remove-Item -LiteralPath $hf_out -Force
+        $hf_ok = $false
+        $script:dedup_count++
+        Write-Host "  .. icerik mevcut bir HF dosyasiyla ayni; yeni dosya atildi" -ForegroundColor Yellow
+    }
 } catch {
     Write-Host "  !! HF basarisiz: $($_.Exception.Message)" -ForegroundColor Red
 }
@@ -58,6 +80,12 @@ try {
     }
     $book_ok = $true
     Write-Host "  OK: $book_out"
+    if (Test-OzdesIcerik -Path $book_out -Desen 'chatgrow_kitap_*.jsonl') {
+        Remove-Item -LiteralPath $book_out -Force
+        $book_ok = $false
+        $script:dedup_count++
+        Write-Host "  .. icerik mevcut bir kitap dosyasiyla ayni; yeni dosya atildi" -ForegroundColor Yellow
+    }
 } catch {
     Write-Host "  !! kitap basarisiz: $($_.Exception.Message)" -ForegroundColor Red
 }
@@ -78,8 +106,12 @@ foreach ($f in $new_rows.Keys) {
     Write-Host "[3/4] satir: $f = $($new_rows[$f])"
 }
 if ($new_rows.Count -eq 0) {
-    Write-Host "  !! hic yeni JSONL uretilemedi; commit atlaniyor" -ForegroundColor Red
-    throw "chatgrow sync: HF ve kitap uretimi basarisiz"
+    if ($script:dedup_count -gt 0) {
+        Write-Host "  !! uretilen ciktilarin tamami mevcut icerikle ayni; commit atlaniyor (guncel)" -ForegroundColor Yellow
+    } else {
+        Write-Host "  !! hic yeni JSONL uretilemedi; commit atlaniyor" -ForegroundColor Red
+        throw "chatgrow sync: HF ve kitap uretimi basarisiz"
+    }
 }
 
 # --- 4) git add+commit+push --------------------------------------------------
