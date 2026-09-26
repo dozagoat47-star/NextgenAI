@@ -17,7 +17,8 @@ sys.path.insert(0, BASE)
 
 from llm import PAD, LLM, encode_llm
 from train_llm import (TorchLLM, _pack_encoded, early_stop_step,
-                       effective_stop_epoch, make_batches)
+                       effective_stop_epoch, make_batches,
+                       min_stoppable_epoch)
 
 _VOCAB = ['<PAD>', '<BOS>', '<SEP>', '<EOS>',
           'm', 'e', 'r', 'h', 'a', 'b', ' ', 'n', 's', 'i', 'l', 'y',
@@ -520,21 +521,34 @@ class TestEarlyStopping(unittest.TestCase):
         self.assertEqual(last, 6)
 
     # --- CONFIG uyarisinin esikleri ---------------------------------------
-    # main() bu esiklere bakip KRITIK / UYARI basar veya hicbir sey basmaz.
-    # [needed > epochs -> KRITIK, needed == epochs -> UYARI, aksi halde sessiz]
+    # main() min_stoppable_epoch(patience, val_every) esigine bakar:
+    #   [esik > epochs -> KRITIK, esik == epochs -> UYARI, aksi halde sessiz]
     def test_budget_warning_thresholds(self):
-        # epochs=4,5 -> durdurma en gec 6. epochta -> HIC TETIKLENEMEZ
+        # epochs=4,5 -> en kencar durus 6 -> HIC TETIKLENEMEZ
         for ep in (4, 5):
-            last, needed = effective_stop_epoch(6, 2, ep)
-            self.assertGreater(needed, ep, 'epochs=%d KRITIK bekleniyordu' % ep)
+            self.assertGreater(min_stoppable_epoch(6, 2), ep,
+                               'epochs=%d KRITIK bekleniyordu' % ep)
         # epochs=6 -> tam son epochta, hicbir epoch tasarruf etmez -> UYARI
-        last, needed = effective_stop_epoch(6, 2, 6)
-        self.assertEqual(needed, 6)
-        self.assertEqual(last, 6)
+        self.assertEqual(min_stoppable_epoch(6, 2), 6)
         # epochs>=7 -> sessiz (en az 1 epoch yedek kalir)
         for ep in (7, 10, 70):
-            last, needed = effective_stop_epoch(6, 2, ep)
-            self.assertLess(needed, ep, 'epochs=%d sessiz olmaliydi' % ep)
+            self.assertLess(min_stoppable_epoch(6, 2), ep,
+                            'epochs=%d sessiz olmaliydi' % ep)
+
+    def test_config_tolerance_is_grid_rounded_not_patience(self):
+        """CONFIG satiri toleransi patience DEGIL, gercek izarada biriken
+        epoch sayisini yazmali. val_every patience'i bolmedigi icin farkli
+        olur: val_every=4, patience=6 -> 2 olcum x 4 = 8 epoch (6 degil)."""
+        for p, ve, beklenen_olcum, beklenen_ep in [
+                (6, 2, 3, 6), (6, 3, 2, 6), (6, 4, 2, 8), (6, 5, 2, 10),
+                (6, 6, 1, 6), (5, 2, 3, 6), (5, 4, 2, 8), (7, 2, 4, 8),
+                (3, 2, 2, 4), (1, 2, 1, 2)]:
+            n_meas = max(1, -(-p // ve))
+            self.assertEqual(n_meas, beklenen_olcum, 'p=%d ve=%d' % (p, ve))
+            self.assertEqual(n_meas * ve, beklenen_ep, 'p=%d ve=%d' % (p, ve))
+            # effective_stop_epoch ile de ayni (val_every>=2'de)
+            self.assertEqual(effective_stop_epoch(p, ve, 999)[1], beklenen_ep,
+                             'p=%d ve=%d' % (p, ve))
 
     def test_budget_warning_scales_with_val_every(self):
         # val_every buyudukce son durdurma epoch'u da buyer
@@ -543,6 +557,97 @@ class TestEarlyStopping(unittest.TestCase):
         self.assertEqual(effective_stop_epoch(6, 3, 100)[1], 6)
         self.assertEqual(effective_stop_epoch(6, 4, 100)[1], 8)
         self.assertEqual(effective_stop_epoch(6, 6, 100)[1], 6)
+
+    @staticmethod
+    def _brute_min_stoppable(patience, val_every, ust=40):
+        """Sablonu oynatip tetiklenebilirligin en kencar epoch'unu bulur.
+
+        Senaryo: ilk olcum kayit acar, sonraki HEP kotudur. Yani durus
+        ancak ve sadece butce yeterliyse olusur.
+        """
+        for n in range(1, ust + 1):
+            best, bad = 1e9, 0
+            for ep in range(1, n + 1):
+                if not (ep % val_every == 0 or ep == 1):
+                    continue
+                vl = 1.0 if ep == 1 else 2.0
+                bad, imp, stop = early_stop_step(vl, best, bad,
+                                                val_every, patience, 5e-4)
+                if imp:
+                    best = vl
+                if stop:
+                    return ep
+        return None
+
+    def test_min_stoppable_matches_brute_force(self):
+        """min_stoppable_epoch() gercek oynatmadan TURETILMIS sayiyi verir."""
+        for ve in (1, 2, 3, 4, 5, 6, 7, 8, 12):
+            for p in (1, 2, 3, 6, 7, 12):
+                beklenen = self._brute_min_stoppable(p, ve)
+                gercek = min_stoppable_epoch(p, ve)
+                self.assertEqual(
+                    gercek, beklenen,
+                    'patience=%d val_every=%d: formul %d, oynatma %d'
+                    % (p, ve, gercek, beklenen))
+
+    def test_min_stoppable_differs_from_tolerans_at_val_every_1(self):
+        """val_every=1'de iki kavram AYRILIR. Regresyon gerekcesi: eskiden
+        esik toleranstan turetiliyordu ve epochs=6/patience=6/val_every=1
+        kombinasyonu 'SON epochta tetiklenir' diye UYARI aliyordu, oysa en
+        kencar durus 7. epoch -> asla tetiklenemez. min_stoppable_epoch
+        ayirir.
+        """
+        for p in range(1, 13):
+            _, toler = effective_stop_epoch(p, 1, 100)
+            self.assertEqual(min_stoppable_epoch(p, 1), 1 + p)
+            self.assertEqual(min_stoppable_epoch(p, 1), toler + 1)
+        # val_every >= 2'de ikisi ayni
+        for ve in (2, 3, 4, 5, 6, 8, 12):
+            for p in range(1, 13):
+                _, toler = effective_stop_epoch(p, ve, 100)
+                self.assertEqual(min_stoppable_epoch(p, ve), toler,
+                                 'p=%d ve=%d' % (p, ve))
+
+    def test_min_stoppable_handles_zero_patience(self):
+        """patience<=0: ilk KOTU olcumde durulur. effective_stop_epoch 0
+        dondurur; mutlak epoch olarak 0 yanlis olurdu (1. epoch her zaman
+        kayit acar, duramaz)."""
+        self.assertEqual(effective_stop_epoch(0, 2, 100)[1], 0)
+        self.assertEqual(min_stoppable_epoch(0, 2), 2)   # ilk kotu olcum 2
+        self.assertEqual(min_stoppable_epoch(0, 3), 3)   # ilk kotu olcum 3
+        self.assertEqual(min_stoppable_epoch(0, 1), 2)   # ilk kotu olcum 2
+        self.assertEqual(min_stoppable_epoch(-1, 2), 2)  # negatif = 0 gibi
+
+    def test_budget_gate_agrees_with_tetiklenebilirlik(self):
+        """Esik, tetiklenebilirligin gercek siniriyla tam uyumlu olmali:
+        altinda KRITIK, taminda UYARI, ustunda sessiz."""
+        for ve in (1, 2, 3, 4, 6):
+            for p in (0, 1, 2, 6, 7):
+                esik = min_stoppable_epoch(p, ve)
+                for epochs in range(1, esik + 4):
+                    beklenen = 'KRITIK' if epochs < esik else (
+                        'UYARI' if epochs == esik else None)
+                    # train_llm.py icindeki dallanmayi birebir taklit et
+                    if esik > epochs:
+                        seviye = 'KRITIK'
+                    elif esik == epochs:
+                        seviye = 'UYARI'
+                    else:
+                        seviye = None
+                    self.assertEqual(
+                        seviye, beklenen,
+                        'p=%d ve=%d epochs=%d esik=%d' % (p, ve, epochs, esik))
+                    # kaba kuvvet: KRITIK dedigimiz butcede GERCEKTEN
+                    # durulamamali, UYARI/sessiz dedigimizde durabilmeli
+                    durus = self._brute_min_stoppable(p, ve, ust=epochs)
+                    self.assertEqual(
+                        durus is not None, beklenen != 'KRITIK',
+                        'p=%d ve=%d epochs=%d: kaba kuvvet durus=%s, esik=%s'
+                        % (p, ve, epochs, durus, beklenen))
+                # esik butcesinde gercekten durus olusmali (tam tolerans)
+                self.assertEqual(
+                    self._brute_min_stoppable(p, ve, ust=esik), esik,
+                    'p=%d ve=%d: esik %d' % (p, ve, esik))
 
     def test_old_default_250_exceeds_session_budget(self):
         # Belgeleyici olcum: 7.31 dk/epoch x 250 = 30.4 saat. 9h oturuma

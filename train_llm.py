@@ -459,6 +459,42 @@ def effective_stop_epoch(patience, val_every, epochs):
     return min(epochs, n_meas * val_every), n_meas * val_every
 
 
+def min_stoppable_epoch(patience, val_every, fresh=True):
+    """Durdurmanin TETIKLENEBILDIGI en kencar epoch (alt sinir) -- taze kosu.
+
+    Tepe noktasinin olabilecegi en kencar yeri varsayar: ilk val olcumu her
+    zaman yeni kayittir, dolayisiyla kotu sayac oradan baslar ve TETIKLENEMEZ
+    bir butce bulmanin tek yolu budur. Resume'da `bad` sayaci devredildigi
+    icin bu hesap gecerli degildir -- orada bütce kontrolu ayri sorudur.
+
+    Gercek olcum izgarasi (egitim dongusuyle birebir):
+        do_val = (ep % val_every == 0 or start_ep == 0 and ep == 1)
+    Taze kosuda (start_ep == 0) 1. epoch'ta bir olcum olur ve o olcum her
+    zaman KAYIT acar (best_val = 1e9). Yani ilk KOTU olcum:
+      * val_every == 1 -> 2. epoch'ta (1. epoch hem baslangic hem katsiyi
+        birden karsiladigi icin kayit acmak zorundadir)
+      * val_every >= 2 -> val_every. epoch'ta
+    Kotu olcum basi val_every epoch biriktirdiginden, tetiklenmek icin
+    k = max(1, ceil(patience/val_every)) kotu olcum gerekir ve durus
+    epoch'u = ilk_kotu_olcum + (k - 1) * val_every olur.
+
+    Iki yan etki:
+      * patience <= 0 -> k = 1, yani ilk kotu olcumde durulur. effective_stop_epoch
+        ise 0 dondurur (mutlak epoch olarak yanlis 0 verirdi).
+      * val_every == 1 -> durus = 1 + max(1, patience). effective_stop_epoch
+        toleransi (patience) dondurur ve MUTLAK epoch'u 1 eksik bildirir.
+    """
+    if val_every < 1:
+        val_every = 1
+    if patience < 0:
+        patience = 0
+    if not fresh:
+        raise ValueError('sadece taze kosu (fresh=True) icin gecerlidir')
+    k = max(1, -(-patience // val_every))      # ceil, en az 1 olcum
+    first_bad = 2 if val_every == 1 else val_every
+    return first_bad + (k - 1) * val_every
+
+
 def refine_resp(r, maxc=MAX_SEQ_LEN - MAX_CTX_LEN - 4):
     r = (r or '').strip()
     if len(r) < 10:
@@ -940,12 +976,16 @@ def main():
               dm, nb, nh, ff, mxc, mxs, bs, val_every, lr_base, export_dir),
           flush=True)
     # patience ve val_every'yi AYRIK goster: ikisi carpilirsa kullanici
-    # gercek epoch butcesini yanlis hesaplar. Kötü val ölçümü sayısı da
-    # yazılır (gerçekte kaç ölçümün "iyileşme yok" sayılacağı).
+    # gercek epoch butcesini yanlis hesaplar. Kotu val OLCUMU sayisi de
+    # yazilir (gercekte kac olcumun "iyilesme yok" sayilacagi) ve toplam
+    # epoch cinsinden TOLERANS gosterilir -- bu ikisi ayni sey DEGIL:
+    # val_every izaraya uymadigi icin toleransi patience'i asabilir
+    # (val_every=4, patience=6 -> 2 olcum x 4 = 8 epoch).
+    _n_meas = max(1, -(-patience // val_every))
+    _toler = _n_meas * val_every
     print('CONFIG: epochs=%d patience=%d EPOCH val_every=%d '
           '-> kotu val olcumu toleransi: %d olcum = %d epoch'
-          % (EPOCHS, patience, val_every,
-             max(1, -(-patience // val_every)), patience), flush=True)
+          % (EPOCHS, patience, val_every, _n_meas, _toler), flush=True)
     print('CONFIG: lr_horizon=%d (LR %.1e -> %.1e)' % (
         lr_horizon, lr_base, lr_base * LR_MIN), flush=True)
     print('CONFIG: optimizer=AdamW wd=%.4f | gomme<->cikis bagi=%s' % (
@@ -954,14 +994,17 @@ def main():
     # yeterli olmali. Aksi halde kosu zorlamayla biter ve val'in yukselmeye
     # baslamasi fark edilmeden epoch butcesi tukenir -- 10 epoch'lik olculmus
     # kosuda tam olarak bu oldu (val 4. epoch'tan itibaren yukselmisti).
-    _last, _needed = effective_stop_epoch(patience, val_every, EPOCHS)
-    if _needed > EPOCHS:
-        # _needed, iyilesme HIC olmazsa durdurmanin en gec tetiklenebilecegi
-        # epoch. Butce bunun altinda -> tetiklenemez, hangi veri olursa olsun.
+    #
+    # Esik, toleranstan DEGIL dogrudan izgaradan turetilir; ikisi
+    # val_every=1'de ve patience=0'da ayrilir (bkz. min_stoppable_epoch).
+    _min_ep = min_stoppable_epoch(patience, val_every)
+    if _min_ep > EPOCHS:
+        # Butce toleransi karsilayacak kadar yok -> HIC TETIKLENEMEZ,
+        # hangi veri cikarsa ciksin.
         _lvl = 'KRITIK'
         _msg = 'HIC TETIKLENEMEZ'
-        _need = _needed + 2 * val_every
-    elif _needed == EPOCHS:
+        _need = _min_ep + 2 * val_every
+    elif _min_ep == EPOCHS:
         # yalnizca son epoch'ta, tam toleransla; hicbir epoch tasarruf etmez.
         _lvl = 'UYARI'
         _msg = 'en fazla SON epochta tetiklenir'
@@ -970,10 +1013,12 @@ def main():
         _lvl = None
     if _lvl:
         print('%s: epochs=%d, patience=%d (EPOCH), val_every=%d. Kotu val '
-              'OLCUMU basi %d epoch biriktirir (toplam %d olcum) -> durdurma en '
-              'gec %d. epochta tetiklenir; bu butceyle %s. En az %d epoch ver.'
+              'OLCUMU basi %d epoch biriktirir (toplam %d olcum = %d epoch) '
+              '-> tepe noktasindan sonra durulur. Ilk val olcumu her zaman '
+              'kayit oldugu icin durdurma en kencar %d. epochta tetiklenebilir: '
+              'bu butceyle %s. En az %d epoch ver.'
               % (_lvl, EPOCHS, patience, val_every, val_every,
-                 max(1, -(-patience // val_every)), _needed, _msg, _need),
+                 _n_meas, _toler, _min_ep, _msg, _need),
               file=sys.stderr, flush=True)
 
     if args.dry_run:
