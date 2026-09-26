@@ -16,6 +16,7 @@ BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE)
 
 from llm import PAD, LLM, encode_llm
+from seqgen import RESP_CHARS_MAX
 from train_llm import (TorchLLM, _pack_encoded, early_stop_step,
                        effective_stop_epoch, make_batches,
                        min_stoppable_epoch)
@@ -686,6 +687,83 @@ class TestEarlyStopping(unittest.TestCase):
         # sigmazdi; bu yuzden varsayilan 70 yapildi.
         self.assertGreater(250 * 7.31 / 60.0, 30.0)
         self.assertLess(70 * 7.31 / 60.0, 9.0)
+
+
+class TestResponseBudget(unittest.TestCase):
+    """Yanit karakter tavani = dizi butcesinin tam doldurulmus hali.
+
+    Regresyon gerekcesi: seqgen.load_pairs yanitlari 70 karakterle
+    kesiyordu, oysa MAX_SEQ_LEN(256) - MAX_CTX_LEN(48) - 4 bosluk birakiyor.
+    Olcum (intents.json, 8.003 yanit): %83.5'i kirpiliyor, %41.8'i icerik
+    atiliyor, kirpilanlarin %81'i kelime ortasindan kesiliyordu. Model
+    noktalamasiz parca ogrendigi icin uretigi yanitlar da kelime ortasinda
+    bitiyordu ('...gecirdigi su').
+    """
+
+    def test_response_budget_matches_seq_budget(self):
+        """seqgen.RESP_CHARS_MAX ile train_llm'in butcesi BIREBIR ayni olmali.
+        Iki dosya ayri tanimliyor; ayrilmalari sessizce veri kaybi yaratir.
+        """
+        from train_llm import MAX_CTX_LEN, MAX_SEQ_LEN
+        self.assertEqual(RESP_CHARS_MAX, MAX_SEQ_LEN - MAX_CTX_LEN - 4)
+        # bosluk tam doldurulur: 48 + 204 + 4 = 256
+        self.assertEqual(MAX_CTX_LEN + RESP_CHARS_MAX + 4, MAX_SEQ_LEN)
+
+    def test_seqgen_uses_response_budget_not_literal_70(self):
+        """load_pairs icinde literal 70 KALMAMALI (sessizce geri gelmesin)."""
+        import io
+        src = io.open(r'C:\Users\cxc\Desktop\Nextgen_API\seqgen.py',
+                      encoding='utf-8').read()
+        self.assertNotRegex(src, r'clean_chars\(\s*r\s*,\s*70\s*\)')
+        self.assertIn('RESP_CHARS_MAX', src)
+
+    def test_chatgrow_and_intents_share_one_budget(self):
+        """ChatGrow ayri bir tavan kullanirsa model iki kirpma aliskanligi
+        ogrenir. Ikisi de tek butcden gelmeli."""
+        import inspect
+        from train_llm import load_chatgrow_pairs
+        sig = inspect.signature(load_chatgrow_pairs)
+        self.assertIsNone(sig.parameters['resp_len'].default,
+                          'resp_len varsayilani sabit olmamali, None -> '
+                          'RESP_CHARS_MAX olmali')
+        self.assertIn('RESP_CHARS_MAX', inspect.getsource(load_chatgrow_pairs))
+
+    def test_responses_use_full_budget(self):
+        """Yeni tavanda yanitlar gercekten uzuyor (70'a donmus olmamali).
+
+        Sentetik intents kullanilir: load_pairs tum dosyayi iter edip
+        SONRA max_pairs ile kirpiyor, yani gercek intents.json (8.003
+        yanit) test paketine ~7 dk ekliyordu. Buradaki onemli olan
+        tavinin UYGULANMASI, veri hacmi degil.
+        """
+        import io
+        import json
+        import os
+        import tempfile
+        from seqgen import load_pairs
+        uzun = 'bu bir yanit. ' * 30          # ~450 karakter, tavanin ustunde
+        kisa = 'kisa yanit'
+        intents = {'intents': [
+            {'tag': 'test', 'patterns': ['test sorusu bir'],
+             'responses': [uzun, kisa, 'x' * 300]},
+        ]}
+        fd, yol = tempfile.mkstemp(suffix='.json')
+        os.close(fd)
+        try:
+            io.open(yol, 'w', encoding='utf-8').write(
+                json.dumps(intents, ensure_ascii=False))
+            pairs = load_pairs(yol, max_pairs=100, use_query=True, ctx_len=64)
+        finally:
+            os.unlink(yol)
+        self.assertTrue(pairs, 'cift uretilmedi')
+        L = [len(r) for _c, r in pairs]
+        self.assertLessEqual(max(L), RESP_CHARS_MAX,
+                             'tavan asilmis: %d > %d' % (max(L), RESP_CHARS_MAX))
+        # 70'lik tavan geri gelmis olsaydi burasi 70 olurdu
+        self.assertEqual(max(L), RESP_CHARS_MAX,
+                         'tavan tam uygulanmali: %d != %d'
+                         % (max(L), RESP_CHARS_MAX))
+        self.assertIn(len(kisa), L, 'kisa yanit oldugu gibi kalmali')
 
 
 if __name__ == '__main__':

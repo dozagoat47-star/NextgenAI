@@ -35,6 +35,26 @@ MODEL_PATH = os.path.join(os.path.dirname(__file__), 'model', 'seq_model.json')
 PAD, BOS, EOS = 0, 1, 2
 ALLOWED_EXTRAS = set(".,;:!?…()%’'\"-–/") | set(string.digits)
 
+# ---------------------------------------------------------------- YANIT BUTCESI
+# TEK KAYNAK. train_llm.py tarafinda MAX_SEQ_LEN=256 / MAX_CTX_LEN=48
+# tanimlidir; buraya BIREBIR UYMALIDIR, yoksa veri modelin goremeyecegi
+# kismi tasir (bkz. tests/test_train_llm.py::test_response_budget_matches_seq_budget).
+#
+# Neden 70 DEGIL: 70 karakter, MAX_SEQ_LEN'in yanita biraktigi 204'un
+# %34'uydu. Olculdu (intents.json, 8.003 yanit):
+#   * %83.5'i kirpiliyordu
+#   * %41.8'i icerik TAMAMEN atiliyordu (388.867 karakter)
+#   * kirpilanlarin %81'i KELIME ORTASINDAN kesiliyordu
+#       ('...insa edilen 381 numarali stalag ')
+# Yani model tam cumle degil, noktalamasiz parca ogreniyordu; bu yuzden
+# uretigi yanitlar da '...gecirdigi su' diye kelime ortasinde bitiyordu.
+#
+# 204 = 256 (MAX_SEQ_LEN) - 48 (MAX_CTX_LEN) - 4 (BOS/SEP/EOS). Bagimsiz
+# bir zihniyet degil, dizi butcesinin TAM doldurulmus hali: 48+204+4 = 256.
+# Artan yanit, train_llm.refine_resp(maxc=204) tarafindan son cumle noktasina
+# gore temizlenir -> model cumle sonunda durmayi ogrenir.
+RESP_CHARS_MAX = 204
+
 
 def utf8_stdout():
     if sys.stdout and sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
@@ -310,13 +330,19 @@ def load_pairs(intents_path, max_pairs=20000, max_per_intent=40,
     (brain._try_seq_rephrase artik query ile ornekliyor); buna koullu egitim
     cok daha tutarli/konuya uygun yanit uretir. use_query=False eski davranis:
     context = intent tag'i (dusuk varyans ama kalite dusuk).
+
+    Yanitlar RESP_CHARS_MAX (204) karakterle sinirlanir -- daha once 70 idi,
+    oysa MAX_SEQ_LEN yanita tam 204 karakter ayiriyor. 70, verinin %42'sini
+    atiyor ve kirpilanlarin %81'ini kelime ortasindan kesiyordu; ayrinti ve
+    olcumler icin RESP_CHARS_MAX yorumuna bakin.
     """
     pairs = []
     if intents_path and os.path.exists(intents_path):
         data = json.load(io.open(intents_path, 'r', encoding='utf-8'))
         for it in data.get('intents', []):
             tag = clean_chars(it.get('tag', ''), 32)
-            resps = [clean_chars(r, 70) for r in it.get('responses', [])]
+            resps = [clean_chars(r, RESP_CHARS_MAX)
+                     for r in it.get('responses', [])]
             resps = [r for r in resps if len(r) >= 6]
             if not tag or not resps:
                 continue

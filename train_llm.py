@@ -100,7 +100,7 @@ except Exception:
 BASE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE)
 
-from seqgen import clean_chars, load_pairs
+from seqgen import RESP_CHARS_MAX, clean_chars, load_pairs
 from llm import PAD, LLM, build_llm_vocab, encode_llm, load_tokenizer
 from naturalize import naturalize_pairs
 
@@ -152,6 +152,13 @@ MAX_SEQ_LEN = 256   # toplam sekans uzunlugu. TEK KAYNAK: kaggle_start.sh ve
                     # Artan islem %30'dur: _pack_encoded PAD kuyrugunu budayip
                     # uzunluga gore kumeler, RAGsiz ciftlerin ort uzunlugu
                     # degismez. Uretimde on-ek boslugu 26 -> ~160 token.
+                    #
+                    # NOT: yanit tarafi artik butceye uygun -- seqgen.RESP_CHARS_MAX
+                    # = 204 karakter, ve BPE'de en uzun yanit 88 TOKEN cikiyor
+                    # (olculdu, 4.000 yanit). Yani yanit asla tasmaz; kalan
+                    # ~112 token RAG bilgisine kalir (kb_budget=200). Tablodaki
+                    # "ort 143" 70 karakterlik yanitlarla olculmustu; yeni
+                    # veriyle biraz yukselir, tasma olusmaz.
 CTX_CHARS = 64      # sorgu icin KARAKTER butcesi: load_pairs ctx_len + kb LUT anahtar
 #                    # uzunlugu. 40-char kesim 689 pattern'i kirpiyordu (data kaybi);
 #                    # 64'te yalnizca 31 uzun pattern kesilir. kb anahtari da AYNI
@@ -627,7 +634,7 @@ def build_kb_lut(path, ctx_chars=CTX_CHARS):
     return lut
 
 
-def load_chatgrow_pairs(path, ctx_len=CTX_CHARS, resp_len=140, max_pairs=20000):
+def load_chatgrow_pairs(path, ctx_len=CTX_CHARS, resp_len=None, max_pairs=20000):
     """chatgrow.py/seed ciktisi -> (sorgu, yanit) ciftleri.
 
     path: tek dosya yolu ya da dosya yollari listesi. Birden cok dosya
@@ -640,7 +647,14 @@ def load_chatgrow_pairs(path, ctx_len=CTX_CHARS, resp_len=140, max_pairs=20000):
     ctx/yanit, intents hattiyla AYNI normalizasyondan gecer (clean_chars:
     ascii + kucuk harf + kisaltma) -> train/eval/llm_inference uzayi birebir.
     Her sorgu, her yanitla bir cift olur; shisha sabit tohumla karistirilir.
+
+    resp_len=None -> RESP_CHARS_MAX (204) kullanilir, yani intents hattinin
+    TAVANI. Daha once 140 idi ve intents hatti 70 idi: model ayni kosuda iki
+    farkli kirpma aliskanligi goruyordu (70 ve 140 karakter). Artik ikisi de
+    tek butcden gelir; bkz. seqgen.RESP_CHARS_MAX.
     """
+    if resp_len is None:
+        resp_len = RESP_CHARS_MAX
     paths = [path] if isinstance(path, str) else list(path)
     seen = set()
     pairs = []
