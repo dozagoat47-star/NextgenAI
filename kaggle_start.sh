@@ -9,14 +9,24 @@
 #         %cd NextgenAI
 #         !python -m pip install --quiet numpy
 #   4) Ikinci hucresine:
-#         !bash kaggle_start.sh train 250
+#         !bash kaggle_start.sh train
+#      (EPOCH vermezsen LLM_EPOCHS=70 kullanilir; 9 saatlik oturuma sigar)
 #      (once deneme istersen:  !bash kaggle_start.sh verify   )
 #      (1 epoch suresi olcmek icin:  !bash kaggle_start.sh bench )
 #   5) Egitim sonrasi indirme hucresi (asagidaki INDIRME notuna bak).
 #
-#   Veri NOTU: train_llm MAX_PAIRS=70000 cifti natural 5 ile ~330k cifte
-#   cikarir -> epoch basina sure eskiye gore ~5.5x. erken durdurma (patience)
-#   otomatik keser; sure endiseleniyorsan 250 yerine 80 ver.
+#   SURE NOTU (OLCULDU: 315883 cift, d=384/6 blok, T4x2, max_seq 256):
+#   encode 9 dk (bir kez) + val olan epoch 7.5 dk + val atlanan epoch 7.1 dk
+#   -> ort 7.31 dk/epoch. 9 saatlik oturum icin en fazla ~70 epoch.
+#   Erken durdurma (patience) val yukselmeye baslayinca keser; EPOCH
+#   vermezsen 70 kullanilir, yine olusturulabilir. Daha uzun egitim istersen
+#   LLM_EPOCHS=150 gibi ver ve Kaggle oturum suren yeterli olsun.
+#
+#   ONCEKILERE DOKUNMA: eski kosularda patience "kotu val OLCUMU" sayiyordu,
+#   --val-every 2 ile birlikte tolerans 12 epoch'a cikiyordu; 10 epoch'lik
+#   olculmus kosuda val 4. epoch'tan yukselmeye baslamis olmasina ragmen
+#   erken durdurma HIC tetiklenememisti. Artik patience EPOCH cinsindendir
+#   (bkz. train_llm.py --patience) ve --val-every yalnizca maliyeti etkiler.
 #
 #   Veriyi/intents'i degistirdiysen repo'ya push ettikten sonra yine 1. adim
 #   (clone) yeterli - tum dosyalar taze gelir.
@@ -25,7 +35,12 @@ set -euo pipefail
 cd /kaggle/working/NextgenAI
 
 MODE="${1:-verify}"
-EPOCHS="${2:-250}"
+# Varsayilan 70: 7.31 dk/epoch x 70 = 8.6 saat + 9 dk encode = 9h oturuma
+# sigar. Eski varsayilan 250 idi -> 30+ saat, ASLA bitmiyordu.
+EPOCHS="${2:-${LLM_EPOCHS:-70}}"
+# Sabir artik EPOCH cinsinden (bkz. train_llm.py). 6 = val 6 epoch boyunca
+# VAL_IMP kadar iyilesmezse dur.
+PATIENCE="${LLM_PATIENCE:-6}"
 
 CGARG=''
 if compgen -G 'chatgrow_*.jsonl' > /dev/null; then
@@ -64,9 +79,12 @@ fi
 DONE=''
 case "$MODE" in
   train)
-    echo "[1/3] RAG egitim (natural 5, epochs=$EPOCHS, d=384/6 blok) -> llm_model.json"
+    echo "[1/3] RAG egitim (natural 5, epochs=$EPOCHS, patience=${PATIENCE} epoch, d=384/6 blok) -> llm_model.json"
+    # --val-every 2 yalnizca VAL MALIYETI icin (olculmus: epoch 7.5 -> 7.1 dk).
+    # Erken durdurma esigini ETKILEMEZ: patience artik epoch cinsinden.
     python train_llm.py --rag --kb-map knowledge_map.jsonl --natural 5 $CGARG \
-      --epochs "$EPOCHS" --batch-size 128 --val-every 2 $DPARGS $REGARGS 2>&1 | tee kaggle_train.log
+      --epochs "$EPOCHS" --patience "$PATIENCE" \
+      --batch-size 128 --val-every 2 $DPARGS $REGARGS 2>&1 | tee kaggle_train.log
     DONE='yes'
     ;;
   bench)
@@ -78,6 +96,8 @@ case "$MODE" in
     grep 'epoch ' kaggle_bench.log | tail -1
     echo "[3/3] Encode ilk seferde ~10 dk ayri, sonra onbellegi kullanilir."
     echo "      Duvar suresi icin Kaggle 'Cell executed in NHmNs' degerine bak."
+    echo "      Ort 7.31 dk/epoch ise 9h icin en fazla ~70 epoch:"
+    echo "        !bash kaggle_start.sh train"
     ;;
   verify)
     echo "[1/3] dry-run dogrulama (GPU gerekmez, ~1-2 dk; TAM encode YAPILMAZ)"
@@ -85,7 +105,7 @@ case "$MODE" in
     python train_llm.py --dry-run --rag --kb-map knowledge_map.jsonl --natural 5 \
       --batch-size 128 --limit-pairs 4000 $CGARG $DPARGS $REGARGS
     echo "[2/3] OK - ilk-kelime hizalama ve RAG hatti hazir."
-    echo "[3/3] Tam egitim icin:  !bash kaggle_start.sh train 250"
+    echo "[3/3] Tam egitim icin:  !bash kaggle_start.sh train"
     ;;
   *)
     echo "Bilinmeyen mod: $MODE  (verify | train)"

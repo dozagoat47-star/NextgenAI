@@ -18,6 +18,10 @@ prof_dump
 llm_data_*.npz
 llm_ckpt.pt
 
+# Kaggle egitim logu (kaggle_start.sh -> kaggle_train.log; kullanici
+# yukleyebilmek icin .txt olarak yeniden adlandirir)
+kaggle_train.txt
+
 # chatgrow dogrulama / test artiklari
 _test_*.jsonl
 _dbg_*

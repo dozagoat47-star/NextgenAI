@@ -16,7 +16,8 @@ BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE)
 
 from llm import PAD, LLM, encode_llm
-from train_llm import TorchLLM, _pack_encoded, make_batches
+from train_llm import (TorchLLM, _pack_encoded, early_stop_step,
+                       effective_stop_epoch, make_batches)
 
 _VOCAB = ['<PAD>', '<BOS>', '<SEP>', '<EOS>',
           'm', 'e', 'r', 'h', 'a', 'b', ' ', 'n', 's', 'i', 'l', 'y',
@@ -284,6 +285,270 @@ class TestTiedExport(unittest.TestCase):
             torch_logits = m(x).float().numpy()
         diff = float(np.max(np.abs(torch_logits - loaded.forward(x.numpy()))))
         self.assertLess(diff, 1e-3)
+
+
+class TestEarlyStopping(unittest.TestCase):
+    """--patience EPOCH cinsindendir; --val-every esigi DEGISTIRMEZ.
+
+    Regresyon gerekcesi: 10 epoch'lik olculmus Kaggle kosusunda val kaybi
+    4. epoch'tan itibaren yukselmeye baslamisti (0.5492 -> 0.5667 -> 0.5736 ->
+    0.5796) ama erken durdurma HIC tetiklenmedi; kosu zorlamayla bitti.
+    Nedeni: sayac kotu val OLCUMU sayiyordu. --val-every 2 ile patience=6
+    -> 12 epoch'lik tolerans; sadece 3 kotu olcum birikti (gereken 6).
+    """
+
+    # kaggle_train.txt'teki 10 epoch'lik olculmus kosu, epoch bazinda.
+    # None = val atlandi (val_every=2).
+    _VAL10 = [0.6955, 0.5663, None, 0.5492, None,
+              0.5667, None, 0.5736, None, 0.5796]
+
+    # Her epoch'a val OLÇUMU olan yogun dizi (val_every=1 testleri icin).
+    # 4. epoch'ta en iyi, sonra monotonik yükselis.
+    _DENSE = [1.0, 0.70, 0.60, 0.5492] + [0.5492 + 0.01 * i for i in range(1, 27)]
+
+    @staticmethod
+    def _grid(per_epoch, val_every, start_ep=1):
+        """--val-every izarasina oturan (epoch, val) olcum listesi uretir."""
+        return [(e, v) for e, v in enumerate(per_epoch, start=1)
+                if v is not None and (e % val_every == 0 or e == start_ep)]
+
+    def _run(self, meas, patience=6, val_every=2, val_imp=5e-4, legacy=False):
+        """Olcum listesini oynatir.
+
+        legacy=True: v1 semantigi (kotu OLCUM sayaci 1 artirir) -- hatanin
+        kendisi, karsilastirma icin.
+
+        Doner: (best_val, best_epoch, stop_epoch, bad_at_stop)
+        """
+        best_val, best_ep, bad, stop_ep, bad_stop = 1e9, None, 0, None, None
+        for ep, vl in meas:
+            if legacy:
+                improved = vl < best_val - val_imp
+                bad = 0 if improved else bad + 1
+                stop = (not improved) and bad >= patience
+            else:
+                bad, improved, stop = early_stop_step(vl, best_val, bad,
+                                                      val_every, patience, val_imp)
+            if improved:
+                best_val, best_ep = vl, ep
+            if stop and stop_ep is None:
+                stop_ep, bad_stop = ep, bad
+                break
+        return best_val, best_ep, stop_ep, bad_stop
+
+    # --- olculmus kosu: en iyi val nerede? --------------------------------
+    def test_measured_run_best_at_epoch_4(self):
+        best_val, best_ep, _, _ = self._run(self._grid(self._VAL10, 2))
+        self.assertEqual(best_ep, 4)
+        self.assertAlmostEqual(best_val, 0.5492, places=6)
+
+    def test_measured_run_v2_stops_legacy_does_not(self):
+        # v2: kotu olcum 2 epoch biriktirir -> ep 6,8,10 -> bad 2,4,6 -> ep 10
+        # v1: kotu olcum 1 biriktirir   -> ep 6,8,10 -> bad 1,2,3 -> HIC olusmaz
+        meas = self._grid(self._VAL10, 2)
+        _, _, stop_v2, _ = self._run(meas, val_every=2)
+        _, _, stop_v1, _ = self._run(meas, val_every=2, legacy=True)
+        self.assertEqual(stop_v2, 10)
+        self.assertIsNone(stop_v1)
+
+    def test_measured_run_with_70_epoch_budget_v2_saves_6_epochs(self):
+        # Bu kosunun devami (val artmaya devam ediyor) + 70 epoch butcesi:
+        # v2 ep 10'da durur, v1 ancak ep 16'da dururdu -> 6 epoch (~44 dk).
+        seq = list(self._VAL10) + [0.580 + 0.001 * i for i in range(60)]
+        meas = self._grid(seq, 2)
+        _, _, stop_v2, _ = self._run(meas, val_every=2)
+        _, _, stop_v1, _ = self._run(meas, val_every=2, legacy=True)
+        self.assertEqual(stop_v2, 10)
+        self.assertEqual(stop_v1, 16)
+        self.assertEqual(stop_v1 - stop_v2, 6)
+
+    # --- ASIL DEGISMEZ: epoch cinsinden tolerans --------------------------
+    def test_epoch_tolerance_is_patience_rounded_up_to_measurement_grid(self):
+        # v2'de sayac EPOCH biriktirir: durdurma aninda
+        #     patience <= bad < patience + val_every
+        # (sayac yalnizca val_every katlarina oturabildigi icin tam patience'a
+        # ulasamayabilir; ve=4, patience=6 -> 8'de durur, 12'de degil.)
+        # v1'de sayac OLCUM biriktirdigi icin epoch toleransi
+        # patience*val_every idi: val_every 2 -> 12, 3 -> 18, 4 -> 24 epoch.
+        for ve in (1, 2, 3, 4, 5, 6):
+            _, _, stop_ep, bad_stop = self._run(self._grid(self._DENSE, ve),
+                                                val_every=ve)
+            self.assertIsNotNone(stop_ep, 've=%d durdurmadi' % ve)
+            self.assertGreaterEqual(bad_stop, 6, 've=%d cok erken durdu' % ve)
+            self.assertLess(bad_stop, 6 + ve,
+                            've=%d: bad=%d, toleransin cok uzerinde' % (ve, bad_stop))
+
+    def test_exact_patience_when_val_every_divides_patience(self):
+        # 6'nin bolenleri olan val_every'lerde sayac tam 6'ya oturur.
+        for ve in (1, 2, 3, 6):
+            _, _, _, bad_stop = self._run(self._grid(self._DENSE, ve),
+                                         val_every=ve)
+            self.assertEqual(bad_stop, 6, 've=%d bad=%s' % (ve, bad_stop))
+
+    def test_legacy_tolerance_grows_with_val_every(self):
+        # Hatanin sayisal ifadesi: v1'de 6 OLCUMun kac epoch tutugu
+        # val_every'ye bagliydi. Olcum sayisi sabit -> epoch toleransi KATLANIR.
+        # 60 epoch yeter ki en sik izarada (ve=6) da 10 olcum olsun.
+        long_seq = ([1.0, 0.70, 0.60, 0.5492]
+                    + [0.5492 + 0.01 * i for i in range(1, 57)])
+        for ve in (1, 2, 3, 4, 6):
+            _, _, stop_ep, bad_stop = self._run(self._grid(long_seq, ve),
+                                                val_every=ve, legacy=True)
+            self.assertEqual(bad_stop, 6, 've=%d legacy bad=%s' % (ve, bad_stop))
+            # 6 OLCUM = 6*ve EPOCH bekleniyordu (hata)
+            _, best_ep, _, _ = self._run(self._grid(long_seq, ve), val_every=ve)
+            self.assertLessEqual(stop_ep - best_ep, 6 * ve)
+        # v2'de hepsi 6 epoch'a sabit
+        for ve in (1, 2, 3, 4, 6):
+            _, best_ep, stop_ep, bad_stop = self._run(self._grid(long_seq, ve),
+                                                      val_every=ve)
+            self.assertGreaterEqual(bad_stop, 6)
+            self.assertLess(bad_stop, 6 + ve)
+            self.assertLessEqual(stop_ep - best_ep, 6 + ve - 1)
+
+    def test_stop_never_exceeds_tolerance_by_more_than_grid_rounding(self):
+        for ve in (1, 2, 3, 4, 5, 6):
+            _, best_ep, stop_ep, _ = self._run(self._grid(self._DENSE, ve),
+                                               val_every=ve)
+            self.assertIsNotNone(stop_ep)
+            self.assertLessEqual(stop_ep - best_ep, 6 + ve - 1,
+                                 've=%d toleransi asirdi' % ve)
+
+    def test_val_every_two_exact_grid(self):
+        # olcum ep 1,2,4,6,8,10 -> kotu olcum 6,8,10 -> bad 2,4,6 -> ep 10
+        _, best_ep, stop_ep, bad = self._run(self._grid(self._VAL10, 2),
+                                             val_every=2)
+        self.assertEqual((best_ep, stop_ep, bad), (4, 10, 6))
+
+    def test_val_every_one_exact_grid(self):
+        # kotu olcum ep 5..10 -> bad 1..6 -> ep 10
+        _, best_ep, stop_ep, bad = self._run(self._grid(self._DENSE, 1),
+                                             val_every=1)
+        self.assertEqual((best_ep, stop_ep, bad), (4, 10, 6))
+
+    def test_val_every_three_grid(self):
+        # izar 1,3,6,9,12. _DENSE ep6'ya kadar AZALIYOR (0.5692), o yuzden
+        # izarinun en iyisi ep6; kotu olcum 9 (bad 3), 12 (bad 6) -> ep 12.
+        _, best_ep, stop_ep, bad = self._run(self._grid(self._DENSE, 3),
+                                             val_every=3)
+        self.assertEqual((best_ep, stop_ep, bad), (6, 12, 6))
+
+    def test_val_every_four_rounds_up_to_eight(self):
+        # izar 1,4,8,12. en iyi ep4; kotu olcum 8 (bad 4), 12 (bad 8>=6) -> ep 12
+        _, best_ep, stop_ep, bad = self._run(self._grid(self._DENSE, 4),
+                                             val_every=4)
+        self.assertEqual((best_ep, stop_ep, bad), (4, 12, 8))
+
+    # --- sayac davranisi -------------------------------------------------
+    def test_improvement_resets_counter(self):
+        bad, improved, stop = early_stop_step(0.9, 1.0, 4, 2, 6)
+        self.assertTrue(improved)
+        self.assertEqual(bad, 0)
+        self.assertFalse(stop)
+
+    def test_equal_val_is_not_improvement(self):
+        # eski rekorla ayni -> VAL_IMP kadar iyi gelistirme yok
+        bad, improved, stop = early_stop_step(1.0, 1.0, 4, 2, 6)
+        self.assertFalse(improved)
+        self.assertEqual(bad, 6)
+        self.assertTrue(stop)
+
+    def test_bad_measurement_accumulates_by_val_every(self):
+        bad, improved, stop = early_stop_step(1.0, 0.5, 2, 2, 6)
+        self.assertFalse(improved)
+        self.assertEqual(bad, 4)
+        self.assertFalse(stop)
+
+    def test_stops_at_patience_boundary(self):
+        bad, improved, stop = early_stop_step(1.0, 0.5, 4, 2, 6)
+        self.assertEqual(bad, 6)
+        self.assertTrue(stop)
+
+    def test_val_imp_guards_against_noise(self):
+        bad, improved, _ = early_stop_step(0.9999, 1.0, 0, 1, 6, 5e-4)
+        self.assertFalse(improved)
+        self.assertEqual(bad, 1)
+        bad, improved, _ = early_stop_step(0.9990, 1.0, 0, 1, 6, 5e-4)
+        self.assertTrue(improved)
+        self.assertEqual(bad, 0)
+
+    def test_monotonic_decline_never_stops(self):
+        vals = [1.0 / (i + 1) for i in range(40)]
+        _, _, stop_ep, _ = self._run(self._grid(vals, 1), val_every=1)
+        self.assertIsNone(stop_ep)
+
+    def test_perfect_plateau_stops_at_patience(self):
+        # val_every=1, patience=6: ilk olcum ep1 rekora girer, ep2..ep7 kotu
+        _, best_ep, stop_ep, bad = self._run(self._grid([0.5] * 30, 1),
+                                             val_every=1)
+        self.assertEqual((best_ep, stop_ep, bad), (1, 7, 6))
+
+    def test_patience_zero_stops_at_first_non_improvement(self):
+        # patience=0: ilk KOTU olcumde dur. _VAL10'da ilk 3 olcum (ep 1,2,4)
+        # rekora girdigi icin durus ep 6.
+        _, best_ep, stop_ep, bad = self._run(self._grid(self._VAL10, 2),
+                                             patience=0)
+        self.assertEqual((best_ep, stop_ep, bad), (4, 6, 2))
+
+    # --- effective_stop_epoch: butce yeterliligi -------------------------
+    def test_effective_stop_epoch_measured_case(self):
+        # epochs=10, patience=6, val_every=2 -> 3 kotu olcum = 6 epoch
+        last, needed = effective_stop_epoch(6, 2, 10)
+        self.assertEqual(needed, 6)
+        self.assertEqual(last, 6)
+
+    def test_effective_stop_epoch_cannot_exceed_budget(self):
+        # epochs=4, patience=6, val_every=2 -> gerek 6 > 4 -> TETIKLENEMEZ
+        last, needed = effective_stop_epoch(6, 2, 4)
+        self.assertEqual(needed, 6)
+        self.assertEqual(last, 4)
+
+    def test_effective_stop_epoch_rounds_up_to_measurement_grid(self):
+        # patience=5, val_every=2 -> ceil(5/2)=3 olcum -> 6 epoch
+        _, needed = effective_stop_epoch(5, 2, 100)
+        self.assertEqual(needed, 6)
+
+    def test_effective_stop_epoch_guards_bad_input(self):
+        self.assertEqual(effective_stop_epoch(6, 0, 100)[1], 6)   # val_every=0
+        self.assertEqual(effective_stop_epoch(-1, 1, 100)[1], 0)  # patience<0
+
+    def test_realistic_70_epoch_budget_can_stop(self):
+        # kaggle_start.sh varsayilani: epochs=70, patience=6, val_every=2
+        last, needed = effective_stop_epoch(6, 2, 70)
+        self.assertEqual(needed, 6)
+        self.assertLess(needed, 70)          # butce YETERLI
+        self.assertEqual(last, 6)
+
+    # --- CONFIG uyarisinin esikleri ---------------------------------------
+    # main() bu esiklere bakip KRITIK / UYARI basar veya hicbir sey basmaz.
+    # [needed > epochs -> KRITIK, needed == epochs -> UYARI, aksi halde sessiz]
+    def test_budget_warning_thresholds(self):
+        # epochs=4,5 -> durdurma en gec 6. epochta -> HIC TETIKLENEMEZ
+        for ep in (4, 5):
+            last, needed = effective_stop_epoch(6, 2, ep)
+            self.assertGreater(needed, ep, 'epochs=%d KRITIK bekleniyordu' % ep)
+        # epochs=6 -> tam son epochta, hicbir epoch tasarruf etmez -> UYARI
+        last, needed = effective_stop_epoch(6, 2, 6)
+        self.assertEqual(needed, 6)
+        self.assertEqual(last, 6)
+        # epochs>=7 -> sessiz (en az 1 epoch yedek kalir)
+        for ep in (7, 10, 70):
+            last, needed = effective_stop_epoch(6, 2, ep)
+            self.assertLess(needed, ep, 'epochs=%d sessiz olmaliydi' % ep)
+
+    def test_budget_warning_scales_with_val_every(self):
+        # val_every buyudukce son durdurma epoch'u da buyer
+        self.assertEqual(effective_stop_epoch(6, 1, 100)[1], 6)
+        self.assertEqual(effective_stop_epoch(6, 2, 100)[1], 6)
+        self.assertEqual(effective_stop_epoch(6, 3, 100)[1], 6)
+        self.assertEqual(effective_stop_epoch(6, 4, 100)[1], 8)
+        self.assertEqual(effective_stop_epoch(6, 6, 100)[1], 6)
+
+    def test_old_default_250_exceeds_session_budget(self):
+        # Belgeleyici olcum: 7.31 dk/epoch x 250 = 30.4 saat. 9h oturuma
+        # sigmazdi; bu yuzden varsayilan 70 yapildi.
+        self.assertGreater(250 * 7.31 / 60.0, 30.0)
+        self.assertLess(70 * 7.31 / 60.0, 9.0)
 
 
 if __name__ == '__main__':

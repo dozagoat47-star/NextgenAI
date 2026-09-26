@@ -49,6 +49,14 @@ STOPWORDS = frozenset("""
     e mi mis mu sey
 """.split())
 
+# Skor semasi surumu. Rapor JSON'una yazilir; --compare IKI farkli surumu
+# karsilastirmayi REDDEDER (birebir ayni olcut olmadan "fark" dedirtmek,
+# guvenilmez model secimine yol acar).
+#   1 = tmean ana eksen: topic_overlap(uretilen, SORGU)  [BOZUK: iyi cevap
+#       soruyu tekrarlamaz -> dogru cevap ~0 alir]
+#   2 = tmean ana eksen: gold_recall(uretilen, ALTIN) (+ topic_k varsa)
+METRIC_VERSION = 2
+
 _WORD_RE = re.compile(r'[a-z\u00e7\u011f\u0131\u00f6\u015f\u00fc0-9]+')
 
 
@@ -135,12 +143,34 @@ def content_terms(tokens, stopwords):
 
 
 def topic_overlap(cand_tokens, ref_tokens, stopwords):
-    """Uretilen icerik kelimelerinin referans icerigine dokunma orani."""
+    """Uretilen icerik kelimelerinin referans icerigine dokunma orani (PRECISION)."""
     c = content_terms(cand_tokens, stopwords)
     r = set(content_terms(ref_tokens, stopwords))
     if not c:
         return 0.0
     return len(set(c) & r) / len(set(c))
+
+
+def gold_recall(cand_tokens, ref_tokens, stopwords):
+    """Altin cevabin icerik kelimelerinin KACI uretimde geciyor (RECALL).
+
+    topic_overlap'in (precision) ters yonu. Neden ayri bir eksen:
+    topic_overlap(cand, GOLD) neredeyse copy_bleu'nun bir kardesidir, ama
+    topic_overlap(cand, SORGU) bir alaka olcutu DEGILDIR -- iyi bir cevap
+    soruyu tekrarlamaz. Olculmus hata: "hayvan turleri nelerdir" sorusuna
+    "kediler balik, tavuk ve kuru mama yerler" cevabi (altin metnin BIREBIR
+    kopyasi) soruyla 0 ortak icerik kelimesi buluyor -> topic_q = 0.000.
+    Yani %50 agirlikli eksen, tam kopya uretimi cezalandiriyor ve soru
+    kelimelerini yankilayan ama konusmayi bilmeyen cevabi odullendiriyordu.
+
+    Bu eksen tersini olcer: "cevap, altinin icerigini gercekten tasiyor mu".
+    Birebir kopyada 1.0, alakasiz cevapta ~0.0 -> dogru ayirt eder.
+    """
+    c = set(content_terms(cand_tokens, stopwords))
+    r = set(content_terms(ref_tokens, stopwords))
+    if not r:
+        return 0.0
+    return len(c & r) / len(r)
 
 
 def length_ratio(cand_tokens, ref_tokens):
@@ -167,19 +197,36 @@ def _measure(query, gold, generated, knowledge, stopwords):
     fluency = 0.5 * (1.0 - rep2) + 0.5 * distinct1
     tq = topic_overlap(cand, q, stopwords)
     tk = topic_overlap(cand, kb, stopwords) if kb else None
-    tmean = (tq + tk) / 2.0 if tk is not None else tq
+    # v1: tmean = (tq + tk)/2, kb yoksa tq  -> BAYAT ve BOZUK (asagida)
+    # v2: ana eksen gold_recall. tq yalnizca tanilama alani olarak raporda kalir
+    #     ve skora GIRMEZ.
+    gr = gold_recall(cand, ref, stopwords)
+    # Konu ekseni: altin icerigi kapsama (gr) + bilgiye dokunma (tk).
+    # tk varsa ikisi ayri ayri olcutler; bilgi parasitesi (context) uretimi
+    # kirletmemis olmanin en dogrudan sinyali tk'dir.
+    if tk is not None:
+        tmean = (gr + tk) / 2.0
+    else:
+        tmean = gr
     gen_index = 0.5 * (1.0 - copy_bleu) + 0.3 * tmean + 0.2 * fluency
     # --- qa_score: ALAKA-ONCELIKLI skor -------------------------------------
     # gen_index OZELLIKLE konu dokunusunu %5 agirlikla olcer; agirliklarin
     # %63'u copy_bleu, %31'i fluency. Oylece 13 raporda goruldugu gibi
     # alaka ekseni (tmean 0.098-0.134) model siralamasini hic belirlemiyor.
     # qa_score alakayi ANA eksen yapar:
-    #   %50 konu dokunusu  -> soruya/ bilgiye gercekten değiyor mu
+    #   %50 konu dokunusu  -> altin cevabin icerigini tasiyor mu (gold_recall)
+    #                         + bilgiye dokunuyor mu (topic_k)
     #   %25 fluency        -> tekrar/bozuk metin degil (donusmus cirpinti)
     #   %15 copy_bleu     -> altin yanitin icerigini de veriyor mu
     #   %10 uzunluk uyumu -> 1 kelimeye 20 kelimelik soruya kisa kesme
     # Bos uretim EN kotu basarisizliktir: agirlikli ortalama onu yalnizca
     # 0.5 * (1/n) kadar kistirirdi, bu yuzden acik -0.5 ceza.
+    #
+    # METRIC_VERSION 1 -> 2 (olculmus duzeltme):
+    #   %50 ekseni tq (URETILEN ~ SORU) idi. Iyi bir cevap soruyu tekrarlamaz,
+    #   o yuzden dogru cevaplar bu eksende ~0 aliyor, soru kelimelerini
+    #   yankilayan bozuk cevaplar ise yuksek aliyordu. Birebir kopya ornek:
+    #   copy_bleu=1.000, topic_q=0.000 -> qa=0.489. Eksen ters calisiyordu.
     lr = length_ratio(cand, ref)
     length_fit = max(0.0, 1.0 - min(1.0, abs(lr - 1.0)))
     is_empty = 1.0 if not cand else 0.0
@@ -199,6 +246,7 @@ def _measure(query, gold, generated, knowledge, stopwords):
         fluency=fluency,
         topic_q=tq,
         topic_k=tk,
+        gold_recall=gr,
         topic_mean=tmean,
         length_ratio=lr,
         avg_word_len=avg_word_len(cand),
@@ -245,8 +293,8 @@ def sample_report(model, items, temperature=0.7, top_k=10, rep_penalty=0.3,
 
 def aggregate_report(rows):
     keys = ['copy_bleu', 'copy_prec1', 'rep2', 'distinct1', 'fluency',
-            'topic_q', 'topic_mean', 'length_ratio', 'avg_word_len',
-            'gen_index', 'qa_score', 'n_tokens', 'gold_tokens']
+            'topic_q', 'gold_recall', 'topic_mean', 'length_ratio',
+            'avg_word_len', 'gen_index', 'qa_score', 'n_tokens', 'gold_tokens']
     agg = {}
     for k in keys:
         vals = [r[k] for r in rows]
@@ -254,6 +302,7 @@ def aggregate_report(rows):
         agg[k + '_std'] = float(np.std(vals)) if len(vals) > 1 else 0.0
     agg['n_samples'] = len(rows)
     agg['n_empty'] = sum(1 for r in rows if r['n_tokens'] == 0)
+    agg['metric_version'] = METRIC_VERSION
     tk = [r['topic_k'] for r in rows if r['topic_k'] is not None]
     agg['topic_k'] = float(np.mean(tk)) if tk else None
     agg['topic_k_std'] = float(np.std(tk)) if len(tk) > 1 else 0.0
@@ -268,7 +317,9 @@ def print_report(title, agg):
     print(f"  1-gram kopya  (prec1)          : {agg['copy_prec1']:.3f} "
           f"(± {agg['copy_prec1_std']:.3f})")
     print(f"  konu dokunusu (sorgu)          : {agg['topic_q']:.3f} "
-          f"(± {agg['topic_q_std']:.3f})")
+          f"(± {agg['topic_q_std']:.3f})  <- tanilama; skora GIRMEZ")
+    print(f"  ALTIN KAPSAMA  (gold_recall)   : {agg['gold_recall']:.3f} "
+          f"(± {agg['gold_recall_std']:.3f})  <- ana alaka ekseni")
     if agg.get('topic_k') is not None:
         print(f"  konu dokunusu (bilgi, n={agg['n_knowledge']})"
               f" : {agg['topic_k']:.3f} (± {agg['topic_k_std']:.3f})")
@@ -282,6 +333,7 @@ def print_report(title, agg):
           f"(± {agg['gen_index_std']:.3f})")
     print(f"  QA skoru     (0-1, alaka-ust) : {agg['qa_score']:.3f} "
           f"(± {agg['qa_score_std']:.3f})  <- asil karsilastirma olcusu")
+    print(f"  metrik semasi: v{METRIC_VERSION}")
     print(f"  ornek: {agg['n_samples']} | bostler: {agg['n_empty']}")
     print()
     print(f"  NOT: gen_index std = ±{agg['gen_index_std']:.3f} olceginde. Iki model")
@@ -351,14 +403,30 @@ def compare_reports(path_a, path_b, key='qa_score'):
 
     Eski raporlarda 'items' yoktur -> karsilastirma yapilmaz (yanlis pozitif
     uretmemek icin); yalnizca toplu degerler gosterilir.
+
+    METRIK SEMASI KORUMASI: A ve B farkli surumdeyse (bkz. METRIC_VERSION)
+    karsilastirma REDDEDILIR. v1'de qa_score'un %50'si uretilen~sorgu
+    ortusuydu (bozuk eksen), v2'de altin~uretilen kapsamasi; ayni sayilar
+    ayni olcutu olcmez. Karsi lastirmak model secimini bozar.
     """
     with io.open(path_a, encoding='utf-8') as f:
         A = json.load(f)
     with io.open(path_b, encoding='utf-8') as f:
         B = json.load(f)
+    va = A.get('report', {}).get('metric_version', 1)
+    vb = B.get('report', {}).get('metric_version', 1)
+    if va != vb:
+        print('KARSILASTIRMA YAPILAMADI: metrik semasi farkli.')
+        print('  A = v%s, B = v%s' % (va, vb))
+        print('  v1 -> v2 degisikligi: qa_score-un %50 ekseni "uretilen~sorgu"')
+        print('  (bozuk) yerine "altin~uretilen kapsama" oldu. Iki surum ayni')
+        print('  olcutu olcmez. Her iki modeli de YENIDEN degerlendirip --out')
+        print('  ile yeni rapor uret, sonra karsilastir.')
+        return 1
     print('A: %s\n   %s' % (path_a, A.get('model', '?')))
     print('B: %s\n   %s\n' % (path_b, B.get('model', '?')))
-    for k in ('gen_index', 'qa_score', 'topic_mean', 'copy_bleu', 'fluency'):
+    for k in ('gen_index', 'qa_score', 'topic_mean', 'gold_recall',
+              'copy_bleu', 'fluency'):
         if k in A.get('report', {}) and k in B.get('report', {}):
             print('  %-12s A=%.4f  B=%.4f  fark=%+.4f'
                   % (k, A['report'][k], B['report'][k],
@@ -479,9 +547,16 @@ def main():
         per_item = [{'q': r['query'], 'gen_index': round(r['gen_index'], 6),
                      'qa_score': round(r['qa_score'], 6),
                      'topic_mean': round(r['topic_mean'], 6),
+                     'gold_recall': round(r['gold_recall'], 6),
                      'copy_bleu': round(r['copy_bleu'], 6),
                      'fluency': round(r['fluency'], 6),
                      'n_tokens': r['n_tokens'],
+                     # gold saklanir: rapor tek basina okundugunda "skor neden
+                     # bu?" sorusu ALTIN metin gorulmeden yanitlanamaz
+                     # (v1'in %50 ekseninin bozuk oldugu ancak boyle
+                     # goruldu). Ayrica paired karsilastirmada soru zorlugu
+                     # farkini ayirt etmeyi kolaylastirir.
+                     'gold': r['gold'],
                      'generated': r['generated']}
                     for r in rows]
         with io.open(args.out, 'w', encoding='utf-8') as f:

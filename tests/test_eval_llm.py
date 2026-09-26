@@ -4,6 +4,8 @@ Saf metrikler (bleu, rep_rate, topic_overlap...) model gerektirmez; rapor
 hatti stub modelle dogrulanir. Egitilmis llm_model.json varsa kucuk bir
 entegrasyon testi de kosulur (model yoksa atlanir).
 """
+import io
+import json
 import os
 import sys
 import unittest
@@ -11,8 +13,9 @@ import unittest
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE)
 
-from eval_llm import (STOPWORDS, _measure, aggregate_report, bleu, distinct_ratio,
-                      prec1, rep_rate, sample_report, tokenize, topic_overlap)
+from eval_llm import (METRIC_VERSION, STOPWORDS, _measure, aggregate_report, bleu,
+                      compare_reports, distinct_ratio, gold_recall, prec1,
+                      rep_rate, sample_report, tokenize, topic_overlap)
 
 
 class TestBleu(unittest.TestCase):
@@ -94,8 +97,8 @@ class TestSampleReport(unittest.TestCase):
         rows = sample_report(self.stub, items, seed=1)
         self.assertEqual(len(rows), 1)
         for k in ('copy_bleu', 'copy_prec1', 'rep2', 'distinct1', 'fluency',
-                  'topic_q', 'topic_mean', 'length_ratio', 'avg_word_len',
-                  'gen_index'):
+                  'topic_q', 'topic_mean', 'gold_recall', 'length_ratio',
+                  'avg_word_len', 'gen_index'):
             self.assertIn(k, rows[0])
 
     def test_knowledge_is_passed_down(self):
@@ -132,6 +135,161 @@ class TestDeterminism(unittest.TestCase):
                        None, STOPWORDS)
         self.assertAlmostEqual(row['copy_bleu'], 1.0)
         self.assertAlmostEqual(row['topic_mean'], 1.0)
+
+
+# --- qa_score v2: ana eksen duzeltmesi -------------------------------------
+# v1'de qa_score'un %50'si topic_overlap(uretilen, SORGU) idi. Olculmus
+# hata: iyi bir cevap soruyu TEKRARLAMAZ, dogru cevaplar bu eksende ~0 alir,
+# soru kelimelerini yankilayan bozuk cevaplar yuksek alir. Orinek (rapordan):
+#   S: hayvan turleri nelerdir
+#   U/G: kediler balik, tavuk ve kuru mama yerler   (BIREBIR KOPYA)
+#   v1: copy_bleu=1.000, topic_q=0.000 -> qa=0.489
+# v2'de ana eksen gold_recall(uretilen, ALTIN).
+Q_FAUNA = 'hayvan turleri nelerdir'
+G_FAUNA = 'kediler balik, tavuk ve kuru mama yerler sevimli ve bagimsiz hayvanlar'
+KB_FAUNA = ('Evcil kediler balik, tavuk ve kuru mama ile beslenir. '
+            'Kediler bagimsiz ve sevimli hayvanlardir.')
+
+
+class TestGoldRecall(unittest.TestCase):
+    """gold_recall: ALTIN cevabin icerik kelimelerinin kaci uretimde gecti."""
+
+    def test_exact_copy_is_one(self):
+        t = tokenize(G_FAUNA)
+        self.assertAlmostEqual(gold_recall(t, t, STOPWORDS), 1.0)
+
+    def test_disjoint_is_zero(self):
+        c = tokenize('istanbul bogazici uzanir martiniler sinirlarinda yasar')
+        self.assertEqual(gold_recall(c, tokenize(G_FAUNA), STOPWORDS), 0.0)
+
+    def test_partial_coverage(self):
+        c = tokenize('kediler balik yerler')
+        # gold content: {kediler, balik, tavuk, kuru, mama, yerler, sevimli,
+        #                 bagimsiz, hayvanlar} = 9
+        self.assertAlmostEqual(gold_recall(c, tokenize(G_FAUNA), STOPWORDS),
+                               3 / 9.0)
+
+    def test_stopwords_ignored(self):
+        c = tokenize('bir iki ve ile kediler balik')
+        self.assertAlmostEqual(gold_recall(c, tokenize('kediler balik'), STOPWORDS),
+                               1.0)
+
+    def test_empty_gold_is_zero(self):
+        self.assertEqual(gold_recall(tokenize('herhangi'), [], STOPWORDS), 0.0)
+
+    def test_empty_candidate_is_zero(self):
+        self.assertEqual(gold_recall([], tokenize(G_FAUNA), STOPWORDS), 0.0)
+
+
+class TestQaScoreV2(unittest.TestCase):
+    """Ana eksen ALTIN kapsamasi; soru yankilamasi ODULLENDIRILMEZ."""
+
+    def _m(self, gen, knowledge=KB_FAUNA):
+        return _measure(Q_FAUNA, G_FAUNA, gen, knowledge, STOPWORDS)
+
+    def test_exact_copy_scores_high(self):
+        r = self._m(G_FAUNA)
+        self.assertAlmostEqual(r['gold_recall'], 1.0)
+        # v1'de burasi 0.489 idi
+        self.assertGreater(r['qa_score'], 0.85)
+
+    def test_query_echo_does_not_score_high(self):
+        # Soruyu kelimesi kelimesine yankilayan cevap: v1'in SEVDIGI davranis.
+        r = self._m(Q_FAUNA)
+        self.assertAlmostEqual(r['topic_q'], 1.0)      # tq ust-duzey yakaliyor
+        self.assertEqual(r['gold_recall'], 0.0)        # ...ama icerik tasimiyor
+        self.assertLess(r['qa_score'], 0.35)
+
+    def test_echo_is_worse_than_irrelevant_but_fluent(self):
+        # v1'de yankilayan (0.527) ALAKASIZDAN (0.314) iyiydi -> eksen ters
+        # calisiyordu. v2'de alakasiz kazandirmali.
+        echo = self._m(Q_FAUNA)['qa_score']
+        off = self._m('istanbul bogazici uzanir martiniler sinirlarinda yasar'
+                      )['qa_score']
+        self.assertLess(echo, off)
+
+    def test_irrelevant_answer_beats_echo(self):
+        off = self._m('kediler cok sevimli hayvanlardir ve bagimsiz yasarlar'
+                      )['qa_score']
+        echo = self._m(Q_FAUNA)['qa_score']
+        self.assertGreater(off, echo)
+
+    def test_ordering_copy_gt_partial_gt_off_gt_empty(self):
+        partial = self._m('kediler balik yerler')['qa_score']
+        off = self._m('istanbul bogazici uzanir')['qa_score']
+        empty = self._m('')['qa_score']
+        self.assertGreater(partial, off)
+        self.assertGreater(off, empty)
+        # Bos uretim: tum agirlikli bilesenler 0, acik -0.5 cezasi.
+        self.assertAlmostEqual(empty, 0.25 * 0.5 - 0.5)
+
+    def test_tmean_uses_knowledge_when_present(self):
+        r = self._m('kediler balik, tavuk ve kuru mama yerler')
+        # gr>0 ve tk>0 -> tmean ikisinin ortasi
+        self.assertGreater(r['topic_k'], 0.0)
+        self.assertAlmostEqual(r['topic_mean'],
+                               (r['gold_recall'] + r['topic_k']) / 2.0)
+
+    def test_tmean_falls_back_to_gold_recall_without_knowledge(self):
+        r = _measure(Q_FAUNA, G_FAUNA, 'kediler balik yerler', None, STOPWORDS)
+        self.assertIsNone(r['topic_k'])
+        self.assertAlmostEqual(r['topic_mean'], r['gold_recall'])
+
+
+class TestMetricVersionGuard(unittest.TestCase):
+    """Farkli sema surumleri karsilastirilamaz (olcut ayni degil)."""
+
+    def _write(self, path, version, items):
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump({'model': 'x', 'report': {'metric_version': version,
+                                                'qa_score': 0.5, 'qa_score_std': 0.1},
+                       'items': items}, f)
+
+    def setUp(self):
+        import tempfile
+        self.tmp = tempfile.mkdtemp()
+        self.a = os.path.join(self.tmp, 'a.json')
+        self.b = os.path.join(self.tmp, 'b.json')
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_mixed_versions_rejected(self):
+        self._write(self.a, 1, [{'q': 's', 'qa_score': 0.5}])
+        self._write(self.b, 2, [{'q': 's', 'qa_score': 0.9}])
+        buf = io.StringIO()
+        old = sys.stdout
+        sys.stdout = buf
+        try:
+            rc = compare_reports(self.a, self.b)
+        finally:
+            sys.stdout = old
+        self.assertEqual(rc, 1)
+        self.assertIn('semasi farkli', buf.getvalue())
+
+    def test_same_version_accepted(self):
+        it = [{'q': 's1', 'qa_score': 0.5}, {'q': 's2', 'qa_score': 0.7}]
+        self._write(self.a, 2, it)
+        self._write(self.b, 2, it)
+        buf = io.StringIO()
+        old = sys.stdout
+        sys.stdout = buf
+        try:
+            rc = compare_reports(self.a, self.b)
+        finally:
+            sys.stdout = old
+        self.assertEqual(rc, 0)
+        self.assertIn('PAIRED', buf.getvalue())
+
+    def test_current_version_is_two(self):
+        self.assertEqual(METRIC_VERSION, 2)
+
+    def test_aggregate_carries_version(self):
+        rows = sample_report(_StubModel(), [('hava nasil', 'bugun guzel')],
+                             seed=1)
+        self.assertEqual(aggregate_report(rows)['metric_version'],
+                         METRIC_VERSION)
 
 
 _MODEL_PATH = os.path.join(BASE, 'model', 'llm_model.json')

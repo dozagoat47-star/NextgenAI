@@ -117,17 +117,19 @@ BATCH_SIZE = 64
 LR_BASE = 1e-3
 LR_MIN = 0.1
 WARMUP = 200
-PATIENCE = 6      # erken durdurma (val loss tabanli): val kaybi VAL_IMP
-#                  # kadar altina inemeyen art arda ~bu kadar val epoch'ta
-#                  # DURUR -> val yukselmeye basladiginda plato yakalanir.
+PATIENCE = 6      # erken durdurma (val loss tabanli): val kaybi VAL_IMP kadar
+#                  # altina inemeyen art arda ~bu kadar EPOCH'ta DURUR -> val
+#                  # yukselmeye basladiginda plato yakalanir. EPOCH cinsindendir
+#                  # (kotu val OLCUMLERI val_every kadar epoch biriktirir), boylece
+#                  # --val-every maliyet dumesi olarak kalir, esegi DEGISTIRMEZ.
 VAL_IMP = 5e-4   # ckpt-secimi + ERKEN-DURDURMA toleransi: val kaybi eski
 # rekorun bu kadar altina inemiyorsa 'iyilestme yok' sayilir (best_state /
 # en iyi kayipta dondurulur; patience uzerinde kalirsa egitim durur).
-LR_HORIZON_PAD = 20   # cosine UFKU, erken durdurma noktasindan bu kadar ONCE
-#                      # kalmamalidir. Hesap: ufuk = patience*val_every + PAD.
-#                      # Aksi halde ufuk --epochs (250) kalir; val ~35. epoch'ta
-#                      # dururken LR 1e-3'ten 9.6e-4'e inmis gibi olur (cosine
-#                      # hic calismaz) -> egitim tepede biter.
+LR_HORIZON_PAD = 20   # cosine UFKU, erken durdurma noktasindan bu kadar SONRA
+#                      # olmalidir. Hesap: ufuk = patience + PAD.
+#                      # Aksi halde ufuk --epochs'a takilir (or. 70) ve val 10.
+#                      # epoch'ta dururken LR 1e-3'ten 9.4e-4'e inmis gibi
+#                      # olur (cosine hic calismaz) -> egitim tepede biter.
 GRAD_CLIP = 5.0
 WEIGHT_DECAY = 0.01   # AdamW ayrik cezasi. 0.01: 16.9M parametre / 68.8k
                       # gercek ornek. Gomme ve norm/bias cezasiz (bkz.
@@ -414,6 +416,47 @@ def masked_acc(logits, tgt, mask):
     nxt[:, :-1] = tgt[:, 1:]
     ok = ((logits.argmax(-1) == nxt) & mask.bool())
     return ok.sum().item() / mask.sum().clamp(min=1.0).item()
+
+
+def early_stop_step(vl, best_val, bad, val_every, patience, val_imp=VAL_IMP):
+    """Erken durdurma sayacini ilerletir. SAF fonksiyon (test edilebilir).
+
+    Doner: (bad, improved, stop)
+
+    Semantik: --patience ve --val-every da EPOCH cinsindendir.
+    Kotu bir val OLCUMU sayaci val_every kadar ARTIRIR. Boylece
+    --val-every yalnizca val MALIYETINI etkiler; durdurma esigini degistirmez.
+
+    Neden boyle (olculmus hata): once sayac kotu val OLCUMU sayiyordu.
+    --val-every 2 ile birlikte patience=6 -> 12 epoch'lik tolerans
+    demekti; 10 epoch'lik olculmus kosuda val 4. epoch'tan itibaren
+    yukselmeye baslamis olmasina ragmen erken durdurma HIC tetiklenemedi
+    (3 kotu olcum birikti, 6 gerekiyordu). --val-every saf bir maliyet
+    dumesi oldugu icin bu birim degisimi dogru olan.
+
+    val_imp: iyilesme esigi. Eski rekorun bu kadar ALTINA inemiyorsa
+    'iyilestme yok' sayilir (gurultuye karsi koruma).
+    """
+    if vl < best_val - val_imp:
+        return 0, True, False
+    bad += val_every
+    return bad, False, bad >= patience
+
+
+def effective_stop_epoch(patience, val_every, epochs):
+    """Verilen ayarlarla en kocaman kaçıncı epoch'ta durulabilir (ust sinir).
+
+    patience EPOCH, val_every EPOCH. Kotu olcum basi val_every kadar
+    biriktiginden: gereken kotu OLCUM = ceil(patience / val_every), yani
+    durdurma en geç `ceil(patience/val_every) * val_every` epoch sonra
+    (iyilesme hic olmazsa) tetiklenir. epochs'tan kucukse TETIKLENEMEZ.
+    """
+    if val_every < 1:
+        val_every = 1
+    if patience < 0:
+        patience = 0
+    n_meas = -(-patience // val_every)          # ceil
+    return min(epochs, n_meas * val_every), n_meas * val_every
 
 
 def refine_resp(r, maxc=MAX_SEQ_LEN - MAX_CTX_LEN - 4):
@@ -833,8 +876,10 @@ def main():
     ap.add_argument('--dry-run', action='store_true',
                     help='torch olmadan veri/RAG hattini dogrula ve cik')
     ap.add_argument('--patience', type=int, default=PATIENCE,
-                    help='erken durdurmada calinmasi gereken iyilesmesiz epoch sayisi '
-                         '(ornegin --patience 250 ile neredeyse tamamen devre disi)')
+                    help='erken durdurmada calinmasi gereken iyilesmesiz EPOCH sayisi. '
+                         'EPOCH cinsindendir: --val-every 2 ile 6 deyince 3 kotu val '
+                         'OLCUMU (= 6 epoch) tolere edilir. --val-every yalnizca maliyeti '
+                         'etkiler, bu esigi DEGISTIRMEZ.')
     ap.add_argument('--d-model', type=int, default=D_MODEL, help='gizli boyut')
     ap.add_argument('--num-blocks', type=int, default=NUM_BLOCKS, help='transformer blok sayisi')
     ap.add_argument('--num-heads', type=int, default=NUM_HEADS, help='dikkat kafa sayisi')
@@ -854,13 +899,14 @@ def main():
                          '+6.1M parametre). Bagli varsayilandir.')
     ap.add_argument('--val-every', type=int, default=1,
                     help='val gecisini her N epochda bir yap (2 -> val maliyeti '
-                         'yarilanir, epoch suresi kisalir)')
+                         'yarilanir, epoch suresi kisalir). SADECE maliyet etkisi: '
+                         'erken durdurma esigini DEGISTIRMEZ.')
     ap.add_argument('--lr-horizon', type=int, default=0, metavar='N',
                     help='cosine ogrenme hizi UFKU (epoch). 0 (varsayilan) = otomatik: '
-                         'min(epochs, patience*val_every + 20). Otomatik secenek, '
-                         'LRnin erken durdurma noktasina kadar gercekten inmesini '
-                         'garanti eder. Cok dusuk -> LR erken flattening yapar; cok '
-                         'yuksek (orn. --epochs) -> decay yine calismaz.')
+                         'min(epochs, patience + 20). Otomatik secenek, LRnin erken '
+                         'durdurma noktasina kadar gercekten inmesini garanti eder. '
+                         'Cok dusuk -> LR erken flattening yapar; cok yuksek '
+                         '(orn. --epochs) -> decay yine calismaz.')
     ap.add_argument('--export-dir', default=None,
                     help='llm_model.json + _weights.npz ciktisi (varsayilan: SAVE_DIR)')
     ap.add_argument('--fresh', action='store_true',
@@ -876,15 +922,15 @@ def main():
     bs, lr_base = args.batch_size, args.lr_base
     wd, tie_embed = args.weight_decay, args.tie_embed
     export_dir = args.export_dir or SAVE_DIR
-    # Cosine ufku. Erken durdurma val kaybinda plato yakaladigi icin gercek
-    # bitis noktasi --epochs degil, ~patience*val_every civaridir. Ufuk bunun
-    # oncesinde kalirsa LR o noktaya kadar hic inmez (cosine faktoru ~1),
-    # egitim tepede sonlanir. PAD, erken durdurmanin biraz GEC tetiklenmesine
-    # izin verir -> LR gercekten inmis olur.
+    # Cosine ufku. Gercek bitis noktasi --epochs degil, ~patience civaridir
+    # (patience artik EPOCH cinsinden; once val olcumu sayiyordu ve val_every
+    # ile katlaniyordu). Ufuk bunun oncesinde kalirsa LR o noktaya kadar hic
+    # inmez (cosine faktoru ~1) ve egitim tepede sonlanir. PAD, erken
+    # durdurmanin biraz GEC tetiklenmesine izin verir -> LR gercekten inmis olur.
     if args.lr_horizon > 0:
         lr_horizon = args.lr_horizon
     else:
-        lr_horizon = min(EPOCHS, patience * val_every + LR_HORIZON_PAD)
+        lr_horizon = min(EPOCHS, patience + LR_HORIZON_PAD)
     if dm % nh != 0:
         raise SystemExit(f'--d-model {dm} --num-heads {nh} ile bolunebilir olmali')
     os.makedirs(export_dir, exist_ok=True)
@@ -893,11 +939,42 @@ def main():
           'max_ctx=%d max_seq=%d batch=%d val_every=%d lr=%.1e export=%s' % (
               dm, nb, nh, ff, mxc, mxs, bs, val_every, lr_base, export_dir),
           flush=True)
-    print('CONFIG: epochs=%d patience=%d val_every=%d lr_horizon=%d (LR %.1e -> %.1e)'
-          % (EPOCHS, patience, val_every, lr_horizon, lr_base, lr_base * LR_MIN),
-          flush=True)
+    # patience ve val_every'yi AYRIK goster: ikisi carpilirsa kullanici
+    # gercek epoch butcesini yanlis hesaplar. Kötü val ölçümü sayısı da
+    # yazılır (gerçekte kaç ölçümün "iyileşme yok" sayılacağı).
+    print('CONFIG: epochs=%d patience=%d EPOCH val_every=%d '
+          '-> kotu val olcumu toleransi: %d olcum = %d epoch'
+          % (EPOCHS, patience, val_every,
+             max(1, -(-patience // val_every)), patience), flush=True)
+    print('CONFIG: lr_horizon=%d (LR %.1e -> %.1e)' % (
+        lr_horizon, lr_base, lr_base * LR_MIN), flush=True)
     print('CONFIG: optimizer=AdamW wd=%.4f | gomme<->cikis bagi=%s' % (
         wd, tie_embed), flush=True)
+    # Erken durdurmanin GERCEKTEN tetiklenebilmesi icin epoch butcesi
+    # yeterli olmali. Aksi halde kosu zorlamayla biter ve val'in yukselmeye
+    # baslamasi fark edilmeden epoch butcesi tukenir -- 10 epoch'lik olculmus
+    # kosuda tam olarak bu oldu (val 4. epoch'tan itibaren yukselmisti).
+    _last, _needed = effective_stop_epoch(patience, val_every, EPOCHS)
+    if _needed > EPOCHS:
+        # _needed, iyilesme HIC olmazsa durdurmanin en gec tetiklenebilecegi
+        # epoch. Butce bunun altinda -> tetiklenemez, hangi veri olursa olsun.
+        _lvl = 'KRITIK'
+        _msg = 'HIC TETIKLENEMEZ'
+        _need = _needed + 2 * val_every
+    elif _needed == EPOCHS:
+        # yalnizca son epoch'ta, tam toleransla; hicbir epoch tasarruf etmez.
+        _lvl = 'UYARI'
+        _msg = 'en fazla SON epochta tetiklenir'
+        _need = EPOCHS + 2 * val_every
+    else:
+        _lvl = None
+    if _lvl:
+        print('%s: epochs=%d, patience=%d (EPOCH), val_every=%d. Kotu val '
+              'OLCUMU basi %d epoch biriktirir (toplam %d olcum) -> durdurma en '
+              'gec %d. epochta tetiklenir; bu butceyle %s. En az %d epoch ver.'
+              % (_lvl, EPOCHS, patience, val_every, val_every,
+                 max(1, -(-patience // val_every)), _needed, _msg, _need),
+              file=sys.stderr, flush=True)
 
     if args.dry_run:
         d = prepare_data(RAG, NATURAL=NATURAL, tokenizer=load_tokenizer(),
@@ -1048,6 +1125,18 @@ def main():
             opt.load_state_dict(cp['opt'])
             best_val, best_state, start_ep, step = cp['best_val'], cp['best_state'], cp['epoch'], cp['step']
             best_acc = cp.get('best_acc', 0.0)
+            # Sabir sayaci da tasinmali. Kaganlde oturum 9 saatlik kosunun
+            # ortasinda kopabiliyor; sayac sifirlanirsa her resume'da model
+            # ek patience*val_every epoch daha tolerere ediliyor ve
+            # "gercek bitis noktasi" sessizce kayar. Eski checkpoint'lerde
+            # 'bad' yok -> 0 (daha genis tolerans, guvenli yon).
+            cp_ve = cp.get('val_every', val_every)
+            if cp_ve == val_every:
+                bad = int(cp.get('bad', 0))
+            else:
+                # val_every degismis: kotu OLCUM sayisini epoch'a cevir ki
+                # esik degissin.
+                bad = int(round(int(cp.get('bad', 0)) * cp_ve / max(1, val_every)))
             best_state = {k: v.detach().cpu().clone() for k, v in best_state.items()}
             # step, ESKI ufka gore sayildigi icin yeni tot_steps'i asabilir
             # (ufuk kisisince prog>1 olur ve cosine anlamsiz bir LR verir).
@@ -1059,7 +1148,8 @@ def main():
                 step = tot_steps
             print('Devam: epoch', start_ep, '| step', step,
                   '| best val:', round(best_val, 4),
-                  '| best acc:', round(best_acc, 3), flush=True)
+                  '| best acc:', round(best_acc, 3),
+                  '| kotu epoch:', bad, '/ esik', patience, flush=True)
 
     # ---- coklu GPU sarmaci (DataParallel) -------------------------------------
     # torch.compile VARSAYILAN KAPALI: bu parametre/buffer tabanli modulde cloud
@@ -1190,30 +1280,27 @@ def main():
             print(f'epoch {ep:3d}/{EPOCHS} | train {tl:.4f} | (val atlandi) | '
                   f'{time.time()-t0:.1f}s | lr {cur:.5f} | step {step}/{tot_steps}', flush=True)
 
-        # EARLY-STOP: val LOSS tabanli. Patience sayaci YALNIZCA val
-        # epoch'larinda artar/sifirlanir. En iyi val kaybini VAL_IMP kadar
-        # asmayan her val epochu 'iyilesme yok' sayar -> val yukselmeye
-        # basladiginda sayac dolar ve egitim rekor kayipta durur.
-        # --val-every 2 ile atlanan epochlarda sayac DEGISMEZ.
+        # EARLY-STOP: val LOSS tabanli, tolerans EPOCH cinsinden -> early_stop_step
         if do_val:
-            if vl < best_val - VAL_IMP:
-                # gercek kayip iyilesmesi -> sayac sifirlanir, rekor guncellenir
-                bad = 0
+            bad, improved, stop = early_stop_step(vl, best_val, bad, val_every,
+                                                  patience, VAL_IMP)
+            if improved:
+                # gercek kayip iyilesmesi -> rekor guncellenir
                 best_val = vl
                 best_acc = va_acc
                 best_state = {k: v.detach().cpu().clone()
                               for k, v in base.state_dict().items()}
-            else:
-                bad += 1
-                if bad >= patience:
-                    print(f'[llm] Erken durdurma: val loss yukselmeye basladi '
-                          f'(son {bad} val epoch iyilesme yok). En iyi val: '
-                          f'{best_val:.4f} | best acc: {best_acc:.3f}', flush=True)
-                    done = True
+            elif stop:
+                print(f'[llm] Erken durdurma: val loss yukselmeye basladi '
+                      f'(son {bad} epoch iyilesme yok, esik {patience}). '
+                      f'En iyi val: {best_val:.4f} | best acc: {best_acc:.3f}',
+                      flush=True)
+                done = True
         if ep % CKPT_FREQ == 0 or done:
             torch.save({'epoch': ep, 'step': step, 'model': best_state,
                         'opt': opt.state_dict(), 'best_val': best_val,
                         'best_state': best_state, 'best_acc': best_acc,
+                        'bad': bad, 'val_every': val_every,
                         'arch': {'d_model': dm, 'num_blocks': nb, 'num_heads': nh,
                                  'ff_mult': ff, 'max_seq_len': mxs, 'V': V,
                                  'tied_embeddings': base.tie_embeddings},

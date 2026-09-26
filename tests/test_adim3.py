@@ -1,8 +1,10 @@
 """Adim 3 testleri: context genisletme + veri/knowledge zenginlestirme.
 
-1) MAX_CTX_LEN=48 / MAX_SEQ_LEN=192 / CTX_CHARS=64 sabitleri ve refine_resp
-   butcesi (140 karakter).
-2) encode_llm yeni budceyle 192 token'i, eski 160/40 kombinasyonuyla da 160
+1) MAX_CTX_LEN=48 / MAX_SEQ_LEN=256 / CTX_CHARS=64 sabitleri ve refine_resp
+   butcesi (204 karakter). max_seq 128'den 256'ya cikarildi: kb_budget
+   = max_seq - max_ctx - 8 oldugu icin 128'de yanit alani daraliyor ve RAG
+   yanitlarinin %87'si kirpiliordu; 256'da bu oran %3.
+2) encode_llm yeni budceyle 256 token'i, eski 160/40 kombinasyonuyla da 160
    token'i asmaz (geri uyumluluk).
 3) kb LUT normalizasyonu: knowledge_map anahtari ile egitim ctx'si AYNI uzayda
    (clean_chars + CTX_CHARS) -> RAG isabeti %65 -> %76. Dosyanin kendisi
@@ -37,20 +39,28 @@ _KB = os.path.join(BASE, 'knowledge_map.jsonl')
 class TestContextExpansion(unittest.TestCase):
     def test_new_budget_constants(self):
         # Adim 3: sorgu 40 -> 48 token, sekans 160 -> 192
+        # Sonra max_seq 128 -> 256 (olcumle secildi, bkz. train_llm.py
+        # tablosu): kb_budget = max_seq - max_ctx - 8 oldugu icin kucuk
+        # degerde yanita yer kalmaz ve RAG yanitlarinin %87'si kirpilirdi.
         self.assertEqual(MAX_CTX_LEN, 48)
-        self.assertEqual(MAX_SEQ_LEN, 192)
+        self.assertEqual(MAX_SEQ_LEN, 256)
         # sorgu karakter butcesi (load_pairs ctx_len + kb lut trunc)
         self.assertEqual(CTX_CHARS, 64)
         self.assertEqual(KB_TEXT_CHARS, 300)
-        # dogal bosluk butcesi: 192 - 48 - 4 = 140 karakter
-        self.assertEqual(MAX_SEQ_LEN - MAX_CTX_LEN - 4, 140)
+        # dogal bosluk butcesi: 256 - 48 - 4 = 204 karakter
+        self.assertEqual(MAX_SEQ_LEN - MAX_CTX_LEN - 4, 204)
 
-    def test_refine_resp_default_cap_is_140_chars(self):
+    def test_refine_resp_default_cap_is_204_chars(self):
         long_r = ('x ' * 500).strip()
         out = refine_resp(long_r)
         self.assertIsNotNone(out)
-        self.assertLessEqual(len(out), 140)
+        self.assertLessEqual(len(out), 204)
         self.assertTrue(out)  # bos secim degeri degeri dondurur
+
+    def test_refine_resp_keeps_short_answers_intact(self):
+        # Butce buyudugu icin 140 karakterin altindaki yanitlar KIRPILMAMALI.
+        short_r = 'benefse kucuk bir kasabadir ve tarihi eskidir'
+        self.assertEqual(refine_resp(short_r), short_r)
 
     def test_encode_budget_192_not_exceeded(self):
         m = LLM(_VOCAB, d_model=8, num_blocks=2, num_heads=2,
