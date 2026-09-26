@@ -26,7 +26,7 @@ Hiz (Kaggle T4 2x):
 Kaggle'da egitim (GPU notebook):
   python train_llm.py --rag --natural 5 --kb-map knowledge_map.jsonl   # oneri (d=256)
   python train_llm.py --rag --natural 5 --kb-map knowledge_map.jsonl --d-model 384 --num-blocks 6
-  python train_llm.py --rag --natural 3 --kb-map knowledge_map.jsonl --max-ctx-len 48 --max-seq-len 192
+  python train_llm.py --rag --natural 3 --kb-map knowledge_map.jsonl --max-ctx-len 48 --max-seq-len 256
   python train_llm.py --epochs 400 --patience 40 --batch-size 64 --val-every 2
 Veri boyu: MAX_PAIRS=70000 ham cift N5 ile ~330k cift -> epoch basina sure eski
 (60k cift) 60/gore ~5.5x artar; erken durdurma (patience) devrede -> genelde
@@ -38,9 +38,33 @@ Val kaybi yukselmeye basladiginda sayac dolar ve patience sonrasi eğitim
 DURUR; en iyi val kaybindaki agirliklarla kapanir. --patience duyarliligi
 ayarlar (orn. --patience 6 -> sert, --patience 20 -> rahat).
 
+COSINE OGRENME HIZI UFKU: --epochs DEGIL. Pratikte egitim --epochs'ten cok
+once (val plato -> ~patience*val_every) biter; ufuk --epochs kalirsa LR o
+noktaya kadar inmis gibi gorunmez (cosine faktoru ~1) ve egitim tepede
+biter. Varsayilan ufuk: min(epochs, patience*val_every + 20) -- yani
+cosine, erken durdurma noktasindan biraz SONRA tamamlanir. Boylece LR
+gercekten iniyor, val daha gec yukseliyor, daha iyi genelleme cikiyor.
+Elle ayarlamak icin: --lr-horizon N.
+
+DOGRULAMA BOLMESI: train/val ayrimi CIFT (pair) seviyesinde DEGIL, SORGU
+(ctx) seviyesindedir -- group_split. load_pairs her pattern'i birden cok
+yanitla eslestirir, naturalize_pairs her cifti k varyanta bolerken ctx'yi
+sabit tutar; bu yuzden pair seviyesinde bolmede val'in TAMAMI train'de de
+bulunur (olculdu: %100 sizinti) ve val kaybi ezberlemeyi goremez.
+
 Kapasite flag'leri: --d-model --num-blocks --num-heads --ff-mult
   --max-ctx-len --max-seq-len --batch-size --lr-base. Varsayilani d=256'dir;
   eski (d=128) model dosyalari veri ogesi tasidigi icin geriye donuk yuklenir.
+
+DUZENLESTIRME (varsayilan acik, kapatmak icin flag):
+  - GOMME<->CIKIS BAGLILIGI: head = embed^T. Cikis matrisi ayri saklanmaz;
+    23.0M -> 16.8M parametre (-%26.8), agirlik dosyasi 87.6 -> 64.1 MB.
+    Yeni egitimde varsayilan ACIK. Kapatmak: --untie-embeddings. Eski (baglanmamis)
+    modeller bayrak yok sayilarak aynen calismaya devam eder.
+  - AdamW: --weight-decay (varsayilan 0.01). Ceza YALNIZCA agirilik
+    matrislerine; bias, LayerNorm ve gomme/cikis CEZASIZ kalir (gomme seyrek
+    tablodur, ceza kullanilmayan tokenlari kalici sifira cekerdi).
+    --weight-decay 0 -> cezasiz AdamW.
 
 Ciktilari:
   <SAVE_DIR>/llm_ckpt.pt    -> kaldigi yerden devam (restart/copma guvenli)
@@ -99,11 +123,33 @@ PATIENCE = 6      # erken durdurma (val loss tabanli): val kaybi VAL_IMP
 VAL_IMP = 5e-4   # ckpt-secimi + ERKEN-DURDURMA toleransi: val kaybi eski
 # rekorun bu kadar altina inemiyorsa 'iyilestme yok' sayilir (best_state /
 # en iyi kayipta dondurulur; patience uzerinde kalirsa egitim durur).
+LR_HORIZON_PAD = 20   # cosine UFKU, erken durdurma noktasindan bu kadar ONCE
+#                      # kalmamalidir. Hesap: ufuk = patience*val_every + PAD.
+#                      # Aksi halde ufuk --epochs (250) kalir; val ~35. epoch'ta
+#                      # dururken LR 1e-3'ten 9.6e-4'e inmis gibi olur (cosine
+#                      # hic calismaz) -> egitim tepede biter.
 GRAD_CLIP = 5.0
+WEIGHT_DECAY = 0.01   # AdamW ayrik cezasi. 0.01: 16.9M parametre / 68.8k
+                      # gercek ornek. Gomme ve norm/bias cezasiz (bkz.
+                      # optimizer kurulumu). 0 yapmak asiri uyuma hic mudahal
+                      # vermiyordu.
+TIE_EMBED = True      # gomme <-> cikis bagliligi (varsayilan acik)
 CKPT_FREQ = 1   # her epoch kaydedilir -> Colab kesilse bile max ~1 epoch kayip, resume aninda
 MAX_PAIRS = 70000   # ham ciftlerin TAMAMI kullanilir (intents.json: ~68.654); eski 20k kirpiyordu
-MAX_CTX_LEN = 48    # sorgu icin token butcesi (Adim 3: 40 -> 48)
-MAX_SEQ_LEN = 192   # toplam sekans uzunlugu (Adim 3: 160 -> 192)
+MAX_CTX_LEN = 48    # sorgu icin token butcesi (olcum: gercek sorgu max 25 token
+                    # -> 48 asilir, hic kesme yok; soru butcesini kucultmek
+                    # bilgi/yanit yerine degil, bos yere yer acar)
+MAX_SEQ_LEN = 256   # toplam sekans uzunlugu. TEK KAYNAK: kaggle_start.sh ve
+                    # colab notebooku da buna bagli (128'de RAG yanitlarinin
+                    # %87'si kirpilirdi). Olcum (knowledge_map 1000 ornek,
+                    # 68794 ciftin gercek karmasi, RAG isabeti %57):
+                    #   max_seq  ort  islem   kirpilan RAG yaniti
+                    #      128   110  1.00x      %87   <- eski, kotu
+                    #      192   137  1.24x      %37
+                    #      256   143  1.30x      %3    <- burasi
+                    # Artan islem %30'dur: _pack_encoded PAD kuyrugunu budayip
+                    # uzunluga gore kumeler, RAGsiz ciftlerin ort uzunlugu
+                    # degismez. Uretimde on-ek boslugu 26 -> ~160 token.
 CTX_CHARS = 64      # sorgu icin KARAKTER butcesi: load_pairs ctx_len + kb LUT anahtar
 #                    # uzunlugu. 40-char kesim 689 pattern'i kirpiyordu (data kaybi);
 #                    # 64'te yalnizca 31 uzun pattern kesilir. kb anahtari da AYNI
@@ -127,7 +173,8 @@ if HAVE_TORCH:
         Dropout yalnizca training'de; eval'da kapali -> NumPy parity bozulmaz.
         """
         def __init__(self, V, d_model=D_MODEL, num_blocks=NUM_BLOCKS, num_heads=NUM_HEADS,
-                     ff_mult=FF_MULT, max_seq_len=MAX_SEQ_LEN, drop=DROPOUT):
+                     ff_mult=FF_MULT, max_seq_len=MAX_SEQ_LEN, drop=DROPOUT,
+                     tie_embeddings=True):
             super().__init__()
             self.V, self.D = V, d_model
             self.N, self.H = num_blocks, num_heads
@@ -135,6 +182,16 @@ if HAVE_TORCH:
             self.ff = ff_mult * d_model
             self.rsqrt = self.hd ** -0.5
             self.drop = drop
+            # GOMME <-> CIKIS BAGLILIGI
+            # embed (V,d) ve head (d,V) ayri ayri 6.14M parametre; modelin
+            # %53.4'u yalnizca bu ikisi. Baglandiginda head = embed^T olur ve
+            # 6.14M parametre (%26.7) tasarruf edilir. 23M -> 16.9M.
+            # Baslangic olcegi zaten ayniydi (embed: randn*0.02, head: he*0.02)
+            # ve Adam her parametreyi olcekleyerek guncelledigi icin cift
+            # yonlu gradyan ayrica bir olcek carpimi gerektirmez.
+            # head_b (cikis biasi) BAGLANMAZ: bias gommenin transpozunda
+            # tasinamiyor, ayrica bir vektor olarak kalir.
+            self.tie_embeddings = bool(tie_embeddings)
 
             def he(shape, scale=None):
                 if scale is None:
@@ -168,7 +225,8 @@ if HAVE_TORCH:
 
             self.out_ln_g = nn.Parameter(torch.ones(1, d_model))
             self.out_ln_b = nn.Parameter(torch.zeros(1, d_model))
-            self.head = nn.Parameter(he((d_model, V), scale=0.02))
+            if not self.tie_embeddings:
+                self.head = nn.Parameter(he((d_model, V), scale=0.02))
             self.head_b = nn.Parameter(torch.zeros(1, V))
 
         def _ln(self, x, g, b):
@@ -213,6 +271,8 @@ if HAVE_TORCH:
                 pre = self._ln(x, getattr(self, f'b{i}_ln2_g'), getattr(self, f'b{i}_ln2_b'))
                 x = x + self._ffn(pre, i)
             h = self._ln(x, self.out_ln_g, self.out_ln_b)
+            if self.tie_embeddings:
+                return h @ self.embed.t() + self.head_b
             return h @ self.head + self.head_b
 
 
@@ -369,6 +429,43 @@ def refine_resp(r, maxc=MAX_SEQ_LEN - MAX_CTX_LEN - 4):
     if not r:
         return None
     return r
+
+
+def group_split(pairs, val_frac=0.1, seed=SEED):
+    """Ayni SORGUYA (ctx) ait TUM ciftleri tek tarafa koyan split.
+
+    Neden gerekli: veri uretimi grup halinde cogalttigi icin ayni ctx yuzlerce
+    kez geciyor -- seqgen.load_pairs her pattern'i tum yanitlarla eslestirir
+    (pats x resps), naturalize_pairs her cifti k dogal varyanta bolerken
+    ctx'yi SABIT tutar. Cift (pair) seviyesinde bolunurse val'in TAMAMI
+    train'de de bulunur (olculdu: 33.088/33.088 = %100 sizinti) -> val kaybi
+    'ezberlemeyi gorme' yetenegini kaybeder, erken durdurma yan sinyal okur.
+
+    Bu bolme ctx uzerinden grup yapar: bir grubun butunu ya val'de ya
+    train'de. Deterministik (seed). Greedy: karistirilmis gruplar sirayla
+    val'e eklenir; hedefi asacak grup train'de kalir (kucuk sapma olur ama
+    oran ~= val_frac).
+
+    Doner: (tr_pairs, va_pairs, va_ctx). va_ctx, degerlendirme betiginin
+    train'e sizan val ciftlerini elemek icin kullanabilecegi grup anahtarlari.
+    """
+    groups = {}
+    for idx, (ctx, _resp) in enumerate(pairs):
+        groups.setdefault(ctx, []).append(idx)
+    order = sorted(groups)
+    random.Random(seed).shuffle(order)
+    target = max(1, int(val_frac * len(pairs)))
+    val_idx, val_keys, n_val = [], [], 0
+    for g in order:
+        if n_val >= target:
+            break
+        val_idx.extend(groups[g])
+        val_keys.append(g)
+        n_val += len(groups[g])
+    val_set = set(val_idx)
+    tr_pairs = [p for i, p in enumerate(pairs) if i not in val_set]
+    va_pairs = [p for i, p in enumerate(pairs) if i in val_set]
+    return tr_pairs, va_pairs, set(val_keys)
 
 
 FUNCTIONAL_OPENERS = frozenset("""
@@ -581,11 +678,10 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
     if tokenizer is not None:
         print('BPE tokenizer: vocab =', len(tokenizer), flush=True)
 
-    rng = np.random.RandomState(SEED)
-    perm = rng.permutation(len(pairs))
-    n_val = max(1, int(0.1 * len(pairs)))
-    tr_pairs = [pairs[i] for i in perm[n_val:]]
-    va_pairs = [pairs[i] for i in perm[:n_val]]
+    tr_pairs, va_pairs, va_ctx = group_split(pairs, val_frac=0.1, seed=SEED)
+    print('split (ctx-grup bazli): train %d | val %d | val grubu %d/%d'
+          % (len(tr_pairs), len(va_pairs), len(va_ctx),
+             len({c for c, _ in pairs})), flush=True)
 
     # ---- RAG: her (sorgu, yanit) ciftine ilgili bilgi parcasi
     ctx_map = {}
@@ -651,7 +747,7 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
         va = make_batches(va_pairs, batch_size, dummy, ctx_map)
         print('train batch:', len(tr), '| val batch:', len(va), flush=True)
         return {'vocab': vocab, 'tokenizer': tokenizer,
-                'tr': tr, 'va': va, 'ctx_map': ctx_map}
+                'tr': tr, 'va': va, 'ctx_map': ctx_map, 'val_ctx': va_ctx}
     if os.path.exists(CACHE):
         try:
             print('ondeklent yukleniyor: %s (%.0f MB) ...' % (
@@ -669,7 +765,7 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
             print('veri ondeklenti kullanildi:', os.path.basename(CACHE),
                   '(%d+%d batch)' % (ntr, nva), flush=True)
             return {'vocab': vocab, 'tokenizer': tokenizer,
-                    'tr': tr0, 'va': va0, 'ctx_map': ctx_map}
+                    'tr': tr0, 'va': va0, 'ctx_map': ctx_map, 'val_ctx': va_ctx}
         except Exception as e:
             print('ondeklent yuklenemedi, yeniden encode:', e, flush=True)
 
@@ -711,7 +807,7 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
     except Exception as e:
         print('ondeklent yazilamadi (devam):', e, flush=True)
     return {'vocab': vocab, 'tokenizer': tokenizer,
-            'tr': tr, 'va': va, 'ctx_map': ctx_map}
+            'tr': tr, 'va': va, 'ctx_map': ctx_map, 'val_ctx': va_ctx}
 
 
 def main():
@@ -749,9 +845,22 @@ def main():
                     help='toplam sekans uzunlugu (secenek: 192)')
     ap.add_argument('--batch-size', type=int, default=BATCH_SIZE)
     ap.add_argument('--lr-base', type=float, default=LR_BASE)
+    ap.add_argument('--weight-decay', type=float, default=WEIGHT_DECAY,
+                    help='AdamW ayrik cezasi (0 = kapat). Gomme, bias ve '
+                         'LayerNorm her zaman cezasiz kalir.')
+    ap.add_argument('--untie-embeddings', dest='tie_embed', action='store_false',
+                    default=TIE_EMBED,
+                    help='gomme/cikis bagligini KAPATIR (head ayri saklanir, '
+                         '+6.1M parametre). Bagli varsayilandir.')
     ap.add_argument('--val-every', type=int, default=1,
                     help='val gecisini her N epochda bir yap (2 -> val maliyeti '
                          'yarilanir, epoch suresi kisalir)')
+    ap.add_argument('--lr-horizon', type=int, default=0, metavar='N',
+                    help='cosine ogrenme hizi UFKU (epoch). 0 (varsayilan) = otomatik: '
+                         'min(epochs, patience*val_every + 20). Otomatik secenek, '
+                         'LRnin erken durdurma noktasina kadar gercekten inmesini '
+                         'garanti eder. Cok dusuk -> LR erken flattening yapar; cok '
+                         'yuksek (orn. --epochs) -> decay yine calismaz.')
     ap.add_argument('--export-dir', default=None,
                     help='llm_model.json + _weights.npz ciktisi (varsayilan: SAVE_DIR)')
     ap.add_argument('--fresh', action='store_true',
@@ -765,7 +874,17 @@ def main():
     dm, nb, nh, ff = args.d_model, args.num_blocks, args.num_heads, args.ff_mult
     mxc, mxs = args.max_ctx_len, args.max_seq_len
     bs, lr_base = args.batch_size, args.lr_base
+    wd, tie_embed = args.weight_decay, args.tie_embed
     export_dir = args.export_dir or SAVE_DIR
+    # Cosine ufku. Erken durdurma val kaybinda plato yakaladigi icin gercek
+    # bitis noktasi --epochs degil, ~patience*val_every civaridir. Ufuk bunun
+    # oncesinde kalirsa LR o noktaya kadar hic inmez (cosine faktoru ~1),
+    # egitim tepede sonlanir. PAD, erken durdurmanin biraz GEC tetiklenmesine
+    # izin verir -> LR gercekten inmis olur.
+    if args.lr_horizon > 0:
+        lr_horizon = args.lr_horizon
+    else:
+        lr_horizon = min(EPOCHS, patience * val_every + LR_HORIZON_PAD)
     if dm % nh != 0:
         raise SystemExit(f'--d-model {dm} --num-heads {nh} ile bolunebilir olmali')
     os.makedirs(export_dir, exist_ok=True)
@@ -774,6 +893,11 @@ def main():
           'max_ctx=%d max_seq=%d batch=%d val_every=%d lr=%.1e export=%s' % (
               dm, nb, nh, ff, mxc, mxs, bs, val_every, lr_base, export_dir),
           flush=True)
+    print('CONFIG: epochs=%d patience=%d val_every=%d lr_horizon=%d (LR %.1e -> %.1e)'
+          % (EPOCHS, patience, val_every, lr_horizon, lr_base, lr_base * LR_MIN),
+          flush=True)
+    print('CONFIG: optimizer=AdamW wd=%.4f | gomme<->cikis bagi=%s' % (
+        wd, tie_embed), flush=True)
 
     if args.dry_run:
         d = prepare_data(RAG, NATURAL=NATURAL, tokenizer=load_tokenizer(),
@@ -832,8 +956,49 @@ def main():
 
     # ---------------- model + resume
     model = TorchLLM(V, d_model=dm, num_blocks=nb, num_heads=nh, ff_mult=ff,
-                     max_seq_len=mxs).to(DEVICE)
-    opt = torch.optim.Adam(model.parameters(), lr=lr_base)
+                     max_seq_len=mxs, tie_embeddings=tie_embed).to(DEVICE)
+
+    # ---------------- optimizer: AdamW + duzenlestirme (weight decay)
+    # Model 23M->16.9M parametre, gercek (benzersiz) ornek ~68.8k; dogal
+    # varyantlar ayni 68.8k'yi 5 katina cikariyor -> belirgin asiri uyum
+    # riski. Onceki kurulum `torch.optim.Adam(..., lr=lr_base)` idi:
+    # weight_decay=0 ve AYRILMIS (decoupled) olmayan ceza. AdamW'ye gecmek
+    # iki seyi birden duzeltir: (a) gercek bir ceza, (b) gradyana eklenen
+    # L2 yerine parametreye dogrudan uygulanan ayrik (decoupled) ceza --
+    # uyarlanabilir optimizerlarda bu iki sey ayni degildir.
+    #
+    # Ceza YALNIZCA agirilik matrislerine uygulanir; standart pratik:
+    #   - bias'lar ve LayerNorm katsayilari (olcek kararlari) cezasiz,
+    #     bunlari kurmak ozellikle kotu,
+    #   - gomme/cikis (embed) cezasiz: 16000x384 seyrek tablo, her satiri
+    #     yalnizca o token goruldugunde guncellenir; ceza -> kullanilmayan
+    #     tokenlari surekli sifira cekerek kalici bozar.
+    decay, no_decay = [], []
+    for name, prm in model.named_parameters():
+        if not prm.requires_grad:
+            continue
+        # Bu modelde vektorler (bias, LayerNorm gamma) (1, d) seklinde
+        # tutulur -- yani ndim=2'dir, bu yuzden ndim<2 tek basina YETMEZ
+        # (b0_bq gibi dikdortgen bias'lar cezaya girerdi). Vektor olma
+        # olcumu shape[0]==1'dir; gomme ayrica istisna (V,d) seyrek tablo.
+        is_vector = prm.ndim < 2 or prm.shape[0] == 1
+        if is_vector or name == 'embed':
+            no_decay.append(prm)
+        else:
+            decay.append(prm)
+    # betas/eps PyTorch VARAYILANINDA birakildi (0.9/0.999, 1e-8): eski
+    # `Adam` ayarlariyla ayni. Boylece bu kosudaki TEK fark duzenlestirmedir;
+    # beta/eps'i de degistirmek isteyen ayri bir deney olurdu.
+    opt = torch.optim.AdamW(
+        [{'params': decay, 'weight_decay': wd},
+         {'params': no_decay, 'weight_decay': 0.0}],
+        lr=lr_base)
+    n_dec = sum(p.numel() for p in decay)
+    n_nod = sum(p.numel() for p in no_decay)
+    print('optimizer: AdamW wd=%.4f | cezali %d (%.1fM) | cezasiz %d (%.1fM) '
+          '| gomme bagli: %s' % (wd, n_dec, n_dec / 1e6,
+                                 n_nod, n_nod / 1e6, model.tie_embeddings),
+          flush=True)
 
     # AMP (fp16): T4 Tensor Core'lari devreye girer (~2x). Master agirliklar
     # FP32 kalir (GradScaler) -> export/parity etkilenmez. Veri zaten egitimin
@@ -851,10 +1016,12 @@ def main():
     bad = 0
     start_ep = 0
     step = 0
-    tot_steps = EPOCHS * len(trX)
-    # veri parmak izi: cift sayisi + natural + uzunluklar -> veri degisince
-    # eski checkpoint otomatik atlanir (eski veriyle egitilmis devam etmez).
-    data_fp = '%d-%d-%d-%d-b4-c%d' % (len(trX), NATURAL, mxc, mxs, CTX_CHARS)
+    tot_steps = lr_horizon * len(trX)
+    # veri parmak izi: cift sayisi + natural + uzunluklar + BOLME STRATEJISI ->
+    # veri degisince eski checkpoint otomatik atlanir (eski veriyle egitilmis
+    # devam etmez). 'gs1' = ctx-grup bazli split; eski (pair seviyesi, sizintili)
+    # checkpoint'lar 'gs0' ile isaretlidir ve otomatik reddedilir.
+    data_fp = '%d-%d-%d-%d-b4-c%d-gs1' % (len(trX), NATURAL, mxc, mxs, CTX_CHARS)
 
     if args.fresh:
         print('Uyari: --fresh verildi, mevcut checkpoint yok sayilir '
@@ -864,7 +1031,12 @@ def main():
         arch = cp.get('arch', {})
         same_arch = (arch.get('d_model') == dm and arch.get('num_blocks') == nb
                      and arch.get('num_heads') == nh and arch.get('ff_mult') == ff
-                     and arch.get('max_seq_len') == mxs and arch.get('V') == V)
+                     and arch.get('max_seq_len') == mxs and arch.get('V') == V
+                     # Baglilik degistiyse checkpoint'in 'head' anahtari ya
+                     # fazladir ya da yoktur -> state_dict yuklemesi PATLAR.
+                     # Bu yuzden mimari uyumuna dahil edilir.
+                     and bool(arch.get('tied_embeddings', False))
+                     == bool(model.tie_embeddings))
         same_data = cp.get('data') == data_fp
         if not same_arch or not same_data:
             print('Uyari: mevcut checkpoint eski (mimari-uyum: %s, '
@@ -877,6 +1049,14 @@ def main():
             best_val, best_state, start_ep, step = cp['best_val'], cp['best_state'], cp['epoch'], cp['step']
             best_acc = cp.get('best_acc', 0.0)
             best_state = {k: v.detach().cpu().clone() for k, v in best_state.items()}
+            # step, ESKI ufka gore sayildigi icin yeni tot_steps'i asabilir
+            # (ufuk kisisince prog>1 olur ve cosine anlamsiz bir LR verir).
+            # Tamponla: ufka sabitle, LR_min uzerinden devam etsin.
+            if step > tot_steps:
+                print('Uyari: checkpoint step %d > yeni lr ufku %d step; '
+                      'step ufka sabitleniyor (LR -> LR_MIN).' % (step, tot_steps),
+                      flush=True)
+                step = tot_steps
             print('Devam: epoch', start_ep, '| step', step,
                   '| best val:', round(best_val, 4),
                   '| best acc:', round(best_acc, 3), flush=True)
@@ -1004,11 +1184,11 @@ def main():
             vl /= len(vaX)
             va_acc /= len(vaX)
             print(f'epoch {ep:3d}/{EPOCHS} | train {tl:.4f} | val {vl:.4f} | acc {va_acc:.3f} | '
-                  f'{time.time()-t0:.1f}s | lr {cur:.5f}', flush=True)
+                  f'{time.time()-t0:.1f}s | lr {cur:.5f} | step {step}/{tot_steps}', flush=True)
         else:
             vl = best_val
             print(f'epoch {ep:3d}/{EPOCHS} | train {tl:.4f} | (val atlandi) | '
-                  f'{time.time()-t0:.1f}s | lr {cur:.5f}', flush=True)
+                  f'{time.time()-t0:.1f}s | lr {cur:.5f} | step {step}/{tot_steps}', flush=True)
 
         # EARLY-STOP: val LOSS tabanli. Patience sayaci YALNIZCA val
         # epoch'larinda artar/sifirlanir. En iyi val kaybini VAL_IMP kadar
@@ -1035,7 +1215,8 @@ def main():
                         'opt': opt.state_dict(), 'best_val': best_val,
                         'best_state': best_state, 'best_acc': best_acc,
                         'arch': {'d_model': dm, 'num_blocks': nb, 'num_heads': nh,
-                                 'ff_mult': ff, 'max_seq_len': mxs, 'V': V},
+                                 'ff_mult': ff, 'max_seq_len': mxs, 'V': V,
+                                 'tied_embeddings': base.tie_embeddings},
                         'data': data_fp}, CKPT)
             print(f'  checkpoint -> {CKPT}', flush=True)
         if done:
@@ -1055,6 +1236,7 @@ def main():
         'd_model': dm, 'num_blocks': nb, 'num_heads': nh,
         'ff_mult': ff,
         'max_ctx_len': mxc, 'max_seq_len': mxs,
+        'tied_embeddings': bool(base.tie_embeddings),
         'weights_file': 'llm_model_weights.npz',
     }
     if tok is not None:
@@ -1085,11 +1267,15 @@ def main():
     np_model = LLM(vocab, d_model=dm, num_blocks=nb, num_heads=nh,
                    ff_mult=ff, max_ctx_len=mxc, max_seq_len=mxs,
                    seed=SEED, tokenizer=tok)
+    np_model.tied_embeddings = bool(base.tie_embeddings)
     np_model.params = {k: np.asarray(v, np.float32) for k, v in best_state.items()}
     numpy_logits = np_model.forward(x.detach().cpu().numpy())
     diff = float(np.max(np.abs(torch_logits - numpy_logits)))
     print(f'parity dogrudan: {diff:.6f} (beklenen < 1e-3)', flush=True)
     assert diff < 1e-3, f'Parity bozuk: {diff}'
+    if base.tie_embeddings:
+        assert 'head' not in best_state, 'bagli modelde head ayri saklanmamali'
+        print('baglilik dogrulandi: head anahtari yok, cikis = embed^T', flush=True)
 
     # --------- parity 2: export round-trip (data + npz -> from_dict -> forward)
     json_model = LLM(['<PAD>', '<BOS>', '<SEP>', '<EOS>']).from_dict(

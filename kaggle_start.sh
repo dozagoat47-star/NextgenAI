@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 # Kaggle Notebook (P100/T4x2 GPU, haftada 30 sa ucretsiz) - Nextgen LLM egitimi.
 #
 # Kullanimi (Kaggle'da):
@@ -35,20 +35,44 @@ fi
 
 # Kapasite: varsayilan d=384 / 6 blok (~22.9M). Env ile asilabilir:
 #   LLM_CAP=256 LLM_BLOCKS=4 bash kaggle_start.sh train ...
-DPARGS="--d-model ${LLM_CAP:-384} --num-blocks ${LLM_BLOCKS:-6} --max-seq-len ${LLM_SEQ:-128}"
+# max-seq-len 256 OZEL BIR SAYI DEGIL, olcumle secildi (knowledge_map.jsonl,
+# 1000 RAG ornegi + 68794 ciftin gercek karmasi):
+#   kb_budget = max_seq - max_ctx - 8 oldugu icin kucuk degerde YANIT yer
+#   kalmaz ve RAG yanitlari kirpilir. RAG isabeti %57.
+#     max_seq  ort uzunluk  islem   RAG yaniti kirpildi
+#        128       110     1.00x        %87   <- eski (bu hatayi yaratti)
+#        192       137     1.24x        %37
+#        256       143     1.30x        %3    <- secilen
+#   Artan islem yalnizca %30: uzunluk-kirpimli batch'ler (train_llm.py
+#   _pack_encoded) RAGsiz 68794 ciftin ort uzunlugu degismiyor.
+#   Uretimde de on-ek 128'de 26 -> 256'da ~160 token bosluk birakir.
+#   Bu train_llm.py MAX_SEQ_LEN varsayilaniyla AYNI olmali (tek kaynak);
+#   Colab notebooku da bu degere bagli.
+DPARGS="--d-model ${LLM_CAP:-384} --num-blocks ${LLM_BLOCKS:-6} --max-seq-len ${LLM_SEQ:-256}"
+
+# Duzenlestirme: gomme<->cikis bagliligi + AdamW. Varsayilanlar train_llm.py
+# ile ayni; burada ACIK yazilir ki Kaggle logu kendi kendini belgelensin.
+#   baglilik : 23.0M -> 16.8M parametre (-%26.8), dosya 87.6 -> 64.1 MB.
+#               Kapatmak icin: LLM_TIE=0
+#   AdamW    : wd=0.01, yalnizca agirilik matrislerine; bias/LayerNorm/gomme
+#              cezasiz. Kapatmak icin: LLM_WD=0
+REGARGS="--weight-decay ${LLM_WD:-0.01}"
+if [ "${LLM_TIE:-1}" = "0" ]; then
+  REGARGS="$REGARGS --untie-embeddings"
+fi
 
 DONE=''
 case "$MODE" in
   train)
     echo "[1/3] RAG egitim (natural 5, epochs=$EPOCHS, d=384/6 blok) -> llm_model.json"
     python train_llm.py --rag --kb-map knowledge_map.jsonl --natural 5 $CGARG \
-      --epochs "$EPOCHS" --batch-size 128 --val-every 2 $DPARGS 2>&1 | tee kaggle_train.log
+      --epochs "$EPOCHS" --batch-size 128 --val-every 2 $DPARGS $REGARGS 2>&1 | tee kaggle_train.log
     DONE='yes'
     ;;
   bench)
     echo "[1/3] 1-epoch zamanlama (cache/encode + 1 epoch, birlikte olculur)"
     python train_llm.py --rag --kb-map knowledge_map.jsonl --natural 5 $CGARG \
-      --epochs 1 --batch-size 128 --val-every 1 --fresh $DPARGS 2>&1 | tee kaggle_bench.log
+      --epochs 1 --batch-size 128 --val-every 1 --fresh $DPARGS $REGARGS 2>&1 | tee kaggle_bench.log
     echo ""
     echo "[2/3] Son egitim satiri (epoch suresi '| NN.Ns' bolumundedir):"
     grep 'epoch ' kaggle_bench.log | tail -1
@@ -59,7 +83,7 @@ case "$MODE" in
     echo "[1/3] dry-run dogrulama (GPU gerekmez, ~1-2 dk; TAM encode YAPILMAZ)"
     echo "      Ayni veri bayraklari -> onbellek parmak izi bench/train ile ayni."
     python train_llm.py --dry-run --rag --kb-map knowledge_map.jsonl --natural 5 \
-      --batch-size 128 --limit-pairs 4000 $CGARG $DPARGS
+      --batch-size 128 --limit-pairs 4000 $CGARG $DPARGS $REGARGS
     echo "[2/3] OK - ilk-kelime hizalama ve RAG hatti hazir."
     echo "[3/3] Tam egitim icin:  !bash kaggle_start.sh train 250"
     ;;

@@ -34,7 +34,9 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE)
 
 from llm import load_llm
-from train_llm import (INTENTS, MAX_PAIRS, CTX_CHARS, build_kb_lut, refine_resp)
+from train_llm import (INTENTS, MAX_PAIRS, CTX_CHARS, build_kb_lut,
+                       refine_resp, group_split, stabilize_first_words)
+from naturalize import naturalize_pairs
 from seqgen import load_pairs
 
 KB_MAP = os.path.join(BASE, 'knowledge_map.jsonl')
@@ -167,6 +169,22 @@ def _measure(query, gold, generated, knowledge, stopwords):
     tk = topic_overlap(cand, kb, stopwords) if kb else None
     tmean = (tq + tk) / 2.0 if tk is not None else tq
     gen_index = 0.5 * (1.0 - copy_bleu) + 0.3 * tmean + 0.2 * fluency
+    # --- qa_score: ALAKA-ONCELIKLI skor -------------------------------------
+    # gen_index OZELLIKLE konu dokunusunu %5 agirlikla olcer; agirliklarin
+    # %63'u copy_bleu, %31'i fluency. Oylece 13 raporda goruldugu gibi
+    # alaka ekseni (tmean 0.098-0.134) model siralamasini hic belirlemiyor.
+    # qa_score alakayi ANA eksen yapar:
+    #   %50 konu dokunusu  -> soruya/ bilgiye gercekten değiyor mu
+    #   %25 fluency        -> tekrar/bozuk metin degil (donusmus cirpinti)
+    #   %15 copy_bleu     -> altin yanitin icerigini de veriyor mu
+    #   %10 uzunluk uyumu -> 1 kelimeye 20 kelimelik soruya kisa kesme
+    # Bos uretim EN kotu basarisizliktir: agirlikli ortalama onu yalnizca
+    # 0.5 * (1/n) kadar kistirirdi, bu yuzden acik -0.5 ceza.
+    lr = length_ratio(cand, ref)
+    length_fit = max(0.0, 1.0 - min(1.0, abs(lr - 1.0)))
+    is_empty = 1.0 if not cand else 0.0
+    qa_score = (0.50 * tmean + 0.25 * fluency + 0.15 * copy_bleu
+                + 0.10 * length_fit - 0.5 * is_empty)
     return dict(
         query=query,
         generated=generated,
@@ -182,9 +200,10 @@ def _measure(query, gold, generated, knowledge, stopwords):
         topic_q=tq,
         topic_k=tk,
         topic_mean=tmean,
-        length_ratio=length_ratio(cand, ref),
+        length_ratio=lr,
         avg_word_len=avg_word_len(cand),
         gen_index=gen_index,
+        qa_score=qa_score,
     )
 
 
@@ -227,7 +246,7 @@ def sample_report(model, items, temperature=0.7, top_k=10, rep_penalty=0.3,
 def aggregate_report(rows):
     keys = ['copy_bleu', 'copy_prec1', 'rep2', 'distinct1', 'fluency',
             'topic_q', 'topic_mean', 'length_ratio', 'avg_word_len',
-            'gen_index', 'n_tokens', 'gold_tokens']
+            'gen_index', 'qa_score', 'n_tokens', 'gold_tokens']
     agg = {}
     for k in keys:
         vals = [r[k] for r in rows]
@@ -261,20 +280,52 @@ def print_report(title, agg):
     print(f"  ort kelime uzunlugu            : {agg['avg_word_len']:.1f}")
     print(f"  genel skor    (0-1)            : {agg['gen_index']:.3f} "
           f"(± {agg['gen_index_std']:.3f})")
+    print(f"  QA skoru     (0-1, alaka-ust) : {agg['qa_score']:.3f} "
+          f"(± {agg['qa_score_std']:.3f})  <- asil karsilastirma olcusu")
     print(f"  ornek: {agg['n_samples']} | bostler: {agg['n_empty']}")
     print()
+    print(f"  NOT: gen_index std = ±{agg['gen_index_std']:.3f} olceginde. Iki model")
+    print("       arasindaki gen_index farki bu degerden KUCUK ise anlamli "
+          "degildir;")
+    print("       secimi --compare ile paired olarak yapin.")
 
 
-def _load_items(rag, limit):
+def _load_items(rag, limit, natural=0):
+    """GUVENILIR degerlendirme seti: modelin EGITIMDE HIC GORMEDIGI sorular.
+
+    Onceki surum sadece load_pairs + refine_resp cagrisiyordu, yani ham
+    (naturalize oncesi) tum ciftlerden orneklendiriyordu. Egitim ise
+    stabilize -> naturalize -> group_split zincirinden gecor; dolayisiyla
+    degerlendirme cogunlukla EGITIM VERISINI olcuyordu -> memorizasyon
+    tespit edilemiyordu.
+
+    Simdi degerlendirme, egitimle BIREBIR AYNI veri hattini kosutur ve
+    group_split'in VAL tarafini alir (model o ctx'lerin hicbirini
+    gormedi). Ayrica her ornekte FARKLI bir ctx secilir; boylece tek bir
+    soru 5 varyantiyla sayilmaz.
+    """
     pairs = load_pairs(INTENTS, max_pairs=MAX_PAIRS, use_query=True,
                        ctx_len=CTX_CHARS)
     pairs = [(ctx, rr) for ctx, r in pairs if (rr := refine_resp(r)) is not None]
+    pairs = stabilize_first_words(pairs)
+    if natural > 0:
+        pairs = naturalize_pairs(pairs, k=natural)
+    tr_pairs, va_pairs, _va_ctx = group_split(pairs, val_frac=0.1)
+    print(f'degerlendirme seti kaynagi: VAL kumesi (egitimde gorulmedi) | '
+          f'val {len(va_pairs)} cift, train {len(tr_pairs)} cift', flush=True)
+
     kb_pre = {}
     if rag and os.path.exists(KB_MAP):
         kb_pre = build_kb_lut(KB_MAP)
         print(f'kb-map yuklendi (normalize-ctx): {len(kb_pre)} desen', flush=True)
+
+    # her ctx'ten TEK cift (deterministik sira: sirali + tohumlu karistirma)
+    seen = set()
     items = []
-    for ctx, gold in pairs:
+    for ctx, gold in va_pairs:
+        if ctx in seen:
+            continue
+        seen.add(ctx)
         k = kb_pre.get(ctx)
         items.append((ctx, gold, k) if k and rag else (ctx, gold))
         if limit and len(items) >= limit:
@@ -282,9 +333,78 @@ def _load_items(rag, limit):
     return items
 
 
+def compare_reports(path_a, path_b, key='qa_score'):
+    """Iki raporu ESLESTIRILMIS (paired) olarak karsilastirir.
+
+    Ayni soru seti uzerinden soru bazinda fark d_i = a_i - b_i hesaplanir.
+    Boylece SORU ZORLUGU varyansi (ortalama std'de en buyuk pay) cikarilir;
+    kalan sey ornekleme gurultusudur.
+
+    DIKKAT: azaltma buyuklugu karsilastirilan kosula baglidir.
+      - ayni seed, farkli model  -> ornekleme gurultusu yok, paired std
+        bagimsiz std'nin belirgin sekilde altina iner (en duyarli durum).
+      - farkli seed, ayni model  -> her sorunun orn farkli; yalnizca soru
+        zorlugu varyansi cikarilir, kalan gurultu kalir. Olcumde goruldugu
+        gibi paired std bagimsiz std'nin %91'i kalabildi.
+    Yani "paired" her zaman dramatik dusus demek DEGILDIR; asil degeri
+    karar verirken ortak soru kumesi uzerinden bakmaktir.
+
+    Eski raporlarda 'items' yoktur -> karsilastirma yapilmaz (yanlis pozitif
+    uretmemek icin); yalnizca toplu degerler gosterilir.
+    """
+    with io.open(path_a, encoding='utf-8') as f:
+        A = json.load(f)
+    with io.open(path_b, encoding='utf-8') as f:
+        B = json.load(f)
+    print('A: %s\n   %s' % (path_a, A.get('model', '?')))
+    print('B: %s\n   %s\n' % (path_b, B.get('model', '?')))
+    for k in ('gen_index', 'qa_score', 'topic_mean', 'copy_bleu', 'fluency'):
+        if k in A.get('report', {}) and k in B.get('report', {}):
+            print('  %-12s A=%.4f  B=%.4f  fark=%+.4f'
+                  % (k, A['report'][k], B['report'][k],
+                     A['report'][k] - B['report'][k]))
+    print()
+    ia = {r['q']: r for r in (A.get('items') or [])}
+    ib = {r['q']: r for r in (B.get('items') or [])}
+    common = [q for q in ia if q in ib and key in ia[q] and key in ib[q]]
+    if not common:
+        print('KARSILASTIRMA YAPILAMADI: raporlarda soru bazli "items" yok.')
+        print('  Eski raporlar bu alani icermiyor. Bir kez daha degerlendirme')
+        print('  calistirip --out ile yeni rapor uret, sonra paired karsilastirma')
+        print('  calisir. (Eski raporlar toplu degerlerle gorulur, karar verilmez.)')
+        return 1
+    d = np.array([ia[q][key] - ib[q][key] for q in common])
+    n = len(d)
+    m = float(d.mean())
+    sd = float(d.std(ddof=1)) if n > 1 else 0.0
+    se = sd / (n ** 0.5) if n > 1 else 0.0
+    t = m / se if se > 0 else 0.0
+    verdict = 'ANLAMLI FARK' if abs(t) >= 2.0 else 'GURULTU ICINDE'
+    indep = A['report'].get(key + '_std', 0.0) or 0.0
+    print('PAIRED %s  (%d ortak soru)' % (key, n))
+    print('  bagimsiz std (A) : %.4f' % indep)
+    print('  bagimsiz std (B) : %.4f' % (B['report'].get(key + '_std', 0.0) or 0.0))
+    print('  paired std       : %.4f%s' % (
+        sd, ('  (bagimsiz stdin %.0f%%i)' % (100.0 * sd / indep)) if indep else ''))
+    print('  ortalama fark    : %+.4f  +- %.4f (standart hata)' % (m, se))
+    print('  t                : %+.2f    |t| >= 2 esigi -> %s' % (t, verdict))
+    if abs(t) < 2.0:
+        print('  -> FARK ANLAMLI DEGIL. Iki modeli "daha iyi" diye secmek')
+        print('     bu olcumde gurultu secmektir.')
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description='LLM uretim kalitesi benchmarki')
+    ap.add_argument('--compare', nargs=2, metavar=('A.json', 'B.json'),
+                    help='iki raporu paired olarak karsilastirir (model calismaz)')
+    ap.add_argument('--compare-key', default='qa_score',
+                    help='karsilastirilacak olcu (varsayilan: qa_score)')
     ap.add_argument('--n', type=int, default=60, help='orneklenecek cift sayisi')
+    ap.add_argument('--natural', type=int, default=5, metavar='K',
+                    help='egitimdeki --natural ile AYNI olmali; split ayni '
+                         'kume duser, aksi halde degerlendirme kumesi '
+                         'egitimle cakismaz olur. 0 = naturalize yok.')
     ap.add_argument('--seed', type=int, default=7)
     ap.add_argument('--temperature', type=float, default=0.7)
     ap.add_argument('--top-k', type=int, default=10)
@@ -302,11 +422,15 @@ def main():
                          '0.0 = kapali, egitimli taban cizgisi)')
     args = ap.parse_args()
 
+    if args.compare:
+        return compare_reports(args.compare[0], args.compare[1],
+                               args.compare_key)
+
     model = load_llm()
     if model is None:
         print('model/llm_model.json bulunamadi - once egitilmis model kopyala')
         return 2
-    items = _load_items(args.rag, args.n)
+    items = _load_items(args.rag, args.n, natural=args.natural)
     print(f'degerlendirme seti: {len(items)} cift (rag={args.rag})',
           flush=True)
     info = (f'd={model.d_model} blok={model.num_blocks} '
@@ -348,10 +472,23 @@ def main():
             print(f"     A: {r['generated'][:90]}")
             print(f"     G: {r['gold'][:70]}")
     if args.out:
+        # Soru BASINA skorlar saklanir: iki raporu karsilastirmak icin
+        # ESLESTIRILMIS (paired) fark hesaplanabilir. Bagimsiz std ile
+        # karsilastirmak ayni 60 soru uzerinde yapildigi icin yanlis; paired
+        # std cok daha kucuktur ve gercek kaziyi ortaya cikarir.
+        per_item = [{'q': r['query'], 'gen_index': round(r['gen_index'], 6),
+                     'qa_score': round(r['qa_score'], 6),
+                     'topic_mean': round(r['topic_mean'], 6),
+                     'copy_bleu': round(r['copy_bleu'], 6),
+                     'fluency': round(r['fluency'], 6),
+                     'n_tokens': r['n_tokens'],
+                     'generated': r['generated']}
+                    for r in rows]
         with io.open(args.out, 'w', encoding='utf-8') as f:
             json.dump({'model': info, 'n': len(items), 'rag': args.rag,
                        'seed': args.seed, 'config': vars(args),
-                       'report': agg}, f, ensure_ascii=False, indent=1)
+                       'report': agg, 'items': per_item},
+                      f, ensure_ascii=False, indent=1)
         print('rapor yazildi:', args.out, flush=True)
     return 0
 

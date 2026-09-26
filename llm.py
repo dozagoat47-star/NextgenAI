@@ -109,6 +109,9 @@ class LLM:
         self.max_ctx_len = int(max_ctx_len)
         self.max_seq_len = int(max_seq_len)
         self.rsqrt = np.float32(1.0 / math.sqrt(self.head_dim))
+        # Baglilik varsayilan olarak KAPALI: taze LLM() cagrilari eski davranisi
+        # (ayri head) korur, sadece bayrak acikken baglanir.
+        self.tied_embeddings = False
         self.params = self._init_params(seed)
         self.pos_enc = self._sinusoidal(self.max_seq_len)
 
@@ -154,8 +157,16 @@ class LLM:
         return pe
 
     # ------------------------------------------------------------ DİKKAT
-    def _attn(self, x, i, causal=True):
-        """x:(B,T,d) -> self-attn ciktisi (B,T,d). causal=yukari-ucgen maske."""
+    def _attn(self, x, i, cache=None, past=0):
+        """x:(B,T,d) -> self-attn ciktisi (B,T,d). causal=yukari-ucgen maske.
+
+        cache=None ise TAM sekans (eski davranis, birebir ayni).
+        cache verilirse onceki token'larin K/V'si cache'ten okunur ve
+        guncellenir; x yalnizca YENI token(lari) icerir (past = onceden
+        islenen token sayisi). Causal maske k_pos > q_pos ile kuruldugu
+        icin yeni pozisyonlar tum gecmise ama hicbir gelecege bakamaz --
+        cache'li yol cache'siz yolla birebir ayni sonucu verir.
+        """
         B, T, d = x.shape
         H, hd = self.num_heads, self.head_dim
         p = self.params
@@ -165,11 +176,18 @@ class LLM:
         Qh = Q.reshape(B, T, H, hd).transpose(0, 2, 1, 3)
         Kh = K.reshape(B, T, H, hd).transpose(0, 2, 1, 3)
         Vh = V.reshape(B, T, H, hd).transpose(0, 2, 1, 3)
-
+        if cache is not None:
+            if cache[i] is not None:
+                Kh = np.concatenate([cache[i][0], Kh], axis=2)
+                Vh = np.concatenate([cache[i][1], Vh], axis=2)
+            cache[i] = (Kh, Vh)
+        Tt = Kh.shape[2]                       # toplam anahtar/deg. sayisi
         scores = Qh @ Kh.transpose(0, 1, 3, 2) * self.rsqrt
-        if causal:
-            tri = np.triu(np.ones((T, T), np.float32), k=1)   # j>i yasa
-            scores = scores + tri[None, None] * np.float32(-1e9)
+        if Tt > 1:
+            # sorgu pozisyonlari past..past+T-1, anahtarlar 0..Tt-1
+            q_pos = np.arange(past, past + T)[:, None]
+            k_pos = np.arange(Tt)[None, :]
+            scores = scores + (k_pos > q_pos)[None, None] * np.float32(-1e9)
         a = softmax(scores, axis=-1)
         out = (a @ Vh).transpose(0, 2, 1, 3).reshape(B, T, d)
         return out @ p[f'b{i}_Wo'] + p[f'b{i}_bo']
@@ -180,18 +198,38 @@ class LLM:
         return h @ p[f'b{i}_W2'] + p[f'b{i}_b2']
 
     # ------------------------------------------------------------ İLERİ
-    def forward(self, X):
-        """X:(B,T) token ids -> logits:(B,T,V) (tam sekans, otoregresif)."""
+    def new_cache(self):
+        """Bos KV onbellegi (her blok icin (K,V) veya None)."""
+        return [None] * self.num_blocks
+
+    def forward(self, X, cache=None, past=0, last_only=False):
+        """X:(B,T) token ids -> logits:(B,T,V) (tam sekans, otoregresif).
+
+        cache=None (varsayilan) -> tam sekans, TAM logit doner (eski yol).
+        cache verilirse X yalnizca yeni token'lardir, past = onceden islenen
+        token sayisi; K/V cache'e yazilir.
+        last_only=True -> yalnizca SON pozisyonun logit'i doner ((B,1,V)).
+        Uretimde her adimda yalnizca son pozisyon kullanildigi icin head
+        matmulu T kat tasarruf eder (T=128'de 16.000-genislik matmul'un
+        %99'u israf edilirdi).
+        """
         p = self.params
+        B, T = X.shape[0], X.shape[1]
         x = p['embed'][X]
-        T = X.shape[1]
-        x = x + self.pos_enc[:T][None, :, :]
+        x = x + self.pos_enc[past:past + T][None, :, :]
         for i in range(self.num_blocks):
             pre = ln(x, p[f'b{i}_ln1_g'], p[f'b{i}_ln1_b'])
-            x = x + self._attn(pre, i)
+            x = x + self._attn(pre, i, cache, past)
             pre = ln(x, p[f'b{i}_ln2_g'], p[f'b{i}_ln2_b'])
             x = x + self._ffn(pre, i)
         h = ln(x, p['out_ln_g'], p['out_ln_b'])
+        if last_only:
+            h = h[:, -1:, :]
+        if self.tied_embeddings:
+            # Bagli gomme/cikis: head = embed^T. head matrisi AYRI saklanmaz
+            # (V*d = 6.1M parametre tasarrufu). embed (V,d) C-sonlu oldugu
+            # icin h @ embed.T BLAS'a transpoz kopya olmadan gider.
+            return h @ p['embed'].T + p['head_b']
         return h @ p['head'] + p['head_b']
 
     # ------------------------------------------------------------ YARDIMCILAR
@@ -290,8 +328,14 @@ class LLM:
         out_ids = []
         seen_ngrams = set()
         generated = set()
+        # KV ONDEKLEK: baslangic sekansi (sorgu + bilgi) ONCE BIR KEZ islenir,
+        # sonraki her adimda YALNIZCA yeni token transformatordan gecer.
+        # Onceki yol her adimda TUM oneki yeniden hesaplardi (O(T^2)) ve
+        # T pozisyonun 16.000-genislik logit'ini atardi.
+        kv = self.new_cache()
+        logits = self.forward(np.array([dec], np.int64), cache=kv,
+                              past=0, last_only=True)[0, -1]
         for step in range(max_len):
-            logits = self.forward(np.array([dec], np.int64))[0, -1]
             if rep_penalty and generated:
                 for idx in generated:
                     logits[idx] -= rep_penalty
@@ -313,6 +357,9 @@ class LLM:
                     del out_ids[-6:]
                     break
                 seen_ngrams.add(ngram)
+            # sonraki adim: yalnizca yeni token
+            logits = self.forward(np.array([[idx]], np.int64), cache=kv,
+                                  past=len(dec) - 1, last_only=True)[0, -1]
 
         return self._decode_clean(self._dec(out_ids))
 
@@ -363,7 +410,7 @@ class LLM:
         """
         p = self.params
         d, ff, N, V = self.d_model, self.ff_dim, self.num_blocks, self.V
-        missing, wrong = [], []
+        missing, wrong, extra = [], [], []
 
         def _chk(name, expected):
             if name not in p:
@@ -386,18 +433,34 @@ class LLM:
             _chk(f'b{i}_ln2_b', (1, d))
         _chk('out_ln_g', (1, d))
         _chk('out_ln_b', (1, d))
-        _chk('head', (d, V))
+        if self.tied_embeddings:
+            # Bagli modelde head AYRI saklanmaz; embed transpoz olarak kullanilir.
+            _chk('embed', (V, d))
+            if 'head' in p:
+                # Bagli header + baglanmamis agirlik dosyasi eslesmesi. head
+                # sessizce yok sayilir ve model tamamen yanlis uretir --
+                # ayni siniftan hata (yanlis NPZ) zaten _chk ile yakalaniyor,
+                # o yuzden burada da reddediyoruz.
+                extra.append('head')
+        else:
+            _chk('head', (d, V))
         _chk('head_b', (1, V))
         if 'pos_enc' in p:
             _chk('pos_enc', (self.max_seq_len, d))
 
-        if not missing and not wrong:
+        if not missing and not wrong and not extra:
             return self
         lines = []
         if missing:
             lines.append('Eksik agirliklar: ' + ', '.join(sorted(missing)))
         for name, got, exp in wrong:
             lines.append(f'{name}: sekil {got} ama beklenen {exp}')
+        if extra:
+            lines.append(
+                'Bagli modelde bulunmamasi gereken agirliklar: '
+                + ', '.join(sorted(extra))
+                + ' (tied_embeddings=true ama agirliklar baglanmamis; '
+                  'head yok sayilir ve model yanlis uretir)')
         raise ValueError(
             '[llm] JSON header ile agirliklar uyumsuz '
             f'(d={d} ff={ff} blok={N} V={V} max_seq={self.max_seq_len}). '
@@ -431,6 +494,9 @@ class LLM:
         self.ff_dim = int(data['ff_mult']) * self.d_model
         self.max_ctx_len = int(data.get('max_ctx_len', 40))
         self.max_seq_len = int(data.get('max_seq_len', 160))
+        # Gomme <-> cikis bagi: True ise head ayri degildir, head = embed^T.
+        # Eski (baglanmamis) modellerde alan yoktur -> False -> eski yol.
+        self.tied_embeddings = bool(data.get('tied_embeddings', False))
         self.rsqrt = np.float32(1.0 / math.sqrt(self.head_dim))
         # Yeni format: ağırlıklar ayrı bir NPZ dosyasında (compact header).
         # weights_path verilmişse NPZ'den, verilmemişse eski inline 'params'

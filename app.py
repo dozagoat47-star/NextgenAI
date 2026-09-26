@@ -11,6 +11,8 @@ import os
 import json
 import random
 import re
+import secrets
+import time
 import webbrowser
 import threading
 from flask import Flask, render_template, request, jsonify
@@ -20,6 +22,9 @@ from corpus import Corpus
 from generator import TextGenerator
 
 app = Flask(__name__)
+
+# Govde boyutu tavani: asiri buyuk JSON ile bellek tuketimi engellenir.
+app.config['MAX_CONTENT_LENGTH'] = 256 * 1024
 
 bot = ChatBot()
 corpus = Corpus()
@@ -31,6 +36,129 @@ _last_tag = None  # baglam: son yanitin intent'i ('espri' devam istekleri icin)
 
 DEFAULT_UNKNOWN = ("Bu konuda henüz yeterli bilgiye sahip değilim, "
                    "farklı bir şekilde sormak ister misin?")
+
+# ===========================================================================
+# DEGISTIRICI UCBIRLIK KORUMASI (/learn, /forget)
+# ---------------------------------------------------------------------------
+# Bu iki uç nokta CALISAN dosyalara yazar (intents.json, bot_data.json,
+# lora.json) ve modelde GERCEK gradient adimlari calistirir. Kimlik
+# dogrulamasi olmadan sunucuya erisebilen herkes:
+#   - kalici davranis enjeksiyonu yapabilir (bot_data/intents),
+#   - intents.json'u bozabilir -> BU DOSYA egitim verisini besledigi icin
+#     sonraki her egitim zehirlenir (AutoGrow ciktisi oldugu icin),
+#   - tek istekle model dosyalarini yazabilir (bozulma),
+#   - istek tekrarlayarak CPU/L surekli tuketebilir (LoRA egitimi).
+#
+# Cozum: paylasilan sifre. NEXTGEN_ADMIN_TOKEN tanimli DEGILSE uclar
+# KAPALI kalir (guvenli varsayilan) - arayuz bu uclari hic cagirmadigi
+# icin web sohbeti etkilenmez.
+#   PowerShell : $env:NEXTGEN_ADMIN_TOKEN='uzun-rastgele-dizgi'
+#   Linux/mac  : export NEXTGEN_ADMIN_TOKEN='uzun-rastgele-dizgi'
+# Istemci     : curl -H "X-Admin-Token: $env:NEXTGEN_ADMIN_TOKEN" ...
+# ========================================================================
+ADMIN_TOKEN_ENV = 'NEXTGEN_ADMIN_TOKEN'
+ADMIN_TOKEN_HEADER = 'X-Admin-Token'
+MAX_LEARN_ENTRIES = 20        # tek istekte en fazla yeni intent
+MAX_LEARN_PATTERNS = 20       # intent basina kalip siniri
+MAX_LEARN_RESPONSES = 10      # intent basina yanit siniri
+MAX_LEARN_TEXT = 300          # kalip/yanit karakter siniri
+TAG_RE = re.compile(r'^[a-z0-9_]{1,64}$')
+_RATE = {}                    # ip -> (kalan jeton, yenilenme zamani)
+RATE_CAP = 10                 # pencere basina izin verilen istek
+RATE_WINDOW = 60.0            # saniye
+
+
+def _admin_token():
+    t = os.environ.get(ADMIN_TOKEN_ENV, '')
+    return t.strip() or None
+
+
+def admin_guard():
+    """(hata_yaniti, durum_kodu) doner; sorun yoksa (None, None).
+
+    Sira: uc kapali mi -> yetki var mi -> hiz siniri. Hiz siniri yetki
+    kontrolunden SONRA cagrilir; boylece kimliksiz istekler jeton tuketmez
+    (aksi halde bir saldirgan sunucuyu kendi kilitleyebilirdi).
+    """
+    expected = _admin_token()
+    if not expected:
+        return (jsonify({
+            'error': f'{ADMIN_TOKEN_ENV} tanimli degil; bu uclar kapali.',
+            'acilis': f'{ADMIN_TOKEN_ENV} ortam degiskenini ayarla, '
+                      'sonra sunucuyu yeniden baslat.'}), 503)
+    given = request.headers.get(ADMIN_TOKEN_HEADER, '')
+    # compare_digest: zamanlama sizintisi olmadan karsilastirma.
+    if not given or not secrets.compare_digest(given, expected):
+        return jsonify({'error': 'yetkisiz'}), 401
+
+    ip = request.remote_addr or '?'
+    now = time.time()
+    left, ref = _RATE.get(ip, (RATE_CAP, now + RATE_WINDOW))
+    if now >= ref:                      # pencere doldu -> yenile
+        left, ref = RATE_CAP, now + RATE_WINDOW
+    if left <= 0:
+        wait = max(1, int(ref - now))
+        return jsonify({'error': f'cok fazla istek; {wait} sn bekle',
+                        'limit': f'{RATE_CAP}/{int(RATE_WINDOW)}sn'}), 429
+    _RATE[ip] = (left - 1, ref)
+    return None, None
+
+
+def _clean_text(v, limit):
+    """Tek satirlik, kontrol karakteri icermeyen metin; fazlasi kirpilir."""
+    if not isinstance(v, str):
+        raise ValueError('metin alanlari string olmali')
+    s = ''.join(ch for ch in v if ch == ' ' or (ch.isprintable() and not _is_ctl(ch)))
+    s = ' '.join(s.split())[:limit].strip()
+    return s
+
+
+def _is_ctl(ch):
+    return ord(ch) < 32 or ord(ch) == 127
+
+
+def validate_entries(entries):
+    """Ogrenilecek kayitlari dogrular ve normalize eder.
+
+    Sema ve sinirlar icin bkz. yukaridaki MAX_LEARN_* sabitleri. Amac:
+    intents.json'a kontrol karakteri / devasa metin / binlerce kayit
+    yazilmasini engellemek.
+    """
+    if not isinstance(entries, list) or not entries:
+        raise ValueError('"entries" bos olamaz')
+    if len(entries) > MAX_LEARN_ENTRIES:
+        raise ValueError(f'en fazla {MAX_LEARN_ENTRIES} kayit')
+    out = []
+    for it in entries:
+        if not isinstance(it, dict):
+            raise ValueError('her kayit bir nesne olmali')
+        raw_tag = it.get('tag')
+        if not isinstance(raw_tag, str):
+            raise ValueError('"tag" string olmali')
+        tag = raw_tag.strip().lower()
+        if not TAG_RE.match(tag):
+            raise ValueError(f"gecersiz tag: {tag!r} "
+                             '(yalnizca kucuk harf, rakam, _ ; 1-64)')
+        pats = it.get('patterns')
+        if not isinstance(pats, list) or not pats:
+            raise ValueError(f'"{tag}": patterns bos liste olamaz')
+        if len(pats) > MAX_LEARN_PATTERNS:
+            raise ValueError(f'"{tag}": en fazla {MAX_LEARN_PATTERNS} kalip')
+        resps = it.get('responses')
+        if resps is None:
+            resps = ['Faydalı bilgiler edindim!']
+        if not isinstance(resps, list) or not resps:
+            raise ValueError(f'"{tag}": responses bos liste olamaz')
+        if len(resps) > MAX_LEARN_RESPONSES:
+            raise ValueError(f'"{tag}": en fazla {MAX_LEARN_RESPONSES} yanit')
+        cp = [_clean_text(p, MAX_LEARN_TEXT) for p in pats]
+        cr = [_clean_text(r, MAX_LEARN_TEXT) for r in resps]
+        cp = [p for p in cp if p]
+        cr = [r for r in cr if r]
+        if not cp or not cr:
+            raise ValueError(f'"{tag}": kalip/yanitlar temizleme sonrasi bos')
+        out.append({'tag': tag, 'patterns': cp, 'responses': cr})
+    return out
 
 FEEDBACK_TEMPLATE = ("Özür dilerim, verdiğim bilgi yanlış veya eksik olabilir. "
                      "Doğrusunu öğrenmem için beni yönlendirebilirsin.")
@@ -375,10 +503,17 @@ def predict():
 
 @app.route('/learn', methods=['POST', 'OPTIONS'])
 def learn():
-    """Yeni intent öğretir: LoRA adaptörü + intents.json/bot_data.json güncelleme."""
+    """Yeni intent öğretir: LoRA adaptörü + intents.json/bot_data.json güncelleme.
+
+    GUVENLIK: yalnizca NEXTGEN_ADMIN_TOKEN sifresi olan istekler calisir ve
+    ogrenilecek kayitlar dogrulanir. Bkz. admin_guard / validate_entries.
+    """
     global bot, model_loaded, all_patterns
     if request.method == 'OPTIONS':
         return '', 204
+    err, code = admin_guard()
+    if err is not None:
+        return err, code
     try:
         data = request.get_json(force=True, silent=True) or {}
         entries = data.get('entries')
@@ -387,6 +522,10 @@ def learn():
         if not entries:
             return jsonify({'error': '"entries" gerekli: '
                                     '[{"tag","patterns","responses"}]'}), 400
+        try:
+            entries = validate_entries(entries)
+        except ValueError as e:
+            return jsonify({'error': str(e)}), 400
 
         script_dir = os.path.dirname(os.path.abspath(__file__))
         model_dir = os.path.join(script_dir, 'model')
@@ -412,15 +551,28 @@ def learn():
 
 @app.route('/forget', methods=['POST', 'OPTIONS'])
 def forget():
-    """Öğretilmiş bir LoRA intent'ini geri alır (taban intent'ler etkilenmez)."""
+    """Öğretilmiş bir LoRA intent'ini geri alır (taban intent'ler etkilenmez).
+
+    GUVENLIK: /learn ile ayni sifre korumasi (bkz. admin_guard).
+    """
     global bot, model_loaded, all_patterns
     if request.method == 'OPTIONS':
         return '', 204
+    err, code = admin_guard()
+    if err is not None:
+        return err, code
     try:
         data = request.get_json(force=True, silent=True) or {}
-        tag = (data.get('tag') or '').strip()
+        raw_tag = data.get('tag')
+        # JSON'da tag sayi/ liste/ nesne olabilir; .strip() onun uzerinde
+        # AttributeError -> 500 uretirdi. Once tipi dogrula.
+        if not isinstance(raw_tag, str):
+            return jsonify({'error': '"tag" bir metin olmali'}), 400
+        tag = raw_tag.strip().lower()
         if not tag:
             return jsonify({'error': '"tag" gerekli'}), 400
+        if not TAG_RE.match(tag):
+            return jsonify({'error': f'gecersiz tag: {tag!r}'}), 400
 
         script_dir = os.path.dirname(os.path.abspath(__file__))
         model_dir = os.path.join(script_dir, 'model')
