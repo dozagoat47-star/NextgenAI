@@ -913,9 +913,11 @@ def main():
                     help='torch olmadan veri/RAG hattini dogrula ve cik')
     ap.add_argument('--patience', type=int, default=PATIENCE,
                     help='erken durdurmada calinmasi gereken iyilesmesiz EPOCH sayisi. '
-                         'EPOCH cinsindendir: --val-every 2 ile 6 deyince 3 kotu val '
-                         'OLCUMU (= 6 epoch) tolere edilir. --val-every yalnizca maliyeti '
-                         'etkiler, bu esigi DEGISTIRMEZ.')
+                         'EPOCH cinsindendir: --val-every 2 ile 2 deyince TEK kotu val '
+                         'OLCUMU (= 2 epoch) tolere edilir, yani val TEK SEFER yukselince '
+                         'durus olur. --val-every 2 ile 6 deyince 3 kotu olcum (= 6 epoch) '
+                         'tolere edilir. --val-every yalnizca maliyeti etkiler, bu esigi '
+                         'DEGISTIRMEZ.')
     ap.add_argument('--d-model', type=int, default=D_MODEL, help='gizli boyut')
     ap.add_argument('--num-blocks', type=int, default=NUM_BLOCKS, help='transformer blok sayisi')
     ap.add_argument('--num-heads', type=int, default=NUM_HEADS, help='dikkat kafa sayisi')

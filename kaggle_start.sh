@@ -35,12 +35,17 @@ set -euo pipefail
 cd /kaggle/working/NextgenAI
 
 MODE="${1:-verify}"
-# Varsayilan 70: 7.31 dk/epoch x 70 = 8.6 saat + 9 dk encode = 9h oturuma
-# sigar. Eski varsayilan 250 idi -> 30+ saat, ASLA bitmiyordu.
-EPOCHS="${2:-${LLM_EPOCHS:-70}}"
-# Sabir artik EPOCH cinsinden (bkz. train_llm.py). 6 = val 6 epoch boyunca
-# VAL_IMP kadar iyilesmezse dur.
-PATIENCE="${LLM_PATIENCE:-6}"
+# Butce: patience=2 ile kosu ilk val yukselmesinde (~6. epoch) bitecegi
+# icin 70 yerine 12 yeter. DIKKAT: EPOCHS artik yalnizca ust sinir DEGIL --
+# lr_horizon = min(EPOCHS, patience+20) oldugu icin EPOCHS lr programini da
+# belirler. 12 -> lr_horizon=12, yani LR butun butce boyunca LR_MIN'e iner
+# (eski 10 epoch'lik kosunun lr_horizon=10'u ile kiyaslanabilir).
+EPOCHS="${2:-${LLM_EPOCHS:-12}}"
+# Sabir EPOCH cinsinden (bkz. train_llm.py). 2 = --val-every 2 ile TEK kotu
+# val OLCUMU, yani val TEK SEFER yukselince dur (kullanici tercihi).
+# Eski deger 6 idi = 3 kotu olcum; gurultu yuzunden gec duruluyordu.
+# Yan etki: lr_horizon 26 -> 12 (EPOCHS da 12 oldugu icin).
+PATIENCE="${LLM_PATIENCE:-2}"
 
 CGARG=''
 if compgen -G 'chatgrow_*.jsonl' > /dev/null; then

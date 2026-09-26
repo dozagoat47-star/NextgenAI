@@ -590,6 +590,38 @@ class TestEarlyStopping(unittest.TestCase):
                     'patience=%d val_every=%d: formul %d, oynatma %d'
                     % (p, ve, gercek, beklenen))
 
+    def test_patience_two_stops_on_first_val_rise(self):
+        """KULLANICI TERCİHI: --patience 2 + --val-every 2 -> val TEK SEFER
+        yukselince dur. 6 -> 2 degisikliginin regresyon kilidi.
+
+        Yan etki: gurultu toleransi kalkar; VAL_IMP (5e-4) tek kalan
+        korumadir.
+        """
+        p, ve = 2, 2
+        # olculmus egri: tepe 4, ilk yukselme 6
+        best_val, best_ep, stop_ep, bad = self._run(
+            self._grid(self._VAL10, ve), patience=p, val_every=ve)
+        self.assertEqual(best_ep, 4)
+        self.assertEqual(stop_ep, 6, 'ilk yukselmede durmaliydi')
+        self.assertEqual(bad, ve)
+        # 1 kotu olcum yeterli: tepeyi 1 (en kencar) yap
+        _, bep, sep, _ = self._run(self._grid(self._VAL10, ve),
+                                   patience=p, val_every=ve, val_imp=0.5)
+        self.assertEqual(bep, 1)
+        self.assertEqual(sep, 2, 'en kencar durus 2. epoch')
+        # ama val gercekten dusmeye devam ederse hic durmaz
+        # (_DENSE tanimi gereği 4. epoch'tan sonra YUKSELIR; o yuzden
+        #  burada gercek monotonik dusus serisi kuruyoruz)
+        lusen = [1.0 / (1 + i) for i in range(24)]
+        _, _, sep_d, _ = self._run(self._grid(lusen, ve),
+                                   patience=p, val_every=ve)
+        self.assertIsNone(sep_d, 'monotonik dususte durmamaliydi')
+        # eski ayar 3 kotu olcum bekliyordu, artik 1
+        _, _, sep6, bad6 = self._run(self._grid(self._VAL10, ve),
+                                     patience=6, val_every=ve)
+        self.assertEqual(sep6, 10)
+        self.assertEqual(bad6, 6)
+
     def test_min_stoppable_differs_from_tolerans_at_val_every_1(self):
         """val_every=1'de iki kavram AYRILIR. Regresyon gerekcesi: eskiden
         esik toleranstan turetiliyordu ve epochs=6/patience=6/val_every=1
