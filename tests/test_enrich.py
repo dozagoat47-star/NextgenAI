@@ -313,6 +313,88 @@ class TestCorpusAppendMany(unittest.TestCase):
         shutil.rmtree(d)
 
 
+class TestCorpusRarePathKeepsNewChunks(unittest.TestCase):
+    """NADIR YOL (paket icinde en az bir mevcut id) yeni parcalari da yazar.
+
+    Regresyon: nadir yol yalnizca mevcut satirlari yerine guncelliyordu.
+    Ayni pakette gelen yeni id'ler dosyaya hic yazilmadan indexe ekleniyordu;
+    "goruldu" isaretlenen madde bir daha hic yazilamiyordu. AutoGrow saatlik
+    calistigi icin korpus 5 gundur buyumuyordu.
+    """
+
+    def _write(self, p, chunks):
+        with io.open(p, 'w', encoding='utf-8') as f:
+            for ch in chunks:
+                f.write(json.dumps(ch, ensure_ascii=False) + '\n')
+
+    def _read(self, p):
+        with io.open(p, 'r', encoding='utf-8') as f:
+            return [json.loads(l) for l in f if l.strip()]
+
+    def _ids(self, p):
+        s = set()
+        with io.open(corpus_mod._corpus_ids_path(p), 'r',
+                     encoding='ascii') as f:
+            for line in f:
+                if line.strip():
+                    s.add(corpus_mod._id_decode(line.strip()))
+        return s
+
+    def test_mixed_batch_writes_both(self):
+        import shutil
+
+        d = tempfile.mkdtemp()
+        p = os.path.join(d, 'corpus.jsonl')
+        self._write(p, [
+            {'id': 'aa', 'title': 'Aa', 'text': 'aa ilk',
+             'patterns': '', 'source': 'test'},
+            {'id': 'bb', 'title': 'Bb', 'text': 'bb ikinci',
+             'patterns': '', 'source': 'test'},
+        ])
+        # 'aa' zaten var (nadir yol), 'cc' ve 'dd' yeni.
+        n = corpus_mod.Corpus.append_many([
+            {'id': 'aa', 'title': 'Aa', 'text': 'aa tazelendi',
+             'patterns': '', 'source': 'autogrow'},
+            {'id': 'cc', 'title': 'Cc', 'text': 'cc YENI madde',
+             'patterns': '', 'source': 'autogrow'},
+            {'id': 'dd', 'title': 'Dd', 'text': 'dd YENI madde',
+             'patterns': '', 'source': 'autogrow'},
+        ], path=p)
+        self.assertEqual(n, 4)
+        rows = self._read(p)
+        self.assertEqual([r['id'] for r in rows], ['aa', 'bb', 'cc', 'dd'])
+        self.assertEqual(rows[0]['text'], 'aa tazelendi')
+        self.assertEqual(rows[2]['text'], 'cc YENI madde')
+        self.assertEqual(self._ids(p), {'aa', 'bb', 'cc', 'dd'})
+        shutil.rmtree(d)
+
+    def test_index_corruption_does_not_swallow_new_chunk(self):
+        """Indeks, korpusta olmayan bir id'i 'goruldu' sayarsa yeniden
+        gelen o parca sessizce atilmamali (index > corpus durumu)."""
+        import shutil
+
+        d = tempfile.mkdtemp()
+        p = os.path.join(d, 'corpus.jsonl')
+        self._write(p, [
+            {'id': 'aa', 'title': 'Aa', 'text': 'aa ilk',
+             'patterns': '', 'source': 'test'},
+        ])
+        # Bozuk indeks: 'hayalet' id'i var ama corpus'ta yok.
+        with io.open(corpus_mod._corpus_ids_path(p), 'w',
+                     encoding='ascii') as f:
+            for cid in ('aa', 'hayalet'):
+                f.write(corpus_mod._id_encode(cid) + '\n')
+        os.utime(p, (1, 1))          # index daha genc gorunsun
+        os.utime(corpus_mod._corpus_ids_path(p), (2, 2))
+
+        corpus_mod.Corpus.append_many(
+            [{'id': 'hayalet', 'title': 'Hayalet', 'text': 'hayalet metni',
+              'patterns': '', 'source': 'autogrow'}], path=p)
+        rows = self._read(p)
+        self.assertIn('hayalet', [r['id'] for r in rows])
+        shutil.rmtree(d)
+
+
 class TestEnrichMetaIdempotency(unittest.TestCase):
     def test_intents_has_enrich_marker(self):
         p = os.path.join(BASE, 'intents.json')

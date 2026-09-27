@@ -1113,6 +1113,10 @@ class Corpus:
         mevcut id'ler guncelleniyorsa yalnizca o satirlar degistirilir, onunun
         byte'lari oldugu gibi korunur. Id kumesi '<dizin>_ids.jsonl' yan
         indeksinden hizli okunur; index bayatsa dosya tek gecisle taranir.
+
+        SOZLESME: verilen her parca dosyaya yazilir. Bir paket hem yeni hem
+        mevcut id iceriyorsa yeni olanlar da sona eklenir; aksi halde yeni
+        madde yalnizca indexe yazilir, korpusa girmez ve bir daha girmez.
         """
         updated = {}
         for ch in chunks:
@@ -1168,6 +1172,7 @@ class Corpus:
         else:
             # NADIR YOL (mevcut parca yeniden ogrenildi): degisen satirlari
             # yerinde guncelle, digerlerini oldugu gibi koru.
+            written = set()
             with open(path, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
             with open(path, 'w', encoding='utf-8') as f:
@@ -1182,12 +1187,20 @@ class Corpus:
                         continue
                     if cid in updates:
                         f.write(json.dumps(updates[cid], ensure_ascii=False) + '\n')
+                        written.add(cid)
                     else:
                         f.write(line)
-            if new_ids:
-                _write_id_set(path, exist | set(new_ids))
-            else:
-                _write_id_set(path, exist)
+            # Ayni pakette gelen YENI parcalar da dosyaya yazilir. Onceki
+            # surumde burada yalnizca id indeksi genisletiliyordu; boylece yeni
+            # madde "goruldu" isaretlenip korpusa hic girmedigi icin bir daha
+            # hic yazilamiyordu (nadir yol her saat calistigi icin buyume
+            # duruyordu: 5 gunde ~60k Wikipedia maddesi bu yolla atildi).
+            missing = [cid for cid in updated if cid not in written]
+            if missing:
+                with open(path, 'a', encoding='utf-8') as f:
+                    for cid in missing:
+                        f.write(json.dumps(updated[cid], ensure_ascii=False) + '\n')
+            _write_id_set(path, exist | set(updated))
 
         total = len(exist) + len(new_ids)
         print(f"[CORPUS] corpus.jsonl guncellendi: {total} parca.")
