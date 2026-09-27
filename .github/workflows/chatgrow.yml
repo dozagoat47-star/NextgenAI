@@ -31,7 +31,7 @@ jobs:
         run: |
           python chatgrow.py --source discourse \
             --forum https://forum.pardus.org.tr \
-            --limit 60 --out chatgrow_discourse_pardus.jsonl
+            --limit 400 --out chatgrow_discourse_pardus.jsonl
 
       - name: Commit and push if changed
         run: |

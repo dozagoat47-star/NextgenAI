@@ -279,16 +279,47 @@ def fetch_topic_posts(base, topic_id):
     return out
 
 
-def build_discourse_chats(base, category, limit):
-    """Discourse forumundan (query -> yanit) ciftleri kurar (kimliksiz)."""
-    chats = []
-    seen = set()
+def discourse_topics(base, category, want, max_pages=60):
+    """Sayfali konu listesi. ASIL ONEMLI: /latest.json sayfalanmazsa
+    her kosuda ayni 30 konu okunur.
+
+    Discourse /latest.json tek sayfada per_page=30 konu doner ve
+    'more_topics_url' ile sonraki sayfayi bildirir. Eski kod
+    'page' parametresi gecmedigi icin kalici olarak sayfa 0'i
+    okuyordu: 18 commit boyunca 30 cift/+0, --limit 60 olsa bile
+    (ci workflow) ust sinir 30 cift idi. Olcum: --limit 200 -> 30 cift.
+
+    Artik sayfa sayfa ilerlenir; her sayfa arasinda nazik beklenir.
+    """
     listing = '/latest.json'
     if category:
         cat = category.strip('/').lstrip('r/').replace(' ', '-')
         listing = f'/c/{cat}/l/latest.json'
-    data = discourse_get(base, listing, {'order': 'posts'})
-    topics = data.get('topic_list', {}).get('topics', []) if data else []
+
+    topics = []
+    sayfa = 0
+    while len(topics) < want and sayfa < max_pages:
+        data = discourse_get(base, listing, {'order': 'posts', 'page': sayfa})
+        if not data:
+            break
+        tl = data.get('topic_list') or {}
+        batch = tl.get('topics') or []
+        if not batch:
+            break
+        topics.extend(batch)
+        sayfa += 1
+        # Son sayfa: daha fazlasini isteyen link yoksa dur
+        if not tl.get('more_topics_url'):
+            break
+        time.sleep(1.0)
+    return topics[:want]
+
+
+def build_discourse_chats(base, category, limit):
+    """Discourse forumundan (query -> yanit) ciftleri kurar (kimliksiz)."""
+    chats = []
+    seen = set()
+    topics = discourse_topics(base, category, limit)
     picked = 0
     for topic in topics:
         if picked >= limit:

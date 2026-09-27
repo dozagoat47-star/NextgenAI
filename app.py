@@ -437,12 +437,33 @@ def refresh_knowledge_intents(intents_file):
     if not os.path.exists(intents_file):
         return
     try:
+        # Siniflandiriciya ait durumu once sakla. load_intents() bunlari
+        # intents.json'dan YENIDEN kuruyor (brain.py:981-984):
+        #     self.vocabulary   = sorted(set(patterns'daki tum kelimeler))
+        #     self.vocab_to_idx = {w: i ...}
+        #     self.pad_idx      = len(vocabulary)
+        # 3.203 satirlik gomme matrisi ise 3.202 kelimeyle EGITILMIS
+        # (model.json). intents.json buyudugu icin sozluk 4.477'ye
+        # cikiyor, id'ler 4.476'ya kadar, gomme 3.203 satirlik:
+        #     IndexError: index 4477 is out of bounds for axis 0
+        #                  with size 3203
+        # Yani bilgi tazelemesi bir mesaj gonderdiginde sunucuyu
+        # DUSURUYORDU. Sadece bilgi kumesi buymeli; sozluk, id eslemi
+        # ve pad egitilmis modelin malidir ve ELLE DEGISTIRILMEZ.
         siniflar = set(bot.intent_tags)
+        sozluk = bot.vocabulary
+        idx = bot.vocab_to_idx
+        pad = bot.pad_idx
+
         bot.load_intents(intents_file)
         bot.intent_tags = sorted(t for t in siniflar if t in bot.intents)
+        bot.vocabulary = sozluk
+        bot.vocab_to_idx = idx
+        bot.pad_idx = pad
         bot._build_keyword_weights()
         print(f"[OK] Bilgi intent'leri intents.json'dan tazelendi: "
-              f"{len(bot.knowledge_intents)} (sinif: {len(bot.intent_tags)})")
+              f"{len(bot.knowledge_intents)} (sinif: {len(bot.intent_tags)}, "
+              f"sozluk {len(sozluk)})")
     except Exception as e:
         print(f"[UYARI] Intent tazeleme basarisiz, model/bot_data.json "
               f"anlik goruntusu kullanilacak: {e}")

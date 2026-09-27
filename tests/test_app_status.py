@@ -92,6 +92,94 @@ class TestRefreshKnowledgeIntents(unittest.TestCase):
         self.assertEqual(len(A.bot.knowledge_intents), once)
 
 
+class TestClassifierVocabularyPreserved(unittest.TestCase):
+    """Tazeleme siniflandiricinin SOZLUGUNU ezmemeli.
+
+    Bu test bir calisma hatasi nedeniyle yazildi. Bilgi tazelemesi
+    eklenince sunucu HER MESAJDA coktu:
+
+        IndexError: index 4477 is out of bounds for axis 0 with size 3203
+
+    Sebep: load_intents() (brain.py:981-984) sozlugu intents.json'dan
+    yeniden kuruyor:
+
+        self.vocabulary   = sorted(set(patterns'daki kelimeler))
+        self.vocab_to_idx = {w: i for i, w in enumerate(vocabulary)}
+        self.pad_idx      = len(vocabulary)
+
+    intents.json buyudugu icin sozluk 3.202 -> 4.477 oldu, id'ler
+    4.476'ya kadar cikti. Ama gomme matrisi (3.203, 128) 3.202 kelimeyle
+    EGITILMIS ve degismiyor. Her tokenizasyonda uretilen id gomme
+    sinirini astigi icin mesaj gondermek coktu.
+
+    Duzeltme: refresh_knowledge_intents() sozluk / vocab_to_idx /
+    pad_idx'i geri koyuyor. Bilgi kumesi buyuyor, siniflandirici
+    mali OLDUGU GIBI kaliyor.
+    """
+
+    def setUp(self):
+        A.bot.load_model(os.path.join(BASE, 'model'))
+        self.vocab = list(A.bot.vocabulary)
+        self.pad = A.bot.pad_idx
+        self.gomme = self._gomme_satiri()
+
+    def _gomme_satiri(self):
+        """Gomme matrisinin ilk boyutu (token sayisi)."""
+        for ad in ('embed', 'wte', 'embedding'):
+            m = getattr(A.bot.model, ad, None)
+            if m is not None and hasattr(m, 'shape'):
+                return m.shape[0]
+        return None
+
+    def test_vocabulary_unchanged_by_refresh(self):
+        A.refresh_knowledge_intents(os.path.join(BASE, 'intents.json'))
+        self.assertEqual(
+            A.bot.vocabulary, self.vocab,
+            'sozluk degisti: egitilmis gommeyle uyumsuz token id uretilir')
+        self.assertEqual(A.bot.pad_idx, self.pad)
+
+    def test_token_ids_stay_inside_embedding(self):
+        """Bu testin varlik sebebi: mesaj gondermek cokuyordu.
+
+        Her kelimenin id'si gomme matrisinin icinde kalmali. Cokerse
+        IndexError: index N is out of bounds for axis 0.
+        """
+        A.refresh_knowledge_intents(os.path.join(BASE, 'intents.json'))
+        if self.gomme is None:
+            self.skipTest('gomme matrisi bulunamadi')
+        enbuyuk = max(A.bot.vocab_to_idx.values())
+        self.assertLess(
+            enbuyuk, self.gomme,
+            'en buyuk token id %d, gomme %d satir: her mesajde cokar'
+            % (enbuyuk, self.gomme))
+
+    def test_pad_idx_inside_embedding(self):
+        A.refresh_knowledge_intents(os.path.join(BASE, 'intents.json'))
+        if self.gomme is None:
+            self.skipTest('gomme matrisi bulunamadi')
+        self.assertLess(A.bot.pad_idx, self.gomme,
+                        'pad_idx gomme disinda')
+
+    def test_classification_still_works_after_refresh(self):
+        """Tazeleme sonrasi siniflandirma saglam kalmali."""
+        A.refresh_knowledge_intents(os.path.join(BASE, 'intents.json'))
+        for soru in ('merhaba', 'tesekkur ederim', 'bugun hava nasil',
+                     'fizik nedir'):
+            try:
+                A.bot._classify(soru)
+            except Exception as e:
+                self.fail('"%s" siniflandirilamadi: %s: %s'
+                          % (soru, type(e).__name__, e))
+
+    def test_knowledge_set_still_grows(self):
+        """Guvenlik agi: sozluk sabit kalirken bilgi buyumeye devam etmeli."""
+        A.bot.load_model(os.path.join(BASE, 'model'))
+        eski = len(A.bot.knowledge_intents)
+        A.refresh_knowledge_intents(os.path.join(BASE, 'intents.json'))
+        self.assertGreater(len(A.bot.knowledge_intents), eski)
+        self.assertEqual(A.bot.vocabulary, self.vocab)
+
+
 class TestStatusFields(unittest.TestCase):
     """/status hangi sayiyi ne anlama geliyor acikca bildirmeli."""
 
