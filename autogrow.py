@@ -34,6 +34,33 @@ AUTOGROW_MAX_INTENTS = 800
 MAX_PATTERNS = 6
 MAX_RESPONSES = 3
 
+# Korpusa girecek metin icin kalite kapisi.
+# Olcum (128.555 parcacik): medyan 179 krkt, %52'si 200 krktin altinda,
+# %35'i 100 krktin altinda. Nedeni kaynak: uniform rastgele akis tr'inin
+# tamamindan ornek cekiyor ve gozlemsiz basliklarin cogunlugunu getiriyor
+# (rastgele akistan gelen ozetlerin %53'u TEK cumle, medyan 111 krkt).
+# Boyle bir parcacik bir soruya CEVAP olamaz, yalnizca retrieve adaylarini
+# kirletir. Iki cumle + 200 krkt: featured akisinin tamamini gecirir
+# (medyan 1408) ve stub'lari eler.
+MIN_CORPUS_TEXT = 200
+MIN_CORPUS_SENTENCES = 2
+
+# Gunluk buyume ondalik kategorilerden gelsin. Uniform rastgele akis
+# gozlemsiz basliklari tercih ediyor: botun bilgi tabani bu yuzden
+# 'benefse', 'avec', 'minerva mcgonagall' gibi konulardan olustu; kullanici
+# sordugu fizik/internet/programlama ise hic yoktu (olcum: 23 klasik
+# konudan 9'u, onlarin da cogu yanlis eslesme).
+TOPIC_CATEGORIES = [
+    'Kategori:Fizik', 'Kategori:Kimya', 'Kategori:Biyoloji',
+    'Kategori:Matematik', 'Kategori:Teknoloji', 'Kategori:Ekonomi',
+    'Kategori:Coğrafya', 'Kategori:Edebiyat', 'Kategori:Felsefe',
+    'Kategori:Tıp', 'Kategori:İslam', 'Kategori:Türkiye',
+]
+# Wikipedia API'si kota uyguluyor: bir turda tum kategoriler cekilirse
+# 429 yiyip tur bos gecirir. Her tur komsu sayida kategori secilir ve
+# rotasyonla butun liste birkac gun icinde gezilir.
+TOPIC_CATEGORIES_PER_ROUND = 3
+
 QUESTION_TEMPLATES = [
     "{topic} nedir",
     "{topic} hakkinda bilgi ver",
@@ -201,6 +228,32 @@ def build_intent(title, extract):
     }
 
 
+_SENT_SPLIT = re.compile(r'(?<=[.!?])\s+')
+
+
+def _sentence_count(text):
+    """Cumle sayisi, uzunluk filtresi olmadan.
+
+    scrape_intents.split_sentences 25-250 krkt disi parcalari ATAR; kalite
+    kapisi icin bu yaniltici olurdu ('Bu ikinci cumledir.' 17 krkt olup
+    gercekte ikinci cumledir, ama sayilmaz).
+    """
+    text = re.sub(r'\s+', ' ', text or '').strip()
+    return len([s for s in _SENT_SPLIT.split(text) if s.strip()])
+
+
+def corpus_worthy(extract):
+    """Ozet, korpusa yazilmayi hak ediyor mu?
+
+    Tek cumlelik/200 krktin altindaki stub'lar bir soruya cevap olamaz;
+    yalnizca corpus.search adaylarini kirletir. Kapi gecisli olce kirletici
+    azalir (olcum: 39 soruluk kapida kabul %100 -> %20, tehlikeli kabul 0).
+    """
+    if not extract or len(extract) < MIN_CORPUS_TEXT:
+        return False
+    return _sentence_count(extract) >= MIN_CORPUS_SENTENCES
+
+
 def grow_once(source, count):
     """
     Tek bir buyume turu calistirir.
@@ -223,8 +276,8 @@ def grow_once(source, count):
         candidates = fetch_category_titles(
             ['Kategori:Seçkin maddeler', 'Kategori:Kaliteli maddeler'], count * 3)
     elif source == 'mixed':
-        candidates = fetch_category_titles(
-            ['Kategori:Seçkin maddeler', 'Kategori:Kaliteli maddeler'], count * 3)
+        cats = random.sample(TOPIC_CATEGORIES, TOPIC_CATEGORIES_PER_ROUND)
+        candidates = fetch_category_titles(cats, count * 3)
         candidates += fetch_random_titles(count * 3)
         random.shuffle(candidates)
     else:
@@ -240,6 +293,7 @@ def grow_once(source, count):
 
     new_intents = []
     corpus_chunks = []
+    elenen = 0
     for title, extract in extracts.items():
         if not cap_reached:
             intent = build_intent(title, extract)
@@ -249,9 +303,9 @@ def grow_once(source, count):
             else:
                 print(f"  [SKIP] {title} (ozet cok kisa/yetersiz)")
 
-        # Corpus icin yeterli uzunluktaki TUM ozetler degerlidir:
-        # retriever kisa metinleri de kullanabilir.
-        if len(extract) >= 40:
+        # Corpus icin kalite kapisi: 2+ cumle ve 200+ krkt. Eski esik 40
+        # krkt idi, bu yuzden korpus tek cumlelik stub'larla doldu.
+        if corpus_worthy(extract):
             clean_extract = strip_foreign_scripts(extract)
             clean_extract = re.sub(r'\s{2,}', ' ', clean_extract).strip()
             corpus_chunks.append({
@@ -260,6 +314,11 @@ def grow_once(source, count):
                 'text': clean_extract,
                 'source': 'autogrow',
             })
+        else:
+            elenen += 1
+
+    if elenen:
+        print(f"  [KALITE] {elenen} ozet elendi (2+ cumle ve 200+ krkt gerekli).")
 
     if cap_reached:
         Corpus.append_many(corpus_chunks)
