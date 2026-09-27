@@ -178,7 +178,17 @@ def clean_intents_file(filepath):
     return len(cleaned)
 
 
-def clean_corpus_file(filepath):
+def clean_corpus_file(filepath, max_drop=0.05, force=False):
+    """Korpusu temizler; TEHLIKELI kayipta dosyaya dokunmadan durur.
+
+   Uyari sebebi: 10 kelimeden kisa metin elenir ve korpusun %27'si bu
+    esigin altinda. Bu script elle calistirildiginda 129.577 -> 94.662
+    yazarak 34.915 parca SILDI. Kayip sessizdi; sadece sayilar
+    yaziliyordu.
+
+    Simdi esik asilirsa (varsayilan %5) hicbir sey yazilmaz, komut
+    basarisiz biter ve --force ile bilerek gecilebilir.
+    """
     if not os.path.exists(filepath):
         print("[CORPUS] dosya yok, atlaniyor.")
         return
@@ -205,6 +215,19 @@ def clean_corpus_file(filepath):
             rec['id'] = ascii_normalize((rec.get('id') or title.lower())).replace(' ', '_')
             lines.append(rec)
             kept += 1
+
+    if before and not force:
+        kayip = (before - kept) / before
+        if kayip > max_drop:
+            pct = 100 * kayip
+            print(f"[CORPUS] UYARI: %{pct:.1f} kayip ({before} -> {kept} parca). "
+                  f"Esik %{100 * max_drop:.0f}. Dosya DEGISTIRILMEDI.")
+            print("[CORPUS] Bu genelde beklenmedik bir esiktir; once "
+                  "nedenini anla, sonra --force ile bilerek calistir.")
+            raise SystemExit(
+                f'corpus temizligi iptal: korpusun %{pct:.1f} kaybi '
+                f'({100 * max_drop:.0f} esigini) asiyor')
+
     with io.open(filepath, 'w', encoding='utf-8') as f:
         for rec in lines:
             f.write(json.dumps(rec, ensure_ascii=False) + '\n')
@@ -217,6 +240,11 @@ def main():
                         help='corpus.jsonl temizligini atla')
     parser.add_argument('--intents', type=str, default=INTENTS_FILE,
                         help='temizlenecek intents dosyasi (default: intents.json)')
+    parser.add_argument('--max-corpus-drop', type=float, default=0.05,
+                        help='bu kayiptan fazlasi olursa corpus YAZILMAZ '
+                             '(varsayilan 0.05 = %%5). 0.0 = esik yok.')
+    parser.add_argument('--force', action='store_true',
+                        help='tehlikeli kayip esigini gec (bilerek)')
     args = parser.parse_args()
 
     print("=" * 50)
@@ -225,7 +253,8 @@ def main():
 
     clean_intents_file(args.intents)
     if not args.no_corpus:
-        clean_corpus_file(CORPUS_FILE)
+        clean_corpus_file(CORPUS_FILE, max_drop=args.max_corpus_drop,
+                          force=args.force)
 
     print("=" * 50)
     print("  SIRA: python train.py --epochs 3000")

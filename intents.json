@@ -329,7 +329,7 @@
         "sen yapay zeka misin",
         "seni nasil yaptilar",
         "kim gelistirdi seni",
-        "ne tur bir yapay zekasın",
+        "ne tur bir yapay zekasin",
         "sende duygular var mi",
         "seni kim programladi",
         "nasil calisiyorsun",
@@ -667,7 +667,7 @@
         "renkler hakkinda konusalim",
         "mavi neden bu kadar sevilir",
         "favori rencim degisiyor senin ne",
-        "renkler duygularý nasil etkiler"
+        "renkler duygulary nasil etkiler"
       ],
       "responses": [
         "Mavi favori rengim! Kodlarım hep mavi ekranda yazılıyor ama bu farklı bir mavi!",
@@ -754,8 +754,8 @@
         "hangi sarkiyi seviyorsun",
         "bana sarki onerir misin",
         "en sevdigim sarki ne olabilir",
-        "sarki söylemeyi sever misin",
-        "turkiye de hangi sarkilar popüler",
+        "sarki soylemeyi sever misin",
+        "turkiye de hangi sarkilar populer",
         "calisirken sarki dinleyen biriyim"
       ],
       "responses": [
@@ -821,7 +821,7 @@
         "neyi tercih edersin cay mi kahve mi",
         "ne yemek yapabilirim",
         "kolay bir yemek tarifi ver",
-        "akşam yemegi icin ne onerirsin",
+        "aksam yemegi icin ne onerirsin",
         "en iyi turk yemekleri neler",
         "yemek yapmayi seviyor musun",
         "pratik tarifler varmi",
@@ -1309,8 +1309,8 @@
         "saglikli beslenme nasil olur",
         "uyku neden onemli",
         "stres vucutu nasil etkiler",
-        "gunde kac adim atmalıyim",
-        "düzenli spor saglikli mi",
+        "gunde kac adim atmaliyim",
+        "duzenli spor saglikli mi",
         "bas agrisi icin ne onerirsin"
       ],
       "responses": [
@@ -1420,7 +1420,7 @@
         "matematik ne ise yarar",
         "ortalama nasil hesaplanir",
         "problemi nasil cozerim",
-        "matematikten korkmamak icin ne yapmalıyım"
+        "matematikten korkmamak icin ne yapmaliyim"
       ],
       "responses": [
         "Matematik, sayılar ve şekiller üzerine çalışan bir bilim dalıdır!",
@@ -1536,7 +1536,7 @@
         "bana mutlu edecek bir sey soyle",
         "kucuk seylerle mutlu olmak mumkun mu",
         "mutluluk ne demek",
-        "mutlu hissetmiyorum ne yapmalıyım",
+        "mutlu hissetmiyorum ne yapmaliyim",
         "gunluk mutluluk ipuclari"
       ],
       "responses": [
@@ -1598,7 +1598,7 @@
         "bitkinim",
         "ne yaparsam yapayim keyfim yok",
         "cok uzgunum",
-        "kıriyorum bir kenara",
+        "kiriyorum bir kenara",
         "bir sey beni cok uzdu",
         "gozyaslarim dinmiyor",
         "bugun hicbir sey canimi acmadi"
@@ -1798,7 +1798,7 @@
         "kizginim",
         "aneya gore o dakikada hepinizin icinde patlayacagim",
         "ofkemi nasil kontrol ederim",
-        "sinirlendiğimde ne yapmalıyım",
+        "sinirlendigimde ne yapmaliyim",
         "ofke aninda soylememe dikkat edeyim",
         "sinirliyken konusmak istemiyorum"
       ],
@@ -1991,7 +1991,7 @@
         "cumartesi ne yapiyorsun",
         "gune nasil baslamaliyim",
         "sabah rutini nasil olmali",
-        "verimli bir gun icin ne yapmalıyım",
+        "verimli bir gun icin ne yapmaliyim",
         "aksam rutinimi nasil kurarim",
         "gunde kac saat calismaliyim",
         "rutinimi bozmak istemiyorum"
@@ -18685,7 +18685,7 @@
         "bu yanit guzeldi",
         "cok kotu bir cevap verdin",
         "bunu begenmedim",
-        "harikasın",
+        "harikasin",
         "onceki cevabini begenmedim",
         "simdi iyi cevap verdin"
       ],
@@ -21038,22 +21038,6 @@
       ]
     },
     {
-      "tag": "l",
-      "patterns": [
-        "l nedir",
-        "l hakkinda bilgi ver",
-        "l ne demek",
-        "l anlat",
-        "bana l hakkinda bilgi ver",
-        "l hakkinda konus"
-      ],
-      "responses": [
-        "harfi olup harfin kullanım sıklığı %5,75'tir.",
-        "Arap harflerine dayalı Osmanlıcada lâm adıyla bilinirdi.",
-        "L, ince ünlülerle beraber kullanıldığı zaman ön damak, kalın ünlülerle beraber kullanıldığı zaman da alt damaktan çıkarılan yumuşak, yayvan ve akıcı bir sestir."
-      ]
-    },
-    {
       "tag": "stefan takov",
       "patterns": [
         "stefan takov nedir",
@@ -21750,22 +21734,6 @@
         "2 Mayıs 1964), Alman teknik direktör, eski futbolcudur.",
         "Kariyerinde yedi Bundesliga ve altı DFB-Pokal bulunan oyuncu, en başarılı Alman futbolculardan biriydi.",
         "2005-2016 döneminde Almanya kadın millî futbol takımının teknik direktörlüğünü yaptı."
-      ]
-    },
-    {
-      "tag": "gm",
-      "patterns": [
-        "gm nedir",
-        "gm hakkinda bilgi ver",
-        "gm ne demek",
-        "gm anlat",
-        "bana gm hakkinda bilgi ver",
-        "gm hakkinda konus"
-      ],
-      "responses": [
-        "GM - ABD'de kurulmuş bir şirket \"General Motors\".",
-        "Gm - Müzikte sol minör GM, General MIDI General Mobile - Cep telefonu markası.",
-        "Gigametre - bir milyar metreye eşdeğer metrik uzunluk birimi."
       ]
     },
     {
