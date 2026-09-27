@@ -1486,3 +1486,47 @@ class TestConfidentWrongAnswers(unittest.TestCase):
         bot = self._bot('selam', ['selam'], ['merhaba!'])
         for q in ('merhaba', 'nasilsin', 'tesekkur ederim', 'gorusuruz'):
             self.assertFalse(bot._is_knowledge_question(q), q)
+
+
+class TestResponseCapInvalidatesCaches(unittest.TestCase):
+    """Yanit tavani degisince ONBELLEK ve CHECKPOINT parmak izi degismeli.
+
+    Canli tuzak: RESP_CHARS_MAX 70 -> 204 oldugunda cift SAYISI degismiyor
+    (clean_chars kirpar, elmez), natural/sekil/seed/ctx-chars da ayni. Bu
+    yuzden parmak izi CAKISIYORDU:
+      - SaveDir'deki eski encode onbellegi (llm_data_*.npz) yeniden yukleniyor
+        -> 70 karakterle encode edilmis veriyle egitim,
+      - eski checkpoint (data='...gs1') ayni sayiliyor -> 70 epoch'lik
+        modelden sessizce devam.
+    Net: 204 deneyi tamamen bos gecmek demekti. (train_llm.py _cache_fp,
+    data_fp)
+    """
+
+    class _Tok:
+        merges = [0] * 12000
+
+        def __len__(self):
+            return 16000
+
+    def _cache_fp(self, cap):
+        import train_llm
+        old = train_llm.RESP_CHARS_MAX
+        try:
+            train_llm.RESP_CHARS_MAX = cap
+            return train_llm._cache_fp(self._Tok(), None, 50000, 5, 1,
+                                       48, 256, 64, ['a'] * 5000)
+        finally:
+            train_llm.RESP_CHARS_MAX = old
+
+    def test_encode_cache_fp_differs_between_caps(self):
+        self.assertNotEqual(self._cache_fp(70), self._cache_fp(204))
+
+    def test_data_fp_carries_response_cap(self):
+        """Resume izi cap'i tasimali; eski surum reddedilmeli."""
+        from seqgen import RESP_CHARS_MAX
+        fp = '%d-%d-%d-%d-b4-c%d-gs1-r%d' % (50000, 5, 48, 256, 48,
+                                            RESP_CHARS_MAX)
+        self.assertIn('-r%d' % RESP_CHARS_MAX, fp)
+        # 70 epoch kosusunun kaydettigi eski bicim
+        eski = '50000-5-48-256-b4-c48-gs1'
+        self.assertNotEqual(eski, fp)

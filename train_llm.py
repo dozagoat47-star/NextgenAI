@@ -297,17 +297,25 @@ def llm_loss(logits, tgt, mask):
 def _cache_fp(tokenizer, kb_map_path, n_pairs, NATURAL, RAG,
               max_ctx_len, max_seq_len, batch_size, vocab):
     """Veri ondeklenti parmak izi: veri/tokenizer/kb-map degisince yeniden
-    encode edilir; ayniysa ondeklent onbellegi (npz) kullanilir."""
+    encode edilir; ayniysa ondeklent onbellegi (npz) kullanilir.
+
+    RESP_CHARS_MAX DAHILDIR: yanit tavani degisince veri icerigi degisir ama
+    cift SAYISI degismez (clean_chars kirpar, elmez). Sayi/sekil/seed ayni
+    kaldigi icin bu bilesen olmadan parmak izi CAKISIR ve onbellek eski
+    kirpma ile encode edilmis veriyi geri yukler -> tavan degisimi sessizce
+    hicbir seye donusurdu.
+    """
     h = hashlib.md5()
     # 'fmt:4' -> v4 cache: duz (flat) duz arrays, pickle YOK, PAD kuyrugu
     # budanmis (dinamik uzunluklu batch). v1-v3 object-array/160-PAD npz'leri
     # Kaggle'da 10 dk'lik yukleme takilmalari yapiyordu; v3 tek seferde
     # okunurdu, v4 ayni duz okuyu + daha kucuk tensorde cosar. format
     # degisince eski cache gecersiz -> ilk koşuda 1 kez encode.
-    h.update(('fmt:4|%d|%d|%d|%d|%d|%d|%d|%d' % (n_pairs, NATURAL, int(RAG),
-                                               max_ctx_len, max_seq_len,
-                                               batch_size, SEED,
-                                               CTX_CHARS)).encode('utf-8'))
+    h.update(('fmt:4|%d|%d|%d|%d|%d|%d|%d|%d|r%d' % (n_pairs, NATURAL, int(RAG),
+                                                    max_ctx_len, max_seq_len,
+                                                    batch_size, SEED,
+                                                    CTX_CHARS,
+                                                    RESP_CHARS_MAX)).encode('utf-8'))
     if kb_map_path and os.path.exists(kb_map_path):
         with io.open(kb_map_path, 'rb') as f:
             h.update(f.read(2_000_000))
@@ -1159,7 +1167,12 @@ def main():
     # veri degisince eski checkpoint otomatik atlanir (eski veriyle egitilmis
     # devam etmez). 'gs1' = ctx-grup bazli split; eski (pair seviyesi, sizintili)
     # checkpoint'lar 'gs0' ile isaretlidir ve otomatik reddedilir.
-    data_fp = '%d-%d-%d-%d-b4-c%d-gs1' % (len(trX), NATURAL, mxc, mxs, CTX_CHARS)
+    # 'r%d' = RESP_CHARS_MAX: yanit tavani 70 -> 204 degistiginde cift sayisi,
+    # natural, mxc/mxs ve CTX_CHARS AYNI kaldigi icin (clean_chars kirpar,
+    # elmez) parmak izi bu bilesen olmadan cakisir ve 70 karakterle egitilmis
+    # modelden sessizce devam edilirdi -> 204 deneyi tamamen bos olurdu.
+    data_fp = '%d-%d-%d-%d-b4-c%d-gs1-r%d' % (len(trX), NATURAL, mxc, mxs,
+                                              CTX_CHARS, RESP_CHARS_MAX)
 
     if args.fresh:
         print('Uyari: --fresh verildi, mevcut checkpoint yok sayilir '
