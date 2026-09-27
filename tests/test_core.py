@@ -1530,3 +1530,147 @@ class TestResponseCapInvalidatesCaches(unittest.TestCase):
         # 70 epoch kosusunun kaydettigi eski bicim
         eski = '50000-5-48-256-b4-c48-gs1'
         self.assertNotEqual(eski, fp)
+
+
+class TestRefusalIsASignal(unittest.TestCase):
+    """Ret bir CEVAP degil bir SINEYDIR; arastirma yolunu acmali.
+
+    app.py:474 kapisi `can_answer(q) and not has_unknown_subject(q)` ile
+    fallback_answer'a (corpus -> internet -> ogren) gider. `can_answer` yalnizca
+    "bir cevap uretebiliyor mu" sordugu icin durust bir ret de ondan gecer ve
+    araştirma hic calismaz. Olculmus: 20 bilgi sorusunun 8'inde bot ret metnini
+    dogrudan yazdi, 11'i arastirmaya gitti.
+    """
+
+    def setUp(self):
+        from brain import ChatBot, REFUSAL_TEXT
+        self.bot = ChatBot()
+        self.REFUSAL_TEXT = REFUSAL_TEXT
+
+    def test_unknown_reply_is_detected_as_refusal(self):
+        self.assertTrue(self.bot.is_refusal(self.bot._unknown_reply()))
+
+    def test_normal_answer_is_not_refusal(self):
+        self.assertFalse(self.bot.is_refusal(
+            "Istanbul Turkiye'nin en buyuk sehridir."))
+
+    def test_phrase_inside_a_real_answer_is_not_refusal(self):
+        """'bilmiyorum' kelimesi gecisi yanlis pozitif uretmemeli.
+
+        Kelime listesiyle eslestirme denendi ve 14 vakanin 2'sinde hata verdi:
+        sohbet intent'i bu kelimeyi kullanabiliyor.
+        """
+        self.assertFalse(self.bot.is_refusal(
+            'Bilmiyorum demek kotu bir sey degildir.'))
+        self.assertFalse(self.bot.is_refusal(
+            'O birakilip gitti, dedi ki "bilmiyorum", sonra cikti.'))
+
+    def test_non_string_input_is_not_refusal(self):
+        for v in (None, '', 12345, [], {}):
+            self.assertFalse(self.bot.is_refusal(v))
+
+    def test_refusal_text_and_gate_agree(self):
+        """Uretici ve taniyici ayni metni paylasmali."""
+        self.assertEqual(self.bot._unknown_reply(), self.REFUSAL_TEXT)
+        self.assertTrue(self.bot.is_refusal(self.REFUSAL_TEXT.upper()))
+        self.assertTrue(self.bot.is_refusal('  ' + self.REFUSAL_TEXT + '  '))
+
+
+class TestRetrievalTrustGate(unittest.TestCase):
+    """Corpus eslesmesi soruyu ANLATIYOR olmali; alaksa durust ret daha iyi.
+
+    128.555 parcaciklik korpusta neredeyse her soru bir eslesme buluyor ve
+    skor esik ustu olsa da eslesme alakasiz olabiliyor. Skor ayirmiyordu:
+    iyi eslesmelerin en dusugu 0.948, kotu eslesmelerin en yuksegi 1.266.
+    """
+
+    def setUp(self):
+        from brain import ChatBot
+        self.bot = ChatBot()
+
+    def _c(self, title):
+        return {'title': title, 'text': 'x', 'score': 1.0}
+
+    def test_headword_match_is_accepted(self):
+        for q, title in (('galaksi nedir', 'Galaksi'),
+                         ('kriptografi nedir', 'Kriptografi hukuku'),
+                         ('demokrasi nedir', 'Demokrasi'),
+                         ('algoritma nedir', 'Algoritma')):
+            self.assertTrue(self.bot.chunk_anchored(q, self._c(title)),
+                            '%s -> %s reddedildi' % (q, title))
+
+    def test_unrelated_headword_is_rejected(self):
+        """Olculmus guvenli cevaplari bozan alakasiz eslesmeler."""
+        for q, title in (
+                ('turkiye nin en buyuk seehri hangisi', 'Briksdalsbreen'),
+                ('turkiye hangi yilda cumhuriyete gecti', 'mansur bin cumhur'),
+                ('bir yilda kac gun vardir', '28 Eylul'),
+                ('bilgisayar nedir', 'oyun'),
+                ('nvidia kimdir', 'SLi'),
+                ('paleolitik donem nedir', 'Taglar Magarasi')):
+            self.assertFalse(self.bot.chunk_anchored(q, self._c(title)),
+                             '%s -> %s KABUL EDILDI' % (q, title))
+
+    def test_turkish_suffix_is_not_stemmed_into_a_match(self):
+        """Govyeleme guveni AZALTIYOR: kirpma ilgisiz kelimeleri birlestirir.
+
+        tokenize() 'islamlar' -> 'islam', 'Dinar' -> 'din',
+        "Allah'im" -> 'allah' uretiyordu; boylece kapi Kastamonu koyunu
+        "islam" sorusuna, Dinar sehirini "din" sorusuna, bir askiyi
+        "allah kimdir" sorusuna kabul ediyordu.
+        """
+        for q, title in (('islam nedir', 'islamlar, Kas'),
+                         ('din nedir', 'Tekin, Dinar'),
+                         ('allah kimdir', "Allah'im Sen Bilirsin")):
+            self.assertFalse(self.bot.chunk_anchored(q, self._c(title)),
+                             '%s -> %s KABUL EDILDI' % (q, title))
+
+    def test_homonym_headword_is_rejected(self):
+        """Baslikta konu kelimesi gecse bile asil konusu baska olabilir."""
+        self.assertFalse(self.bot.chunk_anchored(
+            'kilic nedir', self._c('Erman Kilic')))
+        self.assertFalse(self.bot.chunk_anchored(
+            'fizik nedir',
+            self._c('Heidelberg universitesi Fizik ve Astronomi Fakultesi')))
+
+    def test_subtopic_not_covering_question_is_rejected(self):
+        """Bas adi eslesse bile baslik sorunun tamamini kapsamali."""
+        self.assertFalse(self.bot.chunk_anchored(
+            'kuantum mekanigi nedir', self._c('Kuantum saati')))
+        self.assertFalse(self.bot.chunk_anchored(
+            'ibrahim haliloglu kimdir', self._c('Haliloglu, canakkale')))
+
+    def test_raw_words_drops_question_pattern(self):
+        """Soru kalibi kelimeleri konu tasimaz; kapiyi boslukla kirarlardi."""
+        self.assertEqual(self.bot.raw_words('demokrasi nedir'), ['demokrasi'])
+        self.assertNotIn('nedir', self.bot.raw_words('galaksi nedir'))
+
+    def test_raw_words_does_not_stem(self):
+        self.assertEqual(self.bot.raw_words('galaksi'), ['galaksi'])
+        self.assertNotIn('galaks', self.bot.raw_words('galaksi'))
+
+    def test_raw_words_filters_weak_words_by_stem(self):
+        """Zayif-kelime filtresi govde uzerinden calisir.
+
+        `_weak_stems()` govdelenmis bir kume donduruyor; dogrudan `w not in
+        weak` demek filtreyi sessizce devre disi birakirdi ve ek almis zayif
+        kelimeler (46 tane) iceri sizardi. Kapinin hassasiyeti buna bagli:
+        "demokrasi nedir" -> ['demokrasi', 'nedir'] idi, 'nedir' kapsama
+        kontrolunu bozuyordu.
+        """
+        self.assertEqual(self.bot.raw_words('galaksi buyukler'), ['galaksi'])
+        for w in ('buyukler', 'bilgiler', 'diller', 'cesitler'):
+            self.assertEqual(self.bot.raw_words(w), [],
+                             '%s zayif kelime olarak elenmeli' % w)
+
+    def test_raw_words_keeps_real_content_words(self):
+        """Süzgeç asil kelimeleri yutmamali."""
+        self.assertEqual(self.bot.raw_words('turkiye deprem riski'),
+                         ['turkiye', 'deprem', 'riski'])
+
+    def test_empty_inputs_are_rejected(self):
+        self.assertFalse(self.bot.chunk_anchored('', self._c('Galaksi')))
+        self.assertFalse(self.bot.chunk_anchored('galaksi nedir', None))
+        self.assertFalse(self.bot.chunk_anchored('galaksi nedir', {}))
+        self.assertFalse(self.bot.chunk_anchored('galaksi nedir',
+                                                 {'title': '', 'score': 1.0}))

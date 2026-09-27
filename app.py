@@ -345,9 +345,23 @@ def fallback_answer(message):
     gecerek anchor-sabit yeni cumle olarak verilir.
     """
     chunk = corpus.search(message)
-    if chunk and chunk['score'] >= corpus.min_score:
+    # Skor esigi YETMEZ: kotu eslesmeler yuksek skorla geliyor
+    # ("turkiye nin en buyuk seehri" -> "Briksdalsbreen" 1.005,
+    #  "bir yilda kac gun vardir"   -> "28 Eylul" 1.266),
+    # iyi eslesmeler ise dusuk skorlu olabiliyor (astroloji 0.948).
+    # Ayirt edici olan baslik capasi: sorunun konu kelimesi parcacinin
+    # basliginda da geciyor mu (bkz. ChatBot.chunk_anchored).
+    #
+    # Bu kapi olmadan arastirma, durust "bilmiyorum" yerine GUVENLI YANLIS
+    # cevap uretirdi. Reddedilince asagida internete dusulur; internet de
+    # yoksa DEFAULT_UNKNOWN yazilir.
+    if (chunk and chunk['score'] >= corpus.min_score
+            and bot.chunk_anchored(message, chunk)):
         print(f"[CHAT] Corpus eslesmesi (%.2f): {chunk['title']}" % chunk['score'])
         return generator.generate_response(chunk['text'], title=chunk.get('title', ''))
+    if chunk:
+        print(f"[CHAT] Corpus eslesmesi reddedildi (baslik capasi yok, %.2f): %s"
+              % (chunk['score'], chunk.get('title', '')))
 
     if is_factual_query(message):
         knowledge = fetch_answer(message)
@@ -460,6 +474,30 @@ def chat():
             _tag = bot._classify(user_message)[0]
             response = bot.get_response(user_message)
             _last_tag = _tag
+
+            # Bot konuyu bulamadiysa ve durustce REDDETTiyse, ret bir cevap
+            # degil bir SINEYDIR: daha iyi bir kaynak vardir (corpus -> internet
+            # -> corpus'a kaydetme, bkz. fallback_answer). Bu kontrol olmadan
+            # ret dogrudan kullaniciya yaziliyordu, yani bot once "bilmiyorum"
+            # diyor, SONRA arastirmiyordu.
+            #
+            # Olculmus: 20 bilgi sorusunun 8'inde can_answer True dondugu icin
+            # ust kapi acilmis, has_unknown_subject 1'i yakalayamadan ret metni
+            # basilmis ve fallback_answer hic cagrilmamisti. Ret cumlesini
+            # ureten tarafla (brain.REFUSAL_MARKERS) ayni listeyi paylasan
+            # is_refusal bu boslugu kapatir.
+            #
+            # `continue` bilincli: arastirma cevabi iceriden zaten
+            # generator'dan gecirildigi icin (fallback_answer, sat 350/369)
+            # asagidaki yeniden-uretim onu ikinci kez bozardi.
+            if bot.is_refusal(response):
+                print(f"[CHAT] Bot konuyu bulamadi (ret), "
+                      f"arastirma deneniyor: {user_message}")
+                response = fallback_answer(user_message)
+                _last_tag = None
+                print(f"[CHAT] Response: {response}")
+                return jsonify({'response': response})
+
             count = extract_count(user_message)
             if (count and count >= 2 and _tag in COUNT_TAGS
                     and _tag in bot.intents):

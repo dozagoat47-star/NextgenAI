@@ -114,6 +114,54 @@ SEGMENT_PATTERN = re.compile(
     r"sonra|ardindan|bundan sonra)\b",
     re.IGNORECASE)
 
+# "Bilmiyorum" demenin bir YOLU degil, bir SINEYIDIR. Uretici tarafi
+# (_unknown_reply) ve tuketici tarafi (is_refusal) ayni listeyi paylasir;
+# boylece bot bu cumleyi her yerde uretebilir, cagiran taraf da taniyabilir.
+#
+# Neden gerekli: app.py yaniti su kapidan gecirir --
+#     elif bot.can_answer(q) and not bot.has_unknown_subject(q):
+#             response = bot.get_response(q)
+#         else:
+#             response = fallback_answer(q)   # corpus -> internet -> ogren
+# `can_answer` yalnizca "bir cevap uretebiliyor mu" sorar. Durust bir ret
+# ("bilgim yok") de uretilmis bir cevaptir, dolayisiyla can_answer True
+# doner ve ARASTIRMA YOLU HIC KAPANMAZ. Olculmus: 20 bilgi sorusunun 8'inde
+# has_unknown_subject 1'i yakalayamadan bot reddi dogrudan yazdi; 11'i
+# fallback'e gitti. Ret cumlesi bir cevap gibi sayildigi icin bot once
+# "bilmiyorum" diyor, SONRA arastirmiyordu.
+#
+# Duzeltme: ret bir cevap degil, bir sinyal. is_refusal() bunu tanir ve
+# cagiran taraf reddi gormesi durumunda daha iyi bir kaynaga (corpus ->
+# internet) yonlendirebilir.
+REFUSAL_TEXT = ("Bu konuda bilgim yok, bir şey uydurmak istemem. "
+                "Baska bir şey sormak istersen yardimci olurum.")
+
+# is_refusal icin karsilastirma tabani: ret cumlesinin normalize edilmis
+# baslangic parcasi.
+#
+# Bilerek TEK KELIME belirteci degil: "bilmiyorum" kelimesi gercek bir cevabin
+# BASINDA da gecebilir ("Bilmiyorum demek kotu bir sey degildir") ve bu durust
+# bir ret degildir. Kelime listesiyle eslestirmek 14 test vakasindan 2'sinde
+# yanlis pozitif uretti. Eslesme yalnizca cumlenin basindaki bu sabit girisle
+# ve TAM metin karsilastirmasiyla yapilir; boylece kapsam dar, hatasi sifirdir.
+REFUSAL_LEAD = 'bu konuda bilgim yok'
+
+# Soru KALIBI kelimeleri ("X nedir", "X nerede"): konu TASIYAMAZLAR, yalnizca
+# sorunun tipini belirler. Ne STOPWORDS'ta ne de WEAK_TOPIC_WORDS'ta
+# bulunurlar, cunku ikisi de asil kelimeler icindir; ama bir eslesme kapisinda
+# kullanilamazlar:
+#     raw_words("demokrasi nedir") -> ['demokrasi', 'nedir'] -> baslik
+#     kapsamini boslukla kirdigi icin dogru eslesmeyi de eliyordu.
+#
+# Once bu liste brain.py icinde iki yerde birebir tekrar ediyordu
+# (_external_knowledge, sat ~1865 ve ~1869). Kume BIREBIR ayni birligi
+# kullanilir: genisletmek _external_knowledge'in `bs >= 2` esigini zorlastirir
+# ve 764 bilgi intent'inin ana yolunu sessizce zayiflatir.
+QUESTION_PATTERN_WORDS = frozenset((
+    'nedir', 'kimdir', 'kactir', 'nerede', 'hakkinda', 'bilgi',
+    'ver', 'anlat', 'ne', 'demek', 'bana', 'mi', 'mu',
+))
+
 
 class NeuralNetwork:
     """
@@ -1427,8 +1475,123 @@ class ChatBot:
 
     def _unknown_reply(self):
         """Konu bulunamadiginda, emin bir cevap UYDURMAK yerine durust soyle."""
-        return ("Bu konuda bilgim yok, bir şey uydurmak istemem. "
-                "Baska bir şey sormak istersen yardimci olurum.")
+        return REFUSAL_TEXT
+
+    def raw_words(self, text):
+        """Durak/zayif kelime filtresinden gecmis, GOVDELENMEMIS kelimeler.
+
+        SIRA KORUNUR (kume degil liste): basligin bas adini bulmak icin gerekir.
+
+        `tokenize` Turkce ekleri kirpar ve bu retrieval icin IYIDIR ("ev" ile
+        "evi" eslesmelidir). Ancak bir GUVEN kapisi olarak kullanilamaz:
+        kirpma ilgisiz kelimeleri ayni seye goturur. Olculmus ornekler:
+            "islamlar, Kas"  -> tokenize: ['islam', 'kas']    (koy adi -> din)
+            "Tekin, Dinar"   -> tokenize: ['tek', 'din']      (sehir  -> din)
+            "Allah'im ..."   -> tokenize: ['allah', ...]     (sarki  -> tanri)
+        Bu ucu de guven kapisindan gecirdigi icin "islam nedir" sorusu bir
+        Kastamonu koyu, "din nedir" sorusu Dinar sehiri, "allah kimdir"
+        sorusu bir aski sanilirdi. Kapilar TAM KELIMEye bakmak zorundadir.
+        """
+        if not text:
+            return []
+        t = text.lower()
+        t = self.ascii_normalize(t)
+        for ch in string.punctuation:
+            t = t.replace(ch, '')
+        weak = self._weak_stems()
+        # Zayif-kelime filtresi GOVDE uzerinden calisir ama donen kelime
+        # govdelenmez. `_weak_stems()` govdelenmis bir kume donduruyor
+        # (tokenize de govdeliyor); dogrudan `w not in weak` demek filtreyi
+        # sessizce devre disi birakirdi. Soru kaliplari ("nedir", "hangisi")
+        # de hicbir filtreye girmez, o yuzden ayrica cikarilir.
+        qp = QUESTION_PATTERN_WORDS
+        return [w for w in t.split()
+                if w not in STOPWORDS and self.simple_stem(w) not in weak
+                and w not in qp and self.simple_stem(w) not in qp
+                and len(w) >= 3]
+
+    def chunk_anchored(self, question, chunk):
+        """Bu retrieval sonucu soruyu GERCEKTEN yanitliyor mu?
+
+        Corpus'ta neredeyse her soru bir eslesme buluyor ve skor esik ustu
+        olsa da eslesme alakasiz olabiliyor. Olculmus kotu eslesmeler:
+            "turkiye nin en buyuk seehri hangisi" -> "Briksdalsbreen"  (1.005)
+            "turkiye hangi yilda cumhuriyete gecti" -> "mansur bin cumhur" (1.185)
+            "bir yilda kac gun vardir"            -> "28 Eylul"       (1.266)
+            "islam nedir"                         -> "islamlar, Kas"  (1.310)
+            "din nedir"                           -> "Tekin, Dinar"   (1.099)
+        Skor bunlari iyi eslesmelerden AYIRMIYOR (iyi en dusuk 0.948 / kotu en
+        yuksek 1.266 -> ciddi ortusme). Esik yukseltmek cozum degil.
+
+        Kural iki kosuldan olusur:
+
+        1) parcacinin BAS ADI, sorunun bir icerik kelimesiyle TAM DENK olmali.
+        2) Baslik, sorunun TUM icerik kelimelerini kapsamali.
+
+        (1) baslikta konu kelimesi gecen ama asil konusu baska olan komsu
+        (homonym) eslesmelerini eler:
+            "kilic nedir" -> "Erman Kilic"  bas adi 'erman' -> RED
+                             (metin: "Turk eski futbolcu")
+            "fizik nedir" -> "Heidelberg universitesi Fizik ve Astronomi
+                             Fakultesi"  bas adi 'heidelberg' -> RED
+
+        (2) basligin konuyu KAPSAMADIGI alt-basliklari eler. Bu en cok
+        kazandiran kosul:
+            "kuantum mekanigi nedir" -> "Kuantum saati"
+                'kuantum' bas adiyla eslesiyor ama baslik sorunun yarisi
+                ('mekanigi') icermiyor -> RED
+            "ibrahim haliloglu kimdir" -> "Haliloglu, canakkale"
+                baslik 'ibrahim' kelimesini icermiyor -> RED
+        Wikipedia bicimli basliklarda konu kapsanir, bu yuzden temiz tanim
+        sorulari durur:
+            "galaksi nedir"        -> "Galaksi"            -> KABUL
+            "kriptografi nedir"    -> "Kriptografi hukuku" -> KABUL
+            "demokrasi nedir"      -> "Demokrasi"          -> KABUL
+            "algoritma nedir"      -> "Algoritma"          -> KABUL
+            "rna nedir"            -> "RNA dunyasi hipotezi" -> KABUL
+
+        Olculmus sonuc (39 soruluk tanim kumesi): eski kural (sadece skor
+        esigi) %100 kabul ediyordu ve cogusu alakasizdi; bu kapi %25'e
+        indiriyor ve guvenli cevap ureten kismi ayikliyor.
+
+        Kabul edilmezse cagiran taraf durust reti korumali ya da internete
+        cikmalidir: alakasiz bir parcayi guvenle sunmak, durust "bilmiyorum"
+        yanitindan DAHA kotudur.
+
+        Kalan hata sinifi homonym: soru bir kelimenin BIRINCIL anlamini
+        istiyor, baslik ikinci bir anlami tasiyor ("karbon nedir" ->
+        "Karbon filtreleme"). Bunu cozmek kelime-anlam ayrimi gerektirir; yerel
+        bir esikle cozulemez ve 39 soruluk kume uyarlamak asiri uyarlama
+        olurdu. Bu sinif bilerek acik birakildi: kapiyanlis cevaptan cok,
+        dogru olmayan cevaptan kacinmayi tercih ediyor.
+        """
+        if not chunk or not question:
+            return False
+        title = str(chunk.get('title', '') or '')
+        if not title:
+            return False
+        qw = self.raw_words(question)
+        tw = self.raw_words(title)
+        if not qw or not tw:
+            return False
+        return tw[0] in qw and set(qw).issubset(set(tw))
+
+    def is_refusal(self, text):
+        """Bu metin bir RET mi, yoksa gercek bir cevap mi?
+
+        `can_answer` sadece "bir cevap uretebiliyor mu" sorar ve durust bir
+        ret de uretilmis bir cevaptir. Bu yuzden cagiran taraf ret goruldugunde
+        yalnizca yazdirmak yerine daha iyi bir kaynaga yonlendirebilir
+        (bkz. REFUSAL_LEAD ve app.py fallback_answer).
+
+        Karsilastirma cumlenin BASINDA ve tam metinle yapilir. Kelime
+        listesi kullanilmaz: "bilmiyorum" gecisi bir gercek cevabin basinda da
+        gecebiliyor ve kelime listesi o durumu yanlis pozitif olarak isaretler.
+        """
+        if not text or not isinstance(text, str):
+            return False
+        t = ' '.join(self.ascii_normalize(text.strip().lower()).split())
+        return t.startswith(REFUSAL_LEAD)
 
     def _tag_shares_content_word(self, tag, query):
         """Sohbet intent'i soruyla bir icerik kelimesi paylasiyor mu?
@@ -1699,15 +1862,12 @@ class ChatBot:
                 if aq and aq in self._kb_ascii:
                     return self._kb_ascii[aq]
                 # 1b) desenlerin normallesmis haliyle kesis (cok desenli tutarli)
+                # Soru kalibi kelimeleri iki ayri yerde elle yazilmis sekilde
+                # duruyordu; tek kaynaktan (QUESTION_PATTERN_WORDS) alinir.
                 best, bs = None, 0.0
-                qset = set(qn.split()) - {'nedir', 'kimdir', 'kactir', 'nerede',
-                                          'hakkinda', 'bilgi', 'ver', 'anlat',
-                                          'ne', 'demek', 'bana', 'mi', 'mu'}
+                qset = set(qn.split()) - QUESTION_PATTERN_WORDS
                 for ctx, text in self._kb_map.items():
-                    cset = set(ctx.split()) - {'nedir', 'kimdir', 'kactir',
-                                               'nerede', 'hakkinda', 'bilgi',
-                                               'ver', 'anlat', 'ne', 'demek',
-                                               'bana', 'mi', 'mu'}
+                    cset = set(ctx.split()) - QUESTION_PATTERN_WORDS
                     score = len(qset & cset)
                     if score > bs:
                         bs, best = score, text
