@@ -17,6 +17,29 @@ from bpe import turkish_lower as _tr_lower
 from transformer import TransformerNN
 
 
+# Uretilen yanit bu uzunluktaysa noktalama ile bitmek ZORUNDA; bitmiyorsa
+# kelime ortasinda kesilmistir (veri tavaninin imzasi). KISA sohbet
+# cevaplari ("merhaba dunya nasilsin canim", 27 krkt) noktalama olmadan da
+# tamdir, bu yuzden muaftir. Esik, reddedilmesi gereken bozuk ornegin
+# uzunlugundan secildi: 73 krkt ("...bir son alandan").
+_TRUNCATION_MIN_CHARS = 60
+
+# Konum TESPIT ETMEYEN kelimeler: neredeyse her intent'te geciyor, bu yuzden
+# "konu ortakligi" kaniti sayilamazlar. Olculmus yanlis eslesmeler:
+#   "turkiye nin en buyuk seehri hangisi" -> tag 'asklarim buyuk benden'
+#       ortak kelime: "buyuk"  -> gecerli sanildi, halbuki bir SARKI adi
+#   "turkiye nin dogusunda hangi sehir var" -> tag 'sehir devrimi'
+#       ortak kelime: "sehir" -> paleolitik/cag cevabi verdi
+# Bunlar sorunun oznesini tasimaz; yalnizca olcek/kiplik/yer belirtir.
+WEAK_TOPIC_WORDS = {
+    'buyuk', 'kucuk', 'sehir', 'yer', 'yil', 'gun', 'ay', 'saat', 'dakika',
+    'isim', 'ad', 'sey', 'konu', 'soru', 'bilgi', 'tarih', 'sayi', 'is',
+    'tur', 'dil', 'ulke', 'kisi', 'insan', 'yontem', 'sekil', 'turler',
+    'cesit', 'farkli', 'ayni', 'yeni', 'eski', 'iyi', 'kötü', 'guzel',
+    'en', 'cok', 'az', 'ilk', 'son', 'ana', 'temel', 'genel', 'ozel',
+    'kendisi', 'kendine', 'biz', 'siz', 'onlar', 'her', 'cogu', 'hepsi',
+}
+
 # Turkce islev/durak kelimeleri: anahtar kelime dikkatinde agirligi sifir.
 # (Cumlede konuyu tasimazlar; "hangi, ne, mi" gibi her yerde gecerler.)
 STOPWORDS = {
@@ -1296,12 +1319,29 @@ class ChatBot:
     def _is_knowledge_question(self, text):
         """Tanim/olgu sorusu mu? ("X nedir", "X ne demek", "X hakkinda bilgi",
         "X kimdir", "X nerede"...) Bilgi intent'leri bu sablonlarla uretilir;
-        siniflandirici chat tag'ine kaptirdiginda bile bilgi oncelik kazanir."""
+        siniflandirici chat tag'ine kaptirdiginda bile bilgi oncelik kazanir.
+
+        OLCUM: yalnizca "nedir/kimdir" kaliplari siniflandiriciyi 0.93-1.00
+        guvenle yanlis sohbet intent'ine bakiyordu:
+            "turkiye hangi yilda cumhuriyete gecti" -> mutluluk (0.932)
+            "bir yilda kac gun vardir"             -> gelecek_planlari (0.982)
+            "dunyanin en buyuk okyanusu hangisi"  -> asklarim buyuk benden
+        Bunlar olgu SORUSU; "nedir" deseler de ayni yoldan gecmeleri gerekir.
+        """
         t = self.ascii_normalize(text).lower()
         return any(m in t for m in (
             'nedir', 'ne demek', 'ne demektir', 'hakkinda bilgi', 'hakkinda bil',
-            'kimdir', 'kimlerdir', 'nerede', 'neredir', 'ne zaman', 'anlami nedir',
-            'acilimi', 'tarihcesi', 'tarihi nedir', 'konusu nedir'))
+            'kimdir', 'kimlerdir', 'nerede', 'neredir', 'ne zaman',
+            'anlami nedir', 'acilimi', 'tarihcesi', 'tarihi nedir',
+            'konusu nedir',
+            # --- genisletme: olgu/sayim/bilgi sorulari
+            'hangisi', 'hangisi?', 'hangisidir', 'hangi biri', 'hangi bir',
+            'kac ', 'kactir', 'kac yil', 'kac gun', 'kac kişi', 'kac kisi',
+            'kac metre', 'kac kilometre', 'kac nufus',
+            'yilinda', 'yili', 'kacindir', 'kaç', 'hangi yil',
+            'nasil olur', 'nasil calisir', 'nasil yapilir', 'nasil kuruldu',
+            'kimse', 'nerelidir', 'yururluk', 'sonucu ne', 'farki ne',
+        ))
 
 
     def _negation_reply(self, content):
@@ -1375,7 +1415,94 @@ class ChatBot:
         top_tag = max(scores, key=lambda t: (scores[t], self._tag_rank(t)))
         if scores[top_tag] < self.knowledge_threshold:
             return None
+        # KAPSAM KAPISI: IDF agirligi tek bir kelimeye dayaninca esik asilir.
+        #   "islam nedir" -> 'islam isbirligi teskilati parlamento birligi'
+        # Tek kelime 'islam' yuksek IDF agirligi tasiyor, esik geciliyor ve
+        # bot IiT/OPEC metni donuyordu -- kullanici Oysa DIN soruyordu ve
+        # bilgi tabaninda din icin kayit YOK. Kullanici tag'in kac kelimesini
+        # gercekten verdi? 1/5 -> guvenilmez, reddet.
+        if not self._knowledge_tag_credible(top_tag, words):
+            return None
         return self._select_response(top_tag, words)
+
+    def _unknown_reply(self):
+        """Konu bulunamadiginda, emin bir cevap UYDURMAK yerine durust soyle."""
+        return ("Bu konuda bilgim yok, bir şey uydurmak istemem. "
+                "Baska bir şey sormak istersen yardimci olurum.")
+
+    def _tag_shares_content_word(self, tag, query):
+        """Sohbet intent'i soruyla bir icerik kelimesi paylasiyor mu?
+
+        Bilgi sorusu retrieval'da bulunamadiysa, sohbet intent'ine gecmek
+        ancak konu gercekten iliskiliyse mantikli. Aksi halde bot 0.95+ guvenle
+        alakasiz bir yanit uydurur ("suyun formulu nedir" -> teknoloji).
+        """
+        qw = self._content_words(query)
+        if not qw:
+            return False
+        return bool(qw & self._content_words(str(tag)))
+
+    def _knowledge_tag_credible(self, tag, query):
+        """Bilgi-intent override'i inandirici bir eslesme mi?
+
+        Siniflandirici guvenli gorunse de bazen YANLIS bilgi intent'i secer
+        ve o intent'in canned metni kullaniciya emin bir dille sunulur.
+        Olculmus regresyon:
+            "islam nedir"  -> tag 'islam isbirligi teskilati parlamento
+                                birligi'
+                         -> "IiT'ye uye bes ulke vardir."   (OPEC!)
+        Kullanici TEK kelime 'islam' dedi; tag ise 5 kelimelik, siyasi bir
+        kurulus adi. Kelime ortusmesi 1/5 = %20.
+
+        Kural: kisitlayici (stopword) ve konum tasimayan (WEAK_TOPIC_WORDS)
+        kelimeler sayilmaz. Bir eslesme ancak iki kosul birlikte saglanirsa
+        guvenilirdir:
+          (a) KONU ORTUSMESI: kullanicinin tag ile paylasan EN AZ BIR
+              konum kelimesi olmali.
+                  "turkiye nin dogusunda hangi sehir var" -> 'sehir devrimi'
+                  'sehir' zayif kelime -> paylasilan konu kelimesi 0 -> REDDEDILIR
+              (eski "tag 1-2 kelimeyse muaf" kurali bunu gecirdi)
+          (b) KAPSAM: tag'in kelimelerinin en az yarisi kullanici tarafindan
+              verilmis olmali.
+                  "islam nedir" -> 'islam isbirligi teskilati parlamento birligi'
+                  1/5 = %20 -> REDDEDILIR
+        Tek kelimelik tag icin (b) tek basina yeterlidir: eslesirse kapsam
+        %100 olur ("fizik nedir" -> 'fizik'), eslesmezse (a) eler.
+        """
+        qw = self._content_words(query)
+        tw = self._content_words(str(tag))
+        if not qw or not tw:
+            return False
+        shared = qw & tw
+        if not shared:
+            return False
+        return len(shared) / float(len(tw)) >= 0.5
+
+    def _weak_stems(self):
+        """WEAK_TOPIC_WORDS'in GOVDELENMIS hali (onbellekli).
+
+        ONEMLI: tokenize() kelimeleri gövdeliyor ('sehir' -> 'seh'), bu yuzden
+        zayif-kelime filtresi de gövde üzerinden çalışmalı. Aksi halde filtre
+        hiç eşleşmiyor ve 'sehir devrimi' yanlış eşleşmesi geçiyordu.
+        """
+        cached = getattr(self, '_weak_stem_cache', None)
+        if cached is None:
+            cached = {self.simple_stem(w) for w in WEAK_TOPIC_WORDS}
+            self._weak_stem_cache = cached
+        return cached
+
+    def _content_words(self, text):
+        """Konum tasiyan kelimeler (stopwords + zayif/genel kelimeler haric).
+
+        Metin veya kelime listesi kabul eder. Zayif kelimeler GOVDELENMIS
+        haliyle karsilastirilir (bkz. _weak_stems).
+        """
+        if isinstance(text, str):
+            ws = self.tokenize(text)
+        else:
+            ws = list(text or [])
+        weak = self._weak_stems()
+        return {t for t in ws if t not in STOPWORDS and t not in weak}
 
     def get_response(self, user_input):
         """Generate response for user input"""
@@ -1395,17 +1522,50 @@ class ChatBot:
         # BILGI ONCELIGI: tanim/olgu sorusu ("X nedir", "X hakkinda bilgi", "X
         # kimdir"...) ise once bilgi retrieval denenir. Sınıflandırıcı bilgi
         # sorusunu chat tag'ine kaptirdiginda bile ("galaksi nedir" -> teknoloji)
-        # ansiklopedik yanit ezilmeden doner. Retrieval bos donerse normal akis
-        # (sohbet siniflandirmasi) devam eder.
+        # ansiklopedik yanit ezilmeden doner.
+        #
+        # OLCULEN REGRESYON: retrieval BOS dondugunde normal akisa dustugunde
+        # siniflandirici bilgi sorusunu 0.93-1.00 GUVENLE tamamen alakasiz bir
+        # sohbet intent'ine bagliyordu:
+        #     "suyun formulu nedir"  -> teknoloji (0.986)
+        #                            "Bunlar surken sinsanlari ingi filmis"
+        #     "dunyanin en buyuk okyanusu hangisi" -> asklarim buyuk benden (0.951)
+        #                            (bir sarki adi!)
+        # Yani "bilmiyorum" demek varken bot UYDURUYORDU. Guven degerinin bu
+        # dalda bir anlami yok: 40 sinifli sohbet siniflandiricisi olgu
+        # sorularinin isini yapmaz, sadece yakin bir sohbet sinifi bulur.
+        # Bu yuzden retrieval bos dondugunde sohbet intent'ine SADECE soruyla
+        # ortak bir icerik kelimesi varsa gecilir; yoksa durustce "bilmiyorum".
         if self._is_knowledge_question(user_input):
             kbt = self._select_knowledge(
                 resp_words, exclude=neg_content if negated else None)
             if kbt:
                 return self._try_kb_rephrase(user_input, kbt)
+            if not (chosen_tag in self.intent_tags
+                    and self._tag_shares_content_word(chosen_tag,
+                                                       user_input)):
+                return self._unknown_reply()
 
         # ANAHTAR KELIME OVERRIDE bilgi intentine ulasti: canned bilgi yaniti
         # (LLM varsa bilgi parcasindan yeniden kurulur -> kopya degil).
-        if chosen_tag not in self.intent_tags:
+        #
+        # REGRESYON: buradaki `chosen_tag not in self.intent_tags` kontrolu,
+        # 'Anlayamadim' SENTINEL'ini de yakalardi. Sentinel gercek bir intent
+        # degil; intents'te olmadigi icin bu dal onu bilgi yoluna sokardi ve
+        # _select_response "Bir hata olustu." yaziyordu:
+        #     K: hayir  ->  B: Bir hata olustu.
+        # unclearness bayragi yalnizca sentinel icin True oldugu icin
+        # (bkz. _classify, sat ~1157) `not unclear` bu yolu tamamen kapatir ve
+        # akis asagidaki GUVENSIZ SECIM dalina, oradan da
+        # "Anlayamadim, baska sekilde soyler misin?" yanitina gider.
+        if not unclear and chosen_tag not in self.intent_tags:
+            # Guven kapisi: siniflandirici yanlis bilgi intent'i secebilir.
+            # Kullanici "islam nedir" dediginde tag 'islam isbirligi teskilati
+            # parlamento birligi' seciliyordu (prob 0.74) ve bot IiT/OPEC
+            # metni emin bir dille donuyordu. Tek kelimeyle, 5 kelimelik
+            # siyasi bir kurulus adi eslesiyor -> inandirici ama YANLIS.
+            if not self._knowledge_tag_credible(chosen_tag, user_input):
+                return self._unknown_reply()
             kb = self._select_response(chosen_tag, resp_words)
             return self._try_kb_rephrase(user_input, kb)
 
@@ -1614,6 +1774,18 @@ class ChatBot:
             yanitlar sorudaki kelimeleri tekrar etmek zorunda degildir.
         """
         if not gen or len(gen) < 12 or len(gen) > 260:
+            return False
+        # TAMAMLANMIS CUMLE KAPISI: UZUN bir uretim noktalama ile bitmiyorsa
+        # kelime ORTASINDA kesilmistir; cevap degil, parcadir.
+        #   K: olur -> "Salasanin anlatin icinden biri ve hayikanlik olumli
+        #               orman bir son alandan"   (73 krkt, yari kelime)
+        # Bu, veri tavaninin (70 karakter) imzasiydi.
+        # KISA metinler muaftir: "merhaba dunya nasilsin canim" gibi selamlasma
+        # cevaplari sohbet dilinde noktalama olmadan da TAMDIR (bkz.
+        # tests/test_core.py::test_accept_generated_*). Esik olmayan her metni
+        # reddetmek bu dogru cevaplari da kirardi.
+        if len(gen) >= _TRUNCATION_MIN_CHARS and not gen.rstrip().endswith(
+                ('.', '!', '?', '…', '"', ')')):
             return False
         letters = [c for c in gen.lower() if c.isalpha()]
         if len(letters) < 6 or len(set(letters)) < int(len(letters) * 0.30):

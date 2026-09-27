@@ -1367,3 +1367,122 @@ class TestTopicGateAndKnowledge(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
+
+class TestConfidentWrongAnswers(unittest.TestCase):
+    """Bot'un YANLIS ama EMIN cevap vermesini engelleyen kapilar.
+
+    Canli sohbetle olculmus regresyonlar (brain.py duzeltmeleri):
+      1) "hayir" -> "Bir hata olustu."        hata_orani %18.4
+      2) kelime ortasinda kesilmis uretim   kesik_orani  %13.2
+      3) "islam nedir" -> IiT/OPEC metni    emin ama YANLIS
+      4) "turkiye nin en buyuk seehri hangisi" -> bir SARKI adi
+    """
+
+    def _bot(self, tag, patterns, canned):
+        from brain import ChatBot
+        bot = ChatBot()
+        bot.intents = {tag: canned}
+        bot.intent_tags = [tag]
+        bot.intent_kws = {tag: set(bot.tokenize(' '.join(patterns)))}
+        return bot
+
+    # ---------------------------------------------------------------- 1
+    def test_unclear_sentinel_never_yields_error_string(self):
+        """Sentinel 'Anlayamadim' bilgi dalina KAYMAMALI.
+
+        Regresyon: chosen_tag not in self.intent_tags dal'i sentinel'i de
+        yakalardi; intents'te olmadigi icin _select_response Listesel
+        varsayilanla "Bir hata olustu." donuyordu.
+        """
+        bot = self._bot('selam', ['selam merhaba'],
+                        ['merhaba! nasilsin?'])
+        bot._classify = lambda *a, **k: ('Anlayamadim', 0.02, True, ['hayir'])
+        out = bot.get_response('hayir')
+        self.assertNotIn('hata olustu', out.lower())
+        self.assertNotIn('hata oluştu', out.lower())
+
+    def test_sentinel_is_not_treated_as_knowledge_tag(self):
+        """Sentinel intent degildir: guven kapisi da onu reddetmeli."""
+        bot = self._bot('selam', ['selam'], ['merhaba!'])
+        self.assertFalse(bot._knowledge_tag_credible('Anlayamadim', 'hayir'))
+
+    # ---------------------------------------------------------------- 2
+    def test_long_truncated_generation_rejected(self):
+        """Noktalamasiz UZUN uretim kesilmis sayilir."""
+        bot = self._bot('yardim', ['yardim eder misin'],
+                        ['yardim ederim memnuniyetle'])
+        bot.intents['yardim'] = ['yardim ederim memnuniyetle yardimci olurum']
+        bot.intent_kws['yardim'] = set(bot.tokenize('yardim eder misin'))
+        kesik = ('Salasanin anlatin icinden biri ve hayikanlik olumli orman '
+                 'bir son alandan')
+        self.assertGreaterEqual(len(kesik), 60)
+        self.assertFalse(bot._accept_generated(kesik, 'yardim'))
+
+    def test_short_greeting_without_punctuation_still_accepted(self):
+        """KISA sohbet cevabinin noktalama olmamasi normaldir -> muaf.
+
+        Kurgu bilerek test_accept_generated_accepts_novel_paraphrase ile
+        ayni: canned kismi kirpma, kalan 'canim' yeni kelime (novelty %25).
+        Boylece test yalnizca noktalama kapisini olcer.
+        """
+        from brain import ChatBot
+        bot = ChatBot()
+        bot.intents = {'selam': ['merhaba dunya nasilsin',
+                                 'selam dostum nasilsin']}
+        bot.intent_tags = ['selam']
+        bot.intent_kws = {'selam': set(bot.tokenize('merhaba selam dunya'))}
+        gen = 'merhaba dunya nasilsin canim'
+        self.assertLess(len(gen), 60)
+        self.assertTrue(bot._accept_generated(gen, 'selam'))
+
+    # ---------------------------------------------------------------- 3
+    def test_partial_keyword_match_not_credible(self):
+        """"islam nedir" -> 'islam isbirligi teskilati...' reddedilmeli.
+
+        Kullanici TEK konum kelimesi veriyor, tag 5 kelimelik siyasi bir
+        kurulus adi. Kapsam 1/5 = %20.
+        """
+        bot = self._bot('selam', ['selam'], ['merhaba!'])
+        self.assertFalse(bot._knowledge_tag_credible(
+            'islam isbirligi teskilati parlamento birligi', 'islam nedir'))
+
+    def test_full_match_is_credible(self):
+        bot = self._bot('selam', ['selam'], ['merhaba!'])
+        self.assertTrue(bot._knowledge_tag_credible('wayne rooney',
+                                                    'wayne rooney kimdir'))
+
+    def test_generic_word_alone_is_not_evidence(self):
+        """Ortak kelime 'sehir' olsa bile konu kaniti sayilmaz.
+
+        Zayif kelimeler GOVDELENMIS haliyle eslesir ('sehir' -> 'seh').
+        """
+        bot = self._bot('selam', ['selam'], ['merhaba!'])
+        self.assertFalse(bot._knowledge_tag_credible(
+            'sehir devrimi', 'turkiye nin dogusunda hangi sehir var'))
+
+    def test_weak_word_filter_is_stem_aware(self):
+        """Filtre gövde üzerinden çalışmalı, yoksa hiç eşleşmez."""
+        bot = self._bot('selam', ['selam'], ['merhaba!'])
+        self.assertIn('seh', bot._weak_stems())
+        self.assertNotIn('seh', bot._content_words('buyuk sehirler'))
+        self.assertIn('devr', bot._content_words('sehir devrimi'))
+
+    # ---------------------------------------------------------------- 4
+    def test_is_knowledge_question_covers_fact_patterns(self):
+        """Sadece 'nedir/kimdir' yakalamak yeterli degil.
+
+        Olcum: "bir yilda kac gun vardir" -> gelecek_planlari (0.982),
+        "turkiye hangi yilda cumhuriyete gecti" -> mutluluk (0.932).
+        """
+        bot = self._bot('selam', ['selam'], ['merhaba!'])
+        for q in ('galaksi nedir', 'wayne rooney kimdir',
+                  'bir yilda kac gun vardir', 'turkiye hangi yilda ...',
+                  'dunyanin en buyuk okyanusu hangisi',
+                  'osmanli devleti ne zaman kuruldu',
+                  'internet nasil calisir'):
+            self.assertTrue(bot._is_knowledge_question(q), q)
+
+    def test_plain_chat_is_not_knowledge_question(self):
+        bot = self._bot('selam', ['selam'], ['merhaba!'])
+        for q in ('merhaba', 'nasilsin', 'tesekkur ederim', 'gorusuruz'):
+            self.assertFalse(bot._is_knowledge_question(q), q)
