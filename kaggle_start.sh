@@ -81,20 +81,32 @@ if [ "${LLM_TIE:-1}" = "0" ]; then
   REGARGS="$REGARGS --untie-embeddings"
 fi
 
+# Dropout ve dogal cogaltma. Ikisi de ezberlemeyi GECIKTIRMANIN kaldiracidir:
+#   9.855 farkli sorudan 350.301 satir uretiliyor (soru basina ~36 tekrar) ve
+#   model 16.9M parametre. 12 epoch'lik kosuda val 2. epoch'tan sonra
+#   monoton yukseliyor (0.4728 -> 0.5177), yani model kapasitesini asiyor.
+#   Daha yuksek dropout ve daha az varyant bu noktayi GECIKTIRIR ama tavanı
+#   KALDIRMAZ: bilgi tasiyan farkli soru sayisini artirmak gerekir.
+#   Varsayilanlar mevcut uretim ayarlaridir; deney icin:
+#     LLM_DROPOUT=0.2 LLM_NATURAL=2 bash kaggle_start.sh train
+DROPOUT="${LLM_DROPOUT:-0.10}"
+NATURAL="${LLM_NATURAL:-5}"
+REGARGS="$REGARGS --dropout $DROPOUT"
+
 DONE=''
 case "$MODE" in
   train)
-    echo "[1/3] RAG egitim (natural 5, epochs=$EPOCHS, patience=${PATIENCE} epoch, d=384/6 blok) -> llm_model.json"
+    echo "[1/3] RAG egitim (natural $NATURAL, dropout=$DROPOUT, epochs=$EPOCHS, patience=${PATIENCE} epoch, d=384/6 blok) -> llm_model.json"
     # --val-every 2 yalnizca VAL MALIYETI icin (olculmus: epoch 7.5 -> 7.1 dk).
     # Erken durdurma esigini ETKILEMEZ: patience artik epoch cinsinden.
-    python train_llm.py --rag --kb-map knowledge_map.jsonl --natural 5 $CGARG \
+    python train_llm.py --rag --kb-map knowledge_map.jsonl --natural "$NATURAL" $CGARG \
       --epochs "$EPOCHS" --patience "$PATIENCE" \
       --batch-size 128 --val-every 2 $DPARGS $REGARGS 2>&1 | tee kaggle_train.log
     DONE='yes'
     ;;
   bench)
     echo "[1/3] 1-epoch zamanlama (cache/encode + 1 epoch, birlikte olculur)"
-    python train_llm.py --rag --kb-map knowledge_map.jsonl --natural 5 $CGARG \
+    python train_llm.py --rag --kb-map knowledge_map.jsonl --natural "$NATURAL" $CGARG \
       --epochs 1 --batch-size 128 --val-every 1 --fresh $DPARGS $REGARGS 2>&1 | tee kaggle_bench.log
     echo ""
     echo "[2/3] Son egitim satiri (epoch suresi '| NN.Ns' bolumundedir):"
@@ -107,7 +119,7 @@ case "$MODE" in
   verify)
     echo "[1/3] dry-run dogrulama (GPU gerekmez, ~1-2 dk; TAM encode YAPILMAZ)"
     echo "      Ayni veri bayraklari -> onbellek parmak izi bench/train ile ayni."
-    python train_llm.py --dry-run --rag --kb-map knowledge_map.jsonl --natural 5 \
+    python train_llm.py --dry-run --rag --kb-map knowledge_map.jsonl --natural "$NATURAL" \
       --batch-size 128 --limit-pairs 4000 $CGARG $DPARGS $REGARGS
     echo "[2/3] OK - ilk-kelime hizalama ve RAG hatti hazir."
     echo "[3/3] Tam egitim icin:  !bash kaggle_start.sh train"

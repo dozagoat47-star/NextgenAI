@@ -97,6 +97,55 @@ class TestMakeBatches(unittest.TestCase):
         self.assertTrue(all(b[0].shape[1] <= 32 for b in batches))
 
 
+class TestRegularizationKnob(unittest.TestCase):
+    """Dropout ayari: ezberlemeyi geciktirmek icin acilabilir olmali.
+
+    VERI: 9.855 farkli sorudan 350.301 satir uretiliyor (soru basina ~36
+    tekrar), model 16.9M parametre. 12 epoch'lik kosuda val 2. epoch'tan
+    sonra monoton yukseliyor (0.4728 -> 0.5177): model kapasitesini asiyor.
+    Daha yuksek dropout bu noktayi GECIKTIRIR.
+    """
+
+    def test_default_dropout_unchanged(self):
+        import train_llm
+        self.assertEqual(train_llm.DROPOUT, 0.10)
+
+    def test_drop_argument_reaches_the_model(self):
+        m = TorchLLM(_V, d_model=_D, num_blocks=_N, num_heads=2,
+                     ff_mult=2, max_seq_len=24, drop=0.25)
+        self.assertEqual(m.drop, 0.25)
+
+    def test_default_matches_production_value(self):
+        m = TorchLLM(_V, d_model=_D, num_blocks=_N, num_heads=2,
+                     ff_mult=2, max_seq_len=24)
+        self.assertEqual(m.drop, 0.10)
+
+    def test_dropout_does_not_change_parameter_count(self):
+        """Dropout yalnizca egitim davranisi; agirligi degistirmez.
+
+        Bu yuzden farkli dropout ile eski checkpoint'ten state_dict yuklemesi
+        PATLAMAZ. Sessiz devam etmesin diye arch parmak izine 'drop' girdi.
+        """
+        a = TorchLLM(_V, d_model=_D, num_blocks=_N, num_heads=2,
+                     ff_mult=2, max_seq_len=24, drop=0.10)
+        b = TorchLLM(_V, d_model=_D, num_blocks=_N, num_heads=2,
+                     ff_mult=2, max_seq_len=24, drop=0.30)
+        na = sum(p.numel() for p in a.parameters())
+        nb = sum(p.numel() for p in b.parameters())
+        self.assertEqual(na, nb)
+        b.load_state_dict(a.state_dict())
+
+    def test_dropout_is_off_in_eval(self):
+        """Eval'da dropout kapali -> numpy parity bozulmaz."""
+        m = TorchLLM(_V, d_model=_D, num_blocks=_N, num_heads=2,
+                     ff_mult=2, max_seq_len=24, drop=0.5).eval()
+        x = torch.randint(0, _V, (2, 12))
+        with torch.no_grad():
+            y1 = m(x)
+            y2 = m(x)
+        self.assertTrue(torch.equal(y1, y2))
+
+
 class TestTiedEmbeddings(unittest.TestCase):
     """Gomme <-> cikis bagliligi: tasarruf, esdegerlik, uyumluluk."""
 

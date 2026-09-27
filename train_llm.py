@@ -112,6 +112,9 @@ D_MODEL = 256
 NUM_BLOCKS = 4
 NUM_HEADS = 8
 FF_MULT = 4
+# Varsayilan duzenleme 0.10. DIZENLEME DENEYI icin `--dropout` ile degistirilebilir
+# (bkz. --dropout yardimi): val egrisi 2. epoch'tan sonra monoton yukseldigi
+# icin (12 epoch'lik kosu: 0.4728 -> 0.5177) modelin kapasitesi veriyi asiyor.
 DROPOUT = 0.10
 BATCH_SIZE = 64
 LR_BASE = 1e-3
@@ -953,6 +956,15 @@ def main():
     ap.add_argument('--weight-decay', type=float, default=WEIGHT_DECAY,
                     help='AdamW ayrik cezasi (0 = kapat). Gomme, bias ve '
                          'LayerNorm her zaman cezasiz kalir.')
+    ap.add_argument('--dropout', type=float, default=DROPOUT,
+                    help='Gizli katman dropout orani (0 = kapat). Eval\'da '
+                         'her zaman kapali, bu yuzden numpy parity degismez.\n'
+                         'DIZENLEME DENEYI icin: veri 9.855 farkli sorudan '
+                         'uretiliyor (350.301 satir = soru basina ~36 tekrar) '
+                         've model 16.9M parametre; 12 epoch\'lik kosuda val '
+                         '2. epoch\'tan sonra monoton yukseliyor (0.4728 -> '
+                         '0.5177) yani ezberliyor. Daha yuksek dropout '
+                         'ezberlemeyi GECIKTIRIR.')
     ap.add_argument('--untie-embeddings', dest='tie_embed', action='store_false',
                     default=TIE_EMBED,
                     help='gomme/cikis bagligini KAPATIR (head ayri saklanir, '
@@ -981,6 +993,7 @@ def main():
     mxc, mxs = args.max_ctx_len, args.max_seq_len
     bs, lr_base = args.batch_size, args.lr_base
     wd, tie_embed = args.weight_decay, args.tie_embed
+    drop = args.dropout
     export_dir = args.export_dir or SAVE_DIR
     # Cosine ufku. Gercek bitis noktasi --epochs degil, ~patience civaridir
     # (patience artik EPOCH cinsinden; once val olcumu sayiyordu ve val_every
@@ -1102,7 +1115,8 @@ def main():
 
     # ---------------- model + resume
     model = TorchLLM(V, d_model=dm, num_blocks=nb, num_heads=nh, ff_mult=ff,
-                     max_seq_len=mxs, tie_embeddings=tie_embed).to(DEVICE)
+                     max_seq_len=mxs, drop=drop, tie_embeddings=tie_embed
+                     ).to(DEVICE)
 
     # ---------------- optimizer: AdamW + duzenlestirme (weight decay)
     # Model 23M->16.9M parametre, gercek (benzersiz) ornek ~68.8k; dogal
@@ -1187,7 +1201,16 @@ def main():
                      # fazladir ya da yoktur -> state_dict yuklemesi PATLAR.
                      # Bu yuzden mimari uyumuna dahil edilir.
                      and bool(arch.get('tied_embeddings', False))
-                     == bool(model.tie_embeddings))
+                     == bool(model.tie_embeddings)
+                     # Dropout AGIRLIKLARI DEGISTIRMEZ (sadece egitim
+                     # davranisini duzenler), bu yuzden state_dict yuklemesi
+                     # patlamaz. Yine de mimari uyumuna dahil: duzenleme
+                     # deneyi karsilastirmasini bulaniklastirmamak icin
+                     # FARKLI dropout ile eski yarim egitimli modelden devam
+                     # etmek yerine sifirdan baslanmali. Aksi halde "dropout
+                     # 0.20 daha iyi" cikarimi, aslinda 0.10 ile yarim
+                     # egitilmis bir modelin devami olurdu.
+                     and arch.get('drop') == drop)
         same_data = cp.get('data') == data_fp
         if not same_arch or not same_data:
             print('Uyari: mevcut checkpoint eski (mimari-uyum: %s, '
@@ -1377,6 +1400,7 @@ def main():
                         'bad': bad, 'val_every': val_every,
                         'arch': {'d_model': dm, 'num_blocks': nb, 'num_heads': nh,
                                  'ff_mult': ff, 'max_seq_len': mxs, 'V': V,
+                                 'drop': drop,
                                  'tied_embeddings': base.tie_embeddings},
                         'data': data_fp}, CKPT)
             print(f'  checkpoint -> {CKPT}', flush=True)
