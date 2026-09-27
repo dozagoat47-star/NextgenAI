@@ -144,6 +144,9 @@
             <span id="vocab-size">Vocabulary: -</span>
             <span id="intent-count">Intents: -</span>
         </div>
+        <div class="status-bar">
+            <span id="build-stamp">Sürüm: -</span>
+        </div>
         <div class="chat-area" id="chatArea">
             <div class="welcome-message" id="welcomeMsg">
                 <div class="icon">&#x1F916;</div>
@@ -183,6 +186,15 @@
             document.getElementById('vocab-size').textContent = `Vocabulary: ${data.vocabulary_size}`;
             document.getElementById('intent-count').textContent =
                 `Intents: ${data.intents_total} (sınıf: ${data.intent_classes}, bilgi: ${data.knowledge_intents})`;
+            // Surum + veri tazeligi: calisan sunucu guncel mi, veriler
+            // ne zaman degisti? "Degisiklik yok" sanilan durumlar icin.
+            const s = document.getElementById('build-stamp');
+            if (s) {
+                s.textContent =
+                    `Sürüm: ${data.app_commit} · başladı: ${data.app_started} · ` +
+                    `intents: ${data.intents_updated} · korpus: ${data.corpus_updated}` +
+                    (data.llm_loaded ? '' : ' · LLM yüklü değil');
+            }
         });
 
         function addMessage(text, isUser) {

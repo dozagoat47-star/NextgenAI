@@ -12,6 +12,7 @@ import json
 import random
 import re
 import secrets
+import subprocess
 import time
 import webbrowser
 import threading
@@ -385,6 +386,37 @@ def fallback_answer(message):
     return DEFAULT_UNKNOWN
 
 
+def _git_commit():
+    """Calisan kodun git surumu.
+
+    Neden: bir guncelleme diskte ama sunucu eski kodla ayaktayken
+    ayirt edilemiyordu ('degisiklik yok' saniliyordu). Artik /status
+    surumu kendisi bildirir.
+    """
+    try:
+        out = subprocess.run(
+            ['git', 'rev-parse', '--short', 'HEAD'],
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+            capture_output=True, text=True, timeout=5)
+        return out.stdout.strip() or 'bilinmiyor'
+    except Exception:
+        return 'bilinmiyor'
+
+
+def _data_stamp(name):
+    """Veri dosyasinin son degisikligi (ISO, yerel)."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
+    try:
+        return time.strftime('%d.%m %H:%M',
+                             time.localtime(os.path.getmtime(path)))
+    except OSError:
+        return 'yok'
+
+
+APP_COMMIT = _git_commit()
+APP_STARTED = time.strftime('%d.%m %H:%M:%S', time.localtime())
+
+
 def load_bot():
     global bot, model_loaded, all_patterns, corpus, corpus_loaded
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -657,6 +689,13 @@ def status():
         'intent_classes': len(bot.intent_tags) if model_loaded else 0,
         'knowledge_intents': knowledge_count,
         'llm_loaded': bool(getattr(bot, 'llm', None)),
+        # Calisan surum ve veri tazeligi: guncelleme diskte ama sunucu
+        # eski kodla ayakta mi ayirt edilebilsin diye.
+        'app_commit': APP_COMMIT,
+        'app_started': APP_STARTED,
+        'intents_updated': _data_stamp('intents.json'),
+        'corpus_updated': _data_stamp('corpus.jsonl'),
+        'llm_updated': _data_stamp(os.path.join('model', 'llm_model.json')),
         # eski alan: siniflandirici sinif sayisi. Asagidaki
         # intent_classes ile ayni; harici istemciler icin korunuyor.
         'intent_count': len(bot.intent_tags) if model_loaded else 0
