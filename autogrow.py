@@ -14,6 +14,7 @@ Kullanim:
 import sys
 import io
 import json
+import os
 import time
 import argparse
 import random
@@ -30,7 +31,21 @@ if sys.stdout.encoding.lower() not in ('utf-8', 'utf8'):
 
 API_BASE = "https://tr.wikipedia.org/w/api.php"
 USER_AGENT = "NextgenAI/1.0 (educational chatbot; local test) requests/2.0"
-AUTOGROW_MAX_INTENTS = 800
+# Intent tavani. Bu bir KALITE kapisi degil, kacak koruma siniridir:
+# eski deger 800 idi ve doldugu icin AutoGrow intents.json'a HIC yazamiyordu
+# (cap_reached) -> yeni bilgi korpusa gidiyor ama intent olmadigi icin LLM'e
+# hic girmiyordu.
+#
+# NEDEN 6.000: olcum. enrich_intents.build_knowledge_map maliyeti 29.1
+# ms/desen (4.584 desen = 133 sn) ve corpus.load() 189 sn. 6.000 intent
+# (~5.236 bilgi -> 31.416 desen) icin ~15 dk + 3 dk = 18.5 dk. 20.000
+# intent 61 dk surerdi, gunluk ise sigmazdi. Artan konular ondalik
+# kategorilerden gelir (asagida) ve kalite kapisindan gecer, yani genisleme
+# bilgi degil, gurultu degildir.
+#
+# Deger build_knowledge_map butcesiyle sinirli (asagi olculdu); istenirse
+# AUTOGROW_MAX_INTENTS ortam degiskeniyle kapatilabilir.
+AUTOGROW_MAX_INTENTS = int(os.environ.get('AUTOGROW_MAX_INTENTS', 6000))
 MAX_PATTERNS = 6
 MAX_RESPONSES = 3
 

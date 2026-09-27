@@ -94,6 +94,58 @@ class TestTopicCategories(unittest.TestCase):
                 self.assertIn(c, autogrow.TOPIC_CATEGORIES)
 
 
+class TestPipelineCaps(unittest.TestCase):
+    """Tavanlar arasi invaryant: ikinci darbogaz birakilmamali.
+
+    Zincir: intents.json (AutoGrow, tavan AUTOGROW_MAX_INTENTS) ->
+    knowledge_map.jsonl (enrich_intents, tavan --kb-limit) ->
+    LLM egitim verisi (train_llm --kb-map).
+
+    Intent tarani kaldirilip kb-limit eski degerde kalirsa knowledge_map
+    6.000'da doyar ve yeni bilgi yine modele giremez - sessiz darbogaz.
+    """
+
+    def test_intent_cap_is_not_a_blocker(self):
+        # 800 idi ve doluydu -> AutoGrow intents.json'a hic yazamiyordu.
+        self.assertGreater(autogrow.AUTOGROW_MAX_INTENTS, 2000)
+
+    def test_intent_cap_env_overridable(self):
+        import importlib
+
+        eski = os.environ.get('AUTOGROW_MAX_INTENTS')
+        try:
+            os.environ['AUTOGROW_MAX_INTENTS'] = '12345'
+            mod = importlib.reload(autogrow)
+            self.assertEqual(mod.AUTOGROW_MAX_INTENTS, 12345)
+        finally:
+            if eski is None:
+                os.environ.pop('AUTOGROW_MAX_INTENTS', None)
+            else:
+                os.environ['AUTOGROW_MAX_INTENTS'] = eski
+            importlib.reload(autogrow)
+
+    def test_kb_limit_covers_max_intent_patterns(self):
+        import enrich_intents
+
+        n = enrich_intents._default_kb_limit()
+        en_fazla_desen = autogrow.AUTOGROW_MAX_INTENTS * autogrow.MAX_PATTERNS
+        self.assertGreaterEqual(
+            n, en_fazla_desen,
+            'kb-limit ikinci darbogaz: %d desen uretilebilir ama tavan %d'
+            % (en_fazla_desen, n))
+
+    def test_kb_limit_budget_is_measurable(self):
+        """Tavan buyutuldugunde sure olcumle izlenir: build_knowledge_map
+        29.1 ms/desen (4.584 desen = 133 sn) + corpus.load 189 sn."""
+        import enrich_intents
+
+        n = enrich_intents._default_kb_limit()
+        saniye = n * 0.0291
+        self.assertLess(
+            saniye, 30 * 60,
+            'kb-limit gunluk ise sigmaz: %.0f dk' % (saniye / 60))
+
+
 class TestGateImpactOnCorpusGrowth(unittest.TestCase):
     """Kapinin gecis orani olculmus degerlere yakin mi?
 

@@ -29,6 +29,17 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 PATH = os.path.join(BASE, 'intents.json')
 KB_MAP_PATH = os.path.join(BASE, 'knowledge_map.jsonl')
 
+# knowledge_map kac desen eslesmesi uretecek. AutoGrow intent tavanini
+# 6.000'e cikardi; 6.000 intent'in ~5.236'si bilgi sinifi ve her biri 6
+# desen -> 31.416 desen. Eski 6.000 tavan ikinci darbogaz olurdu (bilgi
+# corpus'a yazilir ama modele girmez). Maliyet olcumu: 29.1 ms/desen.
+KB_LIMIT_DEFAULT = int(os.environ.get('KB_LIMIT', 40000))
+
+
+def _default_kb_limit():
+    """knowledge_map tavaninin TEK kaynagi (CLI ve testler buradan okur)."""
+    return int(os.environ.get('KB_LIMIT', KB_LIMIT_DEFAULT))
+
 from bpe import clean_text as _clean
 from naturalize import natural_variants
 
@@ -161,9 +172,12 @@ def main():
     ap.add_argument('--out', default=PATH)
     ap.add_argument('--kb-map', default=KB_MAP_PATH,
                     help='knowledge_map cikis yolu (bos dize = uretme)')
-    ap.add_argument('--kb-limit', type=int, default=6000,
-                    help='knowledge_map kac desen eslesmesi uretilecek (hiz; '
-                         '4400 uzeri tum bilgi desenlerini kapsar)')
+    ap.add_argument('--kb-limit', type=int, default=_default_kb_limit(),
+                    help='knowledge_map kac desen eslesmesi uretilecek. '
+                         'AutoGrow intent tavanini 6.000\'e cikardi; 6.000 '
+                         'intent (5.236 bilgi) x 6 desen = 31.416 desen, yani '
+                         'eski 6.000 tavan ikinci darbogaz olurdu. Maliyet '
+                         'olcumu: 29.1 ms/desen -> ~15 dk.')
     args = ap.parse_args()
 
     data = _load_data(PATH)
