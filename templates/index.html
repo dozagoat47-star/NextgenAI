@@ -181,7 +181,8 @@
 
         fetch('/status').then(r => r.json()).then(data => {
             document.getElementById('vocab-size').textContent = `Vocabulary: ${data.vocabulary_size}`;
-            document.getElementById('intent-count').textContent = `Intents: ${data.intent_count}`;
+            document.getElementById('intent-count').textContent =
+                `Intents: ${data.intents_total} (sınıf: ${data.intent_classes}, bilgi: ${data.knowledge_intents})`;
         });
 
         function addMessage(text, isUser) {

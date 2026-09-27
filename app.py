@@ -636,11 +636,29 @@ def forget():
 
 @app.route('/status')
 def status():
+    # Intent sayisi UC farkli seyi olcebilir; hangisinin ne oldugu
+    # belirsiz olmasin diye ayri ayri bildiriliyor:
+    #   intents_total     - intents.json'daki gercek toplam
+    #   intent_classes    - siniflandiricinin cikti katmani (yalnizca
+    #                       sohbet intent'leri; bilgi intent'leri
+    #                       conversational_data ile cikariliyor)
+    #   knowledge_intents - retrieval/LLM bilgi tabani
+    intents_total = 0
+    knowledge_count = 0
+    if model_loaded:
+        knowledge_count = len(bot.knowledge_intents)
+        intents_total = len(bot.intent_tags) + knowledge_count
     return jsonify({
         'model_loaded': model_loaded,
         'corpus_loaded': corpus_loaded,
         'corpus_chunks': len(corpus.chunks) if corpus_loaded else 0,
         'vocabulary_size': len(bot.vocabulary) if model_loaded else 0,
+        'intents_total': intents_total,
+        'intent_classes': len(bot.intent_tags) if model_loaded else 0,
+        'knowledge_intents': knowledge_count,
+        'llm_loaded': bool(getattr(bot, 'llm', None)),
+        # eski alan: siniflandirici sinif sayisi. Asagidaki
+        # intent_classes ile ayni; harici istemciler icin korunuyor.
         'intent_count': len(bot.intent_tags) if model_loaded else 0
     })
 
