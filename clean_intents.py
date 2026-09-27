@@ -55,6 +55,11 @@ HARMFUL_TAG = [
 
 MIN_TOKENS = 3
 
+# Etiket icin asgari karakter sayisi. Tek/iki harfli basliklar
+# (Wikipedia'nin harf maddeleri: L, W, I) konu degildir. autogrow da
+# ayni esigi uygular; test_core.TestIntentsSchema en az 2 istiyor.
+MIN_TAG_CHARS = 3
+
 
 def strip_foreign_scripts(text):
     """Latin disi yazim bloklarini metinden temizler, dolguyu birlestirir."""
@@ -118,11 +123,17 @@ def clean_intent(intent):
 
 
 def merge_by_tag(intents):
-    """Normalize edilmis tag'a gore birlesitr (duplike konular tek olur)."""
+    """Normalize edilmis tag'a gore birlesitr (duplike konular tek olur).
+
+    Cok kisa etiketler elenir: Wikipedia'nin harf maddeleri (L, W, I)
+    konu degildir ve 'l nedir' gibi kalipsiz uretir. intents.json'a
+    tag='l' girmisti; egitim oncesi kalkan olan
+    test_core.TestIntentsSchema (tag >= 2) bunu yakaladi.
+    """
     merged = {}
     for it in intents:
         key = it['tag']
-        if not key:
+        if not key or len(key.strip()) < MIN_TAG_CHARS:
             continue
         if key not in merged:
             merged[key] = {'tag': key, 'patterns': list(it['patterns']),

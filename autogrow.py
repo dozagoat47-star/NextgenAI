@@ -60,6 +60,12 @@ MAX_RESPONSES = 3
 MIN_CORPUS_TEXT = 200
 MIN_CORPUS_SENTENCES = 2
 
+# Intent etiketi icin asgari uzunluk. Tek/iki harfli basliklar (Wikipedia'nin
+# harf maddeleri: L, W, I) konu degildir; 'l nedir' gibi kalipsiz intent
+# uretirler. intents.json'a tag='l' girdi ve egitim oncesi kalkan olan
+# test_core.TestIntentsSchema (tag >= 2) dusuyordu.
+MIN_TAG_CHARS = 3
+
 # Gunluk buyume ondalik kategorilerden gelsin. Uniform rastgele akis
 # gozlemsiz basliklari tercih ediyor: botun bilgi tabani bu yuzden
 # 'benefse', 'avec', 'minerva mcgonagall' gibi konulardan olustu; kullanici
@@ -214,6 +220,13 @@ def build_intent(title, extract):
 
     clean = ascii_normalize(title.lower().replace('_', ' ').strip())
     if len(clean.split()) > 6:
+        return None
+    # Cok kisa baslik konu degildir: tek harfli maddeler (L, W, I) bir
+    # soruya cevap olamaz ve 'l nedir' gibi kalipsiz intent uretirler.
+    # Yakalandi: intents.json'a tag='l' girmisti ve test_core
+    # (egitim oncesi kalkan) dusuyordu. test_core tag >= 2 istiyor;
+    # burada daha sert: 3.
+    if len(clean.strip()) < MIN_TAG_CHARS:
         return None
     if is_harmful_tag(clean):
         print(f"  [SKIP] {title} (guvenlik/icerik filtresi)")

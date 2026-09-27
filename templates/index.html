@@ -192,8 +192,8 @@
             if (s) {
                 s.textContent =
                     `Sürüm: ${data.app_commit} · başladı: ${data.app_started} · ` +
-                    `intents: ${data.intents_updated} · korpus: ${data.corpus_updated}` +
-                    (data.llm_loaded ? '' : ' · LLM yüklü değil');
+                    `intents: ${data.intents_updated} · korpus: ${data.corpus_updated} · ` +
+                    (data.llm_loaded ? 'LLM hazır' : 'LLM YOK');
             }
         });
 

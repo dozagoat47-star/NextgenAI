@@ -417,6 +417,73 @@ APP_COMMIT = _git_commit()
 APP_STARTED = time.strftime('%d.%m %H:%M:%S', time.localtime())
 
 
+def refresh_knowledge_intents(intents_file):
+    """Bilgi intent'lerini intents.json'dan tazeler (egitim gerekmez).
+
+    Gerekce: load_model() bilgi kumesini model/bot_data.json'daki anlik
+    goruntuden aliyor (brain.py:2065). O dosya CI'daki train.py
+    beklemede guncelleniyor, bu yuzden yeni AutoGrow maddeleri sunucuya
+    hic girmiyordu - 26.09 anlik goruntusunde kilitliydi ve /status
+    "Intents: 804" diyordu.
+
+    Bilgi intent'leri siniflandirici DEGIL: yalnizca anahtar kelime
+    retrieval'i ve LLM bilgi kullanimi icin tutulur. Agirlik egitimi
+    gerekmez. Bu yuzden intents.json'dan tazelemek guvenlidir - sinif
+    etiketleri (intent_tags) egitilmis modelin cikti katmani oldugu icin
+    KORUNUR, yalnizca bilgi kumesi buyur.
+
+    Kanit (olculdu): 764 -> 1.362 bilgi intent, sinif 40'te sabit.
+    """
+    if not os.path.exists(intents_file):
+        return
+    try:
+        siniflar = set(bot.intent_tags)
+        bot.load_intents(intents_file)
+        bot.intent_tags = sorted(t for t in siniflar if t in bot.intents)
+        bot._build_keyword_weights()
+        print(f"[OK] Bilgi intent'leri intents.json'dan tazelendi: "
+              f"{len(bot.knowledge_intents)} (sinif: {len(bot.intent_tags)})")
+    except Exception as e:
+        print(f"[UYARI] Intent tazeleme basarisiz, model/bot_data.json "
+              f"anlik goruntusu kullanilacak: {e}")
+
+
+def preload_llm():
+    """LLM'i acilista yukler.
+
+    Yoksa llm_enabled None kalir ve /status ilk soruya kadar
+    'LLM yuklu degil' gosterirdi; o anlam 'henuz yuklenmedi' idi ama
+    ekranda 'yok' gibi okunuyordu. Olcum: load_llm() 0.3 sn.
+    """
+    try:
+        if bot._ensure_llm():
+            print("[OK] LLM yuklendi.")
+            return True
+        print("[UYARI] LLM yuklenemedi (model/llm_model.json yok).")
+    except Exception as e:
+        print(f"[UYARI] LLM yukleme hatasi: {e}")
+    return False
+
+
+def reload_bot():
+    """Model + intent'leri bastan yukler (learn/forget sonrasi)."""
+    global all_patterns, model_loaded
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    model_dir = os.path.join(script_dir, 'model')
+    intents_file = os.path.join(script_dir, 'intents.json')
+
+    bot.load_model(model_dir)
+    if os.path.exists(intents_file):
+        with open(intents_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        all_patterns = []
+        for intent in data['intents']:
+            for p in intent['patterns']:
+                all_patterns.append(bot.ascii_normalize(p.lower()))
+        refresh_knowledge_intents(intents_file)
+    model_loaded = True
+
+
 def load_bot():
     global bot, model_loaded, all_patterns, corpus, corpus_loaded
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -438,6 +505,10 @@ def load_bot():
         for intent in data['intents']:
             for p in intent['patterns']:
                 all_patterns.append(bot.ascii_normalize(p.lower()))
+
+    if model_loaded:
+        refresh_knowledge_intents(intents_file)
+        preload_llm()
 
     # RAG-lite: ilk acilista corpus yoksa mevcut intents'lardan tohumla
     Corpus.seed_from_intents()
@@ -605,14 +676,7 @@ def learn():
         summary = finetune_add(model_dir, intents_file, entries)
         print(f"[LEARN] ok: {summary}")
 
-        bot.load_model(model_dir)
-        with open(intents_file, 'r', encoding='utf-8') as f:
-            intents_data = json.load(f)
-        all_patterns = []
-        for intent in intents_data['intents']:
-            for p in intent['patterns']:
-                all_patterns.append(bot.ascii_normalize(p.lower()))
-        model_loaded = True
+        reload_bot()
         return jsonify({'ok': True, **summary})
     except Exception as e:
         traceback.print_exc()
@@ -652,14 +716,7 @@ def forget():
         summary = forget_intent(model_dir, intents_file, tag)
         print(f"[FORGET] ok: {summary}")
 
-        bot.load_model(model_dir)
-        with open(intents_file, 'r', encoding='utf-8') as f:
-            intents_data = json.load(f)
-        all_patterns = []
-        for intent in intents_data['intents']:
-            for p in intent['patterns']:
-                all_patterns.append(bot.ascii_normalize(p.lower()))
-        model_loaded = True
+        reload_bot()
         return jsonify({'ok': True, **summary})
     except Exception as e:
         traceback.print_exc()
