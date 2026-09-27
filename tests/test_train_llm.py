@@ -10,16 +10,33 @@ import tempfile
 import unittest
 
 import numpy as np
-import torch
+
+try:
+    import torch
+except ImportError:                       # CI'da torch KURULU DEGIL
+    torch = None                          # (ci.yml yalnizca numpy+requests)
+# Torch tarafi siniflar @requires_torch ile skip edilir; boylece
+# modul CI'da YUKLENIR (daha once sert `import torch` yuzunden
+# unittest.loader._FailedTest veriyor ve butun suite'i dusuruyordu).
+# Ayni desen tests/test_parity.py'de zaten kullaniliyor.
+requires_torch = unittest.skipIf(
+    torch is None, 'PyTorch kurulu degil => torch tarafi testler skip')
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE)
 
 from llm import PAD, LLM, encode_llm
 from seqgen import RESP_CHARS_MAX
-from train_llm import (TorchLLM, _pack_encoded, early_stop_step,
+from train_llm import (_pack_encoded, early_stop_step,
                        effective_stop_epoch, make_batches,
                        min_stoppable_epoch)
+
+# TorchLLM yalnizca torch varken tanimli (train_llm.py:89-98 graceful
+# import yapiyor, HAVE_TORCH=False iken sinifi olusmaz). Dogrudan
+# import etmek CI'da modulun tamamini dusuruyordu.
+TorchLLM = None
+if torch is not None:
+    from train_llm import TorchLLM
 
 _VOCAB = ['<PAD>', '<BOS>', '<SEP>', '<EOS>',
           'm', 'e', 'r', 'h', 'a', 'b', ' ', 'n', 's', 'i', 'l', 'y',
@@ -97,6 +114,7 @@ class TestMakeBatches(unittest.TestCase):
         self.assertTrue(all(b[0].shape[1] <= 32 for b in batches))
 
 
+@requires_torch
 class TestRegularizationKnob(unittest.TestCase):
     """Dropout ayari: ezberlemeyi geciktirmek icin acilabilir olmali.
 
@@ -146,6 +164,7 @@ class TestRegularizationKnob(unittest.TestCase):
         self.assertTrue(torch.equal(y1, y2))
 
 
+@requires_torch
 class TestTiedEmbeddings(unittest.TestCase):
     """Gomme <-> cikis bagliligi: tasarruf, esdegerlik, uyumluluk."""
 
@@ -278,6 +297,7 @@ class TestNumpyTiedLoad(unittest.TestCase):
         self.assertIn('head', str(cm.exception))
 
 
+@requires_torch
 class TestTiedExport(unittest.TestCase):
     """Kaggle export yolu: basit dis durum -> NPZ + header -> from_dict."""
 

@@ -18,7 +18,11 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install numpy requests
+        # flask sart: app.py sunucu dosyasi, test_app_status.py onu
+        # import ediyor. flask kurulu degilken modul YUKLENEMIYOR ve
+        # unittest.loader._FailedTest butun suite'i kirmizi ediyordu
+        # (26.09'dan beri). Import smoke check'a da eklenmeli.
+        run: pip install numpy requests flask
 
       - name: Cache corpus embeddings + index
         uses: actions/cache@v4
@@ -33,6 +37,7 @@ jobs:
         run: |
           python -c "import brain, corpus, generator, seqgen"
           python -c "import clean_intents, scrape_intents, autogrow, train"
+          python -c "import app; print('[OK] app import edildi')"
 
       - name: Run test suite
         run: python -m unittest discover -s tests -v
