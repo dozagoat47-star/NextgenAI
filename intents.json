@@ -100183,6 +100183,1233 @@
         "Doğum tarihi bilinmeyen ozan Artvin'in Ardanuç ilçesine bağlı Ançkora (şimdiki adı Anaçlı) köyünde doğmuştur.",
         "Hayatı hakkında çok fazla bilgi mevcut değildir."
       ]
+    },
+    {
+      "tag": "emine sans umar",
+      "patterns": [
+        "emine sans umar nedir",
+        "emine sans umar hakkinda bilgi ver",
+        "emine sans umar ne demek",
+        "emine sans umar anlat",
+        "bana emine sans umar hakkinda bilgi ver",
+        "emine sans umar hakkinda konus"
+      ],
+      "responses": [
+        "1960), Türk tiyatro, sinema ve dizi oyuncusu, yönetmen ve seslendirme sanatçısıdır.",
+        "Devlet Konservatuvarı mezunu olan Emine Umar, BKM, Tiyatrokare, Tiyatro Ti gibi topluluklarda çalıştı.",
+        "Tiyatroda pek çok kademede görev yapan sanatçı, yönetmenlik de yapmasının yanı sıra, sinema ve dizi filmlerde çeşitli roller aldı."
+      ]
+    },
+    {
+      "tag": "guvenpark",
+      "patterns": [
+        "guvenpark nedir",
+        "guvenpark hakkinda bilgi ver",
+        "guvenpark ne demek",
+        "guvenpark anlat",
+        "bana guvenpark hakkinda bilgi ver",
+        "guvenpark hakkinda konus"
+      ],
+      "responses": [
+        "Güvenpark, Ankara, Kızılay Meydanı'nda bulunan şehrin cumhuriyet tarihinin ilk parkıdır.",
+        "Clemens Holzmeister tarafından meydana bir park ve anıt yapımı projesi sonucu yapılmış, içine Güvenpark Anıtı yerleştirilmiş, park adını bu anıttan almıştır.",
+        "Güvenpark'ta bugün yetişkin ağaçlar, havuz, oturaklar ve çocuk parkı bulunmaktadır."
+      ]
+    },
+    {
+      "tag": "kgb archiver",
+      "patterns": [
+        "kgb archiver nedir",
+        "kgb archiver hakkinda bilgi ver",
+        "kgb archiver ne demek",
+        "kgb archiver anlat",
+        "bana kgb archiver hakkinda bilgi ver",
+        "kgb archiver hakkinda konus"
+      ],
+      "responses": [
+        "KGB Archiver, Tomasz Pawlak tarafından PAQ6 sıkıştırma işlem yolu tabanında geliştirilmiş, terk edilmiş, ücretsiz, açık kaynaklı ve çapraz-platform dosya arşivleme ve veri sıkıştırma programı.",
+        "Zaman maliyeti ve bellek tüketiminde yüksek sıkıştırma oranı kazanır."
+      ]
+    },
+    {
+      "tag": "king kong",
+      "patterns": [
+        "king kong nedir",
+        "king kong hakkinda bilgi ver",
+        "king kong ne demek",
+        "king kong anlat",
+        "bana king kong hakkinda bilgi ver",
+        "king kong hakkinda konus"
+      ],
+      "responses": [
+        "King Kong, ilk olarak 1933 (King Kong) yılında gözüken, birçok film ve animasyona konu olan, 2016 yılında Legendary Entertainmet ve Warner Bros.",
+        "tarafından satın alınıp bambaşka bir hikâyeyle sunulan devasa kurgusal goril."
+      ]
+    },
+    {
+      "tag": "peter kassig",
+      "patterns": [
+        "peter kassig nedir",
+        "peter kassig hakkinda bilgi ver",
+        "peter kassig ne demek",
+        "peter kassig anlat",
+        "bana peter kassig hakkinda bilgi ver",
+        "peter kassig hakkinda konus"
+      ],
+      "responses": [
+        "16 Aralık 2014), Amerikalı bir yardım gönüllüsüydü.",
+        "2013 yılı sonlarında Müslüman olmuş ve adını Adbul Rahman Kassig olarak değiştirmiştir.",
+        "3 Ekim 2014'te ailesi tarafından yayımlanan bir videoda ailesi \"Abdul Rahman Kassig IŞİD tarafından kaçırılıp hapsedilmeden ve herhangi bir baskıya maruz kalmadan Müslüman olmaya karar vermişti\" demişti."
+      ]
+    },
+    {
+      "tag": "demirhan, kibris",
+      "patterns": [
+        "demirhan, kibris nedir",
+        "demirhan, kibris hakkinda bilgi ver",
+        "demirhan, kibris ne demek",
+        "demirhan, kibris anlat",
+        "bana demirhan, kibris hakkinda bilgi ver",
+        "demirhan, kibris hakkinda konus"
+      ],
+      "responses": [
+        "Demirhan (Yunanca: , romanize: Trahoni), hukuken Kıbrıs Cumhuriyeti'nin Lefkoşa kazasının, fiilen Kuzey Kıbrıs Türk Cumhuriyeti'nin Lefkoşa ilçesine bağlı Değirmenlik-Akıncılar belediyesine bağlı bir köydür.",
+        "Köy, Değirmenlik'in güneyinde yer almaktadır.",
+        "Köyün nüfusu 2011 yılı itibarı ile 530'dur."
+      ]
+    },
+    {
+      "tag": "don't look up",
+      "patterns": [
+        "don't look up nedir",
+        "don't look up hakkinda bilgi ver",
+        "don't look up ne demek",
+        "don't look up anlat",
+        "bana don't look up hakkinda bilgi ver",
+        "don't look up hakkinda konus"
+      ],
+      "responses": [
+        "Don't Look Up (Türkçe: Yukarı Bakma); yönetmenliğini ve senaristliğini Adam McKay'in yaptığı, 24 Aralık 2021 tarihinde Netflix'te yayına giren Amerikan yapımı hiciv türünde bir bilimkurgu filmidir.",
+        "Başrollerinde Leonardo DiCaprio ve Jennifer Lawrence yer almaktadır.",
+        "Filmde Leonardo DiCaprio ve Jennifer Lawrence, Dünya'ya yaklaşan ve altı ay içerisinde Dünya'yı yok edecek olan bir kuyruklu yıldız hakkında bir medya turu aracılığıyla insanlığı uyarmaya çalışan iki gökbilimciyi canlandırmaktadır."
+      ]
+    },
+    {
+      "tag": "hamid nutki",
+      "patterns": [
+        "hamid nutki nedir",
+        "hamid nutki hakkinda bilgi ver",
+        "hamid nutki ne demek",
+        "hamid nutki anlat",
+        "bana hamid nutki hakkinda bilgi ver",
+        "hamid nutki hakkinda konus"
+      ],
+      "responses": [
+        "Hamid Nutki (Farsça: ) (1920-1999) İranlı şair, yazar, yazar ve üniversite profesörüydü.",
+        "İran'daki modern halkla ilişkiler alanının kurucu babası olarak kabul edilmektedir.",
+        "Güney Azerbaycan'da Tebriz şehrinde doğdu."
+      ]
+    },
+    {
+      "tag": "minerva",
+      "patterns": [
+        "minerva nedir",
+        "minerva hakkinda bilgi ver",
+        "minerva ne demek",
+        "minerva anlat",
+        "bana minerva hakkinda bilgi ver",
+        "minerva hakkinda konus"
+      ],
+      "responses": [
+        "Minerva, Roma mitolojisindeki hikmet, akıl, savaş, sanat, okul ve ticaret tanrıçasıdır.",
+        "Jupiter ve Iuno ile birlikte diğer tanrılara hükmettiği düşünülen bir üçleme oluşturmaktaydı.",
+        "Orijini Etrüsk Menrva olan ve Roma mitolojisine de geçen Minerva; Roma Krallığı, Roma Cumhuriyeti ve Roma İmparatorluğu dönemlerinde saygı görmüş ve Roma tanrıçası olarak tanınmıştır."
+      ]
+    },
+    {
+      "tag": "miguel algarin",
+      "patterns": [
+        "miguel algarin nedir",
+        "miguel algarin hakkinda bilgi ver",
+        "miguel algarin ne demek",
+        "miguel algarin anlat",
+        "bana miguel algarin hakkinda bilgi ver",
+        "miguel algarin hakkinda konus"
+      ],
+      "responses": [
+        "11 Eylül 1941, Santurce, Porto Riko - ö.",
+        "1 Aralık 2020, New York Şehri), Porto Rikolu tarihçi, şair, eğitimci, oyun yazarı ve çevirmen."
+      ]
+    },
+    {
+      "tag": "dagistan bayragi",
+      "patterns": [
+        "dagistan bayragi nedir",
+        "dagistan bayragi hakkinda bilgi ver",
+        "dagistan bayragi ne demek",
+        "dagistan bayragi anlat",
+        "bana dagistan bayragi hakkinda bilgi ver",
+        "dagistan bayragi hakkinda konus"
+      ],
+      "responses": [
+        "Dağıstan bayrağı, Rusya'daki Dağıstan'ın bayrağıdır.",
+        "Bayrak resmî olarak 26 Şubat 1994'te kabul edildi.",
+        "Yeşil İslam'ı, mavi Hazar denizi'ni, kırmızı cesaret ve sadakati temsil etmek üzere toplam üç renge sahiptir ve yataydır."
+      ]
+    },
+    {
+      "tag": "shinya kawashima",
+      "patterns": [
+        "shinya kawashima nedir",
+        "shinya kawashima hakkinda bilgi ver",
+        "shinya kawashima ne demek",
+        "shinya kawashima anlat",
+        "bana shinya kawashima hakkinda bilgi ver",
+        "shinya kawashima hakkinda konus"
+      ],
+      "responses": [
+        "20 Temmuz 1978), Japon eski futbolcudur.",
+        "Profesyonel kariyerine 1997 yılında Sanfrecce Hiroshima kulübünde başladı.",
+        "Daha sonra sırasıyla Urawa Red Diamonds, Avispa Fukuoka, FC Gifu kulüplerinde oynadı."
+      ]
+    },
+    {
+      "tag": "bounnhang vorachith",
+      "patterns": [
+        "bounnhang vorachith nedir",
+        "bounnhang vorachith hakkinda bilgi ver",
+        "bounnhang vorachith ne demek",
+        "bounnhang vorachith anlat",
+        "bana bounnhang vorachith hakkinda bilgi ver",
+        "bounnhang vorachith hakkinda konus"
+      ],
+      "responses": [
+        "Bounnhang Vorachith (15 Ağustos 1937), Laoslu politikacı.",
+        "1996 yılından itibaren 2001 yılına kadar başbakan yardımcısı olarak görev yaptı ve daha sonra başbakan olarak atandı.",
+        "Bouasone Bouphavanh ise başbakan olarak atandı."
+      ]
+    },
+    {
+      "tag": "duygu sag",
+      "patterns": [
+        "duygu sag nedir",
+        "duygu sag hakkinda bilgi ver",
+        "duygu sag ne demek",
+        "duygu sag anlat",
+        "bana duygu sag hakkinda bilgi ver",
+        "duygu sag hakkinda konus"
+      ],
+      "responses": [
+        "1981, İzmir), Türk immunolog.",
+        "Çalışmaları, insan bağışıklık sisteminin kanserle nasıl mücadele ettiğinin anlaşılmasına katkı sağlamıştır."
+      ]
+    },
+    {
+      "tag": "ngc 1930",
+      "patterns": [
+        "ngc 1930 nedir",
+        "ngc 1930 hakkinda bilgi ver",
+        "ngc 1930 ne demek",
+        "ngc 1930 anlat",
+        "bana ngc 1930 hakkinda bilgi ver",
+        "ngc 1930 hakkinda konus"
+      ],
+      "responses": [
+        "NGC 1930, Yeni Genel Katalog'da yer alan bir galaksidir.",
+        "Gökyüzünde Ressam takımyıldızı yönünde bulunur.",
+        "SB0 tipi bir çubuklu sarmal galaksidir."
+      ]
+    },
+    {
+      "tag": "tsv hannover-burgdorf",
+      "patterns": [
+        "tsv hannover-burgdorf nedir",
+        "tsv hannover-burgdorf hakkinda bilgi ver",
+        "tsv hannover-burgdorf ne demek",
+        "tsv hannover-burgdorf anlat",
+        "bana tsv hannover-burgdorf hakkinda bilgi ver",
+        "tsv hannover-burgdorf hakkinda konus"
+      ],
+      "responses": [
+        "TSV Hannover-Burgdorf, Handball-Bundesliga'da oynayan bir Alman erkek profesyonel hentbol takımıdır.",
+        "Kulüp, 1922 yılında kurulmuş olup Hannover merkezlidir ve ana maçlarını Swiss Life Hall ve ZAG-Arena'da oynamaktadır."
+      ]
+    },
+    {
+      "tag": "gnu octave",
+      "patterns": [
+        "gnu octave nedir",
+        "gnu octave hakkinda bilgi ver",
+        "gnu octave ne demek",
+        "gnu octave anlat",
+        "bana gnu octave hakkinda bilgi ver",
+        "gnu octave hakkinda konus"
+      ],
+      "responses": [
+        "GNU Octave ya da kısaca Octave, öncelikli olarak sayısal hesaplamalar için tasarlanmış yüksek seviyeli bir dildir.",
+        "Octave, özgür ve ücretsiz bir yazılımdır.",
+        "Ticari karşılığı olan MATLAB ile çoğunlukla uyumlu bir dil kullanır."
+      ]
+    },
+    {
+      "tag": "ivan bebek",
+      "patterns": [
+        "ivan bebek nedir",
+        "ivan bebek hakkinda bilgi ver",
+        "ivan bebek ne demek",
+        "ivan bebek anlat",
+        "bana ivan bebek hakkinda bilgi ver",
+        "ivan bebek hakkinda konus"
+      ],
+      "responses": [
+        "30 Mayıs 1977, Rijeka), FIFA kokartlı Hırvat profesyonel futbol hakemi.",
+        "UEFA Şampiyonlar Ligi grup maçlarından 2007-08 sezonu'ndaki Lazio-Werder Bremen maçını ve 2008-09 sezonu'ndaki Bordeaux-CFR Cluj maçını yönetmiştir."
+      ]
+    },
+    {
+      "tag": "ngc 1789",
+      "patterns": [
+        "ngc 1789 nedir",
+        "ngc 1789 hakkinda bilgi ver",
+        "ngc 1789 ne demek",
+        "ngc 1789 anlat",
+        "bana ngc 1789 hakkinda bilgi ver",
+        "ngc 1789 hakkinda konus"
+      ],
+      "responses": [
+        "NGC 1789, Yeni Genel Katalog'da yer alan bir açık yıldız kümesidir.",
+        "Gökyüzünde Masa takımyıldızı yönünde bulunur.",
+        "OCL tipi bir açık yıldız kümesidir."
+      ]
+    },
+    {
+      "tag": "olga berggolts",
+      "patterns": [
+        "olga berggolts nedir",
+        "olga berggolts hakkinda bilgi ver",
+        "olga berggolts ne demek",
+        "olga berggolts anlat",
+        "bana olga berggolts hakkinda bilgi ver",
+        "olga berggolts hakkinda konus"
+      ],
+      "responses": [
+        "Olga Fyodorovna Berggolts (ayrıca Berggoltz veya Bergholz) (Rusça: ́ ́ ́ , 16 Mayıs 1910 - 13 Kasım 1975), Sovyet şair.",
+        "Sanatçı özellikle Leningrad'ın II.",
+        "Dünya Savaşı sırasında kuşatılığı dönemde radyoda yaptığı yayınlarla bilinmektedir."
+      ]
+    },
+    {
+      "tag": "arthur lewis",
+      "patterns": [
+        "arthur lewis nedir",
+        "arthur lewis hakkinda bilgi ver",
+        "arthur lewis ne demek",
+        "arthur lewis anlat",
+        "bana arthur lewis hakkinda bilgi ver",
+        "arthur lewis hakkinda konus"
+      ],
+      "responses": [
+        "23 Ocak 1915, Castries, Saint Lucia – ö.",
+        "15 Haziran 1991 Saint Michael, Barbados) Karayipler doğumlu bir iktisatçı.",
+        "Gelişme ekonomisi konusundaki seçkin katkıları ünlüdür."
+      ]
+    },
+    {
+      "tag": "caroline adasi yer kumrusu",
+      "patterns": [
+        "caroline adasi yer kumrusu nedir",
+        "caroline adasi yer kumrusu hakkinda bilgi ver",
+        "caroline adasi yer kumrusu ne demek",
+        "caroline adasi yer kumrusu anlat",
+        "bana caroline adasi yer kumrusu hakkinda bilgi ver",
+        "caroline adasi yer kumrusu hakkinda konus"
+      ],
+      "responses": [
+        "Caroline Adası yer kumrusu (Pampusana kubaryi), Güvercingiller (Columbidae) familyasından bir kuş türü.",
+        "Mikronezya Federal Devletleri'ne endemiktir, Pohnpei ve Chuuk'un Tol, Weno, Patta, Dublon, Fenepi ve Ipis adalarında yaşar."
+      ]
+    },
+    {
+      "tag": "fistful of mercy",
+      "patterns": [
+        "fistful of mercy nedir",
+        "fistful of mercy hakkinda bilgi ver",
+        "fistful of mercy ne demek",
+        "fistful of mercy anlat",
+        "bana fistful of mercy hakkinda bilgi ver",
+        "fistful of mercy hakkinda konus"
+      ],
+      "responses": [
+        "Fistful of Mercy, Dhani Harrison, Ben Harper ve Joseph Arthur'dan oluşan rock grubudur.",
+        "Şubat 2010'da kurulmuştur.",
+        "Grup 10 Kasım 2010'da Conan'ın üçüncü bölümünde, özel konuk Tom Morello ile \"Father's Son\" şarkısını seslendirmiştir."
+      ]
+    },
+    {
+      "tag": "nelson nehri",
+      "patterns": [
+        "nelson nehri nedir",
+        "nelson nehri hakkinda bilgi ver",
+        "nelson nehri ne demek",
+        "nelson nehri anlat",
+        "bana nelson nehri hakkinda bilgi ver",
+        "nelson nehri hakkinda konus"
+      ],
+      "responses": [
+        "Nelson Nehri (İngilizce: Nelson River), Kanada'nın Manitoba eyaletinde bulunan bir nehirdir.",
+        "Nehir, 644 km uzunluğunda olup> Winnipeg Gölü'nden başlayarak Hudson Körfezi'ne dökülmektedir."
+      ]
+    },
+    {
+      "tag": "amerikan ornitologlar birligi",
+      "patterns": [
+        "amerikan ornitologlar birligi nedir",
+        "amerikan ornitologlar birligi hakkinda bilgi ver",
+        "amerikan ornitologlar birligi ne demek",
+        "amerikan ornitologlar birligi anlat",
+        "bana amerikan ornitologlar birligi hakkinda bilgi ver",
+        "amerikan ornitologlar birligi hakkinda konus"
+      ],
+      "responses": [
+        "ABD Ornitoloji Derneği (AOS), Amerika Birleşik Devletleri merkezli bir ornitoloji kuruluşudur.",
+        "Dernek, Ekim 2016'da Amerikan Ornitologlar Birliği (AOU) ve Cooper Ornitoloji Derneği'nin birleşmesiyle kurulmuştur.",
+        "Üyeleri ağırlıklı olarak profesyonel ornitologlardan oluşsa da üyelik kuşlara ilgi duyan herkese açıktır."
+      ]
+    },
+    {
+      "tag": "cebrail sapiyev",
+      "patterns": [
+        "cebrail sapiyev nedir",
+        "cebrail sapiyev hakkinda bilgi ver",
+        "cebrail sapiyev ne demek",
+        "cebrail sapiyev anlat",
+        "bana cebrail sapiyev hakkinda bilgi ver",
+        "cebrail sapiyev hakkinda konus"
+      ],
+      "responses": [
+        "20 Nisan 1997), Özbekistan adına yarışan serbest stil güreşçidir.",
+        "2022 Asya Oyunları'nda 86 kg kategorisinde bronz madalya kazanmıştır."
+      ]
+    },
+    {
+      "tag": "cook parti egilimi endeksi",
+      "patterns": [
+        "cook parti egilimi endeksi nedir",
+        "cook parti egilimi endeksi hakkinda bilgi ver",
+        "cook parti egilimi endeksi ne demek",
+        "cook parti egilimi endeksi anlat",
+        "bana cook parti egilimi endeksi hakkinda bilgi ver",
+        "cook parti egilimi endeksi hakkinda konus"
+      ],
+      "responses": [
+        "Cook Parti Eğilimi Endeksi (İngilizce: Cook Partisan Voting Index), kısaca PVI ya da CPVI, bir ABD kongre bölgesinin veya ABD eyaletinin parti eğiliminin bir ölçüsüdür.",
+        "Bu eğilim, söz konusu bölge veya eyaletin önceki iki başkanlık seçiminde nasıl oy verdiğine dayanarak ülke genelinin ortalamasıyla karşılaştırıldığında Cumhuriyetçi Parti'ye veya Demokrat Parti'ye eğilimi şeklinde gösterilir."
+      ]
+    },
+    {
+      "tag": "dolly zoom",
+      "patterns": [
+        "dolly zoom nedir",
+        "dolly zoom hakkinda bilgi ver",
+        "dolly zoom ne demek",
+        "dolly zoom anlat",
+        "bana dolly zoom hakkinda bilgi ver",
+        "dolly zoom hakkinda konus"
+      ],
+      "responses": [
+        "Dolly zoom, sinemada kullanılan bir kamera özel efektidir.",
+        "Film kamerasını taşıyan ve \"dolly\" adı verilen kaydırma arabası veya vinç ileri veya geriye doğru çekilirken kameranın bunun tersine bir optik yaklaştırma veya uzaklaştırma işlemi (zoom in veya zoom out) yapmasına \"dolly zoom\" adı verilir.",
+        "Dolly zoom işleminde, merkezdeki obje perdede sabit kalırken önünde ve arkasındaki nesneler hızla değişen objektif açısının çarpıtmalarına uğrayarak özel görsel efektler oluştururlar."
+      ]
+    },
+    {
+      "tag": "eritema multiforme",
+      "patterns": [
+        "eritema multiforme nedir",
+        "eritema multiforme hakkinda bilgi ver",
+        "eritema multiforme ne demek",
+        "eritema multiforme anlat",
+        "bana eritema multiforme hakkinda bilgi ver",
+        "eritema multiforme hakkinda konus"
+      ],
+      "responses": [
+        "Eritema multiforme (EM), hedef tarzında lezyonların görülmesiyle karakterize dermatolojik bir hastalıktır.",
+        "1866 yılında Ferdinand Von Hebra tarafından tanımlanmıştır.",
+        "En sık görülen sebebi herpes simpleks enfeksiyonu geçirilmesidir."
+      ]
+    },
+    {
+      "tag": "portekiz kadin milli yedili ragbi takimi",
+      "patterns": [
+        "portekiz kadin milli yedili ragbi takimi nedir",
+        "portekiz kadin milli yedili ragbi takimi hakkinda bilgi ver",
+        "portekiz kadin milli yedili ragbi takimi ne demek",
+        "portekiz kadin milli yedili ragbi takimi anlat",
+        "bana portekiz kadin milli yedili ragbi takimi hakkinda bilgi ver",
+        "portekiz kadin milli yedili ragbi takimi hakkinda konus"
+      ],
+      "responses": [
+        "Portekiz kadın millî yedili ragbi birliği takımı, yedili ragbi birliğinde Portekiz'i temsil eden ulusal bir spor takımıdır.",
+        "Portekiz kadın millî yedili ragbi birliği takımı tarihleri boyunca Dünya Serisi'ne katılamamışlardır.",
+        "2012'de düzenlenen IRB Kadınlar Yedili Challenge Kupasında kupa finali maçında Çin'e 5:43 yenilerek turnuvaya veda etmiştir."
+      ]
+    },
+    {
+      "tag": "trixxo arena",
+      "patterns": [
+        "trixxo arena nedir",
+        "trixxo arena hakkinda bilgi ver",
+        "trixxo arena ne demek",
+        "trixxo arena anlat",
+        "bana trixxo arena hakkinda bilgi ver",
+        "trixxo arena hakkinda konus"
+      ],
+      "responses": [
+        "Kasım'ın 26ıncısı'nda, 2005 Eurovision Çocuk Şarkı Yarışması, Trixxo arenasında yer aldı.",
+        "2005, \"Plopsa salonu Hasselt\"'in sonunda, çocuklar için bir salon cazibe parkı, Grenslandhallen Trixxo arenasının yanında açtı ve Belçika'da benzersizdir."
+      ]
+    },
+    {
+      "tag": "jordy alcivar",
+      "patterns": [
+        "jordy alcivar nedir",
+        "jordy alcivar hakkinda bilgi ver",
+        "jordy alcivar ne demek",
+        "jordy alcivar anlat",
+        "bana jordy alcivar hakkinda bilgi ver",
+        "jordy alcivar hakkinda konus"
+      ],
+      "responses": [
+        "5 Ağustos 1999), Ekvadorlu futbolcudur.",
+        "Orta saha mevkiinde görev almaktadır.",
+        "Serie A (Ekvador) takımlarından CSD Independiente del Valle'de forma giymektedir."
+      ]
+    },
+    {
+      "tag": "papalik haclari",
+      "patterns": [
+        "papalik haclari nedir",
+        "papalik haclari hakkinda bilgi ver",
+        "papalik haclari ne demek",
+        "papalik haclari anlat",
+        "bana papalik haclari hakkinda bilgi ver",
+        "papalik haclari hakkinda konus"
+      ],
+      "responses": [
+        "Papalık Haçı veya papalık haçı şu anlamlara gelebilir: Papalık haçı, papalık sembolü olarak üç çapraz çubuğa sahip dikey bir çubuktur Papalık ferulası, papanın taşıdığı başlığında haç olan asa Papalık Haçı, Dublin, Papa II.",
+        "Ioannes Paulus'un 1979'daki İrlanda ziyareti anısına dikilmiş anıt."
+      ]
+    },
+    {
+      "tag": "normal dagilim",
+      "patterns": [
+        "normal dagilim nedir",
+        "normal dagilim hakkinda bilgi ver",
+        "normal dagilim ne demek",
+        "normal dagilim anlat",
+        "bana normal dagilim hakkinda bilgi ver",
+        "normal dagilim hakkinda konus"
+      ],
+      "responses": [
+        "Normal dağılım, aynı zamanda Gauss dağılımı veya Gauss tipi dağılım olarak isimlendirilen, birçok alanda pratik uygulaması olan, çok önemli bir sürekli olasılık dağılım ailesidir.",
+        "Bu dağılım ailesinin her bir üyesi sadece iki parametreyle tam olarak tanımlanabilir: Bunlar konum gösteren ortalama ( , aritmetik ortalama) ve ölçek gösteren varyans ( 2, \"yayılım\")dır.",
+        "Standart normal dağılım, ortalama değeri 0 ve varyans değeri 1 olan normal dağılım ailesinin tek bir elemanıdır."
+      ]
+    },
+    {
+      "tag": "2024 dunya boks u19 sampiyonasi",
+      "patterns": [
+        "2024 dunya boks u19 sampiyonasi nedir",
+        "2024 dunya boks u19 sampiyonasi hakkinda bilgi ver",
+        "2024 dunya boks u19 sampiyonasi ne demek",
+        "2024 dunya boks u19 sampiyonasi anlat",
+        "bana 2024 dunya boks u19 sampiyonasi hakkinda bilgi ver",
+        "2024 dunya boks u19 sampiyonasi hakkinda konus"
+      ],
+      "responses": [
+        "2024 Dünya Boks U19 Şampiyonası, 26 Ekim – 2 Kasım 2024 tarihleri arasında Amerika Birleşik Devletleri'nin Colorado eyaletine bağlı Pueblo kentinde düzenlenmiştir.",
+        "World Boxing tarafından 19 yaş altı sporcular için organize edilen turnuva, Dünya Boks U19 Şampiyonası’nın ilk edisyonudur.",
+        "Turnuvada erkekler ve kadınlar için 10’ar sıklet kategorisi yer almıştır."
+      ]
+    },
+    {
+      "tag": "rijksmuseum amsterdam",
+      "patterns": [
+        "rijksmuseum amsterdam nedir",
+        "rijksmuseum amsterdam hakkinda bilgi ver",
+        "rijksmuseum amsterdam ne demek",
+        "rijksmuseum amsterdam anlat",
+        "bana rijksmuseum amsterdam hakkinda bilgi ver",
+        "rijksmuseum amsterdam hakkinda konus"
+      ],
+      "responses": [
+        "Rijksmuseum Amsterdam ya da Rijksmuseum (Devlet Müzesi), Amsterdam'daki Museumplein'da yer alan bir Hollanda ulusal müzesidir.",
+        "Müzede sanat, zanaat ve tarih alanındaki parçalar sergilenir.",
+        "Müze, Hollanda Altın Çağı'na ait geniş bir tablo koleksiyonuna ve oldukça büyük bir Asya sanatı koleksiyonuna sahiptir."
+      ]
+    },
+    {
+      "tag": "allen testi",
+      "patterns": [
+        "allen testi nedir",
+        "allen testi hakkinda bilgi ver",
+        "allen testi ne demek",
+        "allen testi anlat",
+        "bana allen testi hakkinda bilgi ver",
+        "allen testi hakkinda konus"
+      ],
+      "responses": [
+        "Tıpta Allen testi, ellere giden arteriyel kan akışının fizik muayenesinde kullanılan tıbbi bir muayene yöntemidir.",
+        "Adını 1942'de testin orijinal versiyonunu ortaya koyan Edgar Van Nuys Allen'den almıştır.",
+        "Wright tarafından önerilen başka bir versiyonu, çağdaş tıp uygulamalarında neredeyse evrensel olarak orijinal yöntemin yerini almıştır."
+      ]
+    },
+    {
+      "tag": "georg buchner",
+      "patterns": [
+        "georg buchner nedir",
+        "georg buchner hakkinda bilgi ver",
+        "georg buchner ne demek",
+        "georg buchner anlat",
+        "bana georg buchner hakkinda bilgi ver",
+        "georg buchner hakkinda konus"
+      ],
+      "responses": [
+        "Karl Georg Büchner, ([kaʁl ˈɡeːɔʁk ˈbyːçɐ] d.",
+        "17 Ekim 1813, Goddelau, Hessen Büyük Dükalığı - ö.",
+        "19 Şubat 1837, Zürih, İsviçre) Alman oyun yazarıdır."
+      ]
+    },
+    {
+      "tag": "huntington park, kaliforniya",
+      "patterns": [
+        "huntington park, kaliforniya nedir",
+        "huntington park, kaliforniya hakkinda bilgi ver",
+        "huntington park, kaliforniya ne demek",
+        "huntington park, kaliforniya anlat",
+        "bana huntington park, kaliforniya hakkinda bilgi ver",
+        "huntington park, kaliforniya hakkinda konus"
+      ],
+      "responses": [
+        "Huntington Park, Amerika Birleşik Devletleri'nin Kaliforniya eyaletinde yer alan ve Los Angeles ilçesinde yer alan şehirdir.",
+        "Şehrin nüfusu 26 Kasım 2009 tarihinde 58.114'tür."
+      ]
+    },
+    {
+      "tag": "kaolin",
+      "patterns": [
+        "kaolin nedir",
+        "kaolin hakkinda bilgi ver",
+        "kaolin ne demek",
+        "kaolin anlat",
+        "bana kaolin hakkinda bilgi ver",
+        "kaolin hakkinda konus"
+      ],
+      "responses": [
+        "Kaolin ya da kaolen arıkil, granit kayaçlardan elde edilen ve bazı seramik ve porselenlerin yapımında kullanılan bir kil türü.",
+        "Türkiye'de arı kil olarak da bilinir.",
+        "Beyaz ve yumuşak bir toprak türüdür."
+      ]
+    },
+    {
+      "tag": "psikoseksuel bozukluk",
+      "patterns": [
+        "psikoseksuel bozukluk nedir",
+        "psikoseksuel bozukluk hakkinda bilgi ver",
+        "psikoseksuel bozukluk ne demek",
+        "psikoseksuel bozukluk anlat",
+        "bana psikoseksuel bozukluk hakkinda bilgi ver",
+        "psikoseksuel bozukluk hakkinda konus"
+      ],
+      "responses": [
+        "Psikoseksüel bozukluk, psikolojik kökenli bir cinsel bozukluktur.",
+        "\"Psikoseksüel bozukluk\" terimi ilk kez Freudyen psikolojide kullanılmıştır.",
+        "\" Psikoseksüel bozukluk \" terimi, TSK tarafından LGBT bireylerin askerlik hizmetinden men edilme gerekçesi olarak kullanılmıştır."
+      ]
+    },
+    {
+      "tag": "2006 avrupa birligi boks sampiyonasi",
+      "patterns": [
+        "2006 avrupa birligi boks sampiyonasi nedir",
+        "2006 avrupa birligi boks sampiyonasi hakkinda bilgi ver",
+        "2006 avrupa birligi boks sampiyonasi ne demek",
+        "2006 avrupa birligi boks sampiyonasi anlat",
+        "bana 2006 avrupa birligi boks sampiyonasi hakkinda bilgi ver",
+        "2006 avrupa birligi boks sampiyonasi hakkinda konus"
+      ],
+      "responses": [
+        "2006 Avrupa Birliği Amatör Boks Şampiyonası, Macaristan'ın Pécs kentinde 23-27 Mayıs 2006 tarihleri arasında düzenlenmiştir.",
+        "edisyonu Avrupa Amatör Boks Birliği (EABA) tarafından organize edilmiştir.",
+        "Şampiyonaya toplam 85 boksör katılmıştır."
+      ]
+    },
+    {
+      "tag": "omer dinc",
+      "patterns": [
+        "omer dinc nedir",
+        "omer dinc hakkinda bilgi ver",
+        "omer dinc ne demek",
+        "omer dinc anlat",
+        "bana omer dinc hakkinda bilgi ver",
+        "omer dinc hakkinda konus"
+      ],
+      "responses": [
+        "22 Ocak 1955), Türk siyasetçi.",
+        "Çiftçilik ve Hayvancılık, Muhtarlık, Türkiye Büyük Millet Meclisi IV.",
+        "Dönem Kütahya Milletvekilliği yapmıştır."
+      ]
+    },
+    {
+      "tag": ".nr",
+      "patterns": [
+        ".nr nedir",
+        ".nr hakkinda bilgi ver",
+        ".nr ne demek",
+        ".nr anlat",
+        "bana .nr hakkinda bilgi ver",
+        ".nr hakkinda konus"
+      ],
+      "responses": [
+        ".nr Nauru için internet ülke kodu üst seviye alan adıdır.",
+        "(CcTLD) Alan adları ücretlidir ve Nauru'nun İnternet servis sağlayıcısı olan CenpacNet'ten sipariş edilebilir.",
+        ".nr TLD alan adının orijinal yapılandırması 1998 yılında ComTech Communications'dan (Avustralya) Shaun Moran tarafından adaki ilk İnternet bağlantısının bir parçası olarak gerçekleştirilmiştir."
+      ]
+    },
+    {
+      "tag": "kotulugun dongusu",
+      "patterns": [
+        "kotulugun dongusu nedir",
+        "kotulugun dongusu hakkinda bilgi ver",
+        "kotulugun dongusu ne demek",
+        "kotulugun dongusu anlat",
+        "bana kotulugun dongusu hakkinda bilgi ver",
+        "kotulugun dongusu hakkinda konus"
+      ],
+      "responses": [
+        "Kötülüğün Döngüsü (İngilizce: The Turn of the Screw) İngiliz opera bestecisi Benjamin Britten tarafından bestelenmiş Prolog ve İki Perde'den oluşan bir oda operasıdır.",
+        "Eserin konusu opera sanatının geleneksel temalarının dışına çıkıp günsel sorunlardan olan çocuklara yönelik şiddet ve taciz konularını işlemektedir.",
+        "Müziksel olarak ise eser bir tema ve 15 serilik onikilik sisteme göre yazılmış varyasyonlardan oluşmakta ve orkestranın aktif olarak katkısını içermektedir."
+      ]
+    },
+    {
+      "tag": "benim icin n'apardin",
+      "patterns": [
+        "benim icin n'apardin nedir",
+        "benim icin n'apardin hakkinda bilgi ver",
+        "benim icin n'apardin ne demek",
+        "benim icin n'apardin anlat",
+        "bana benim icin n'apardin hakkinda bilgi ver",
+        "benim icin n'apardin hakkinda konus"
+      ],
+      "responses": [
+        "\"Benim İçin N'apardın\", Gökhan Özen'in 2005 yılında çıkarmış olduğu Kalbim Seninle - One More Time maxi singlenın ilk şarkısıdır.",
+        "Şarkının söz ve müziği Nazan Öncel imzası taşımaktadır.",
+        "Aranjesi ise Gökhan Özen'e aittir."
+      ]
+    },
+    {
+      "tag": "derry sehri havalimani",
+      "patterns": [
+        "derry sehri havalimani nedir",
+        "derry sehri havalimani hakkinda bilgi ver",
+        "derry sehri havalimani ne demek",
+        "derry sehri havalimani anlat",
+        "bana derry sehri havalimani hakkinda bilgi ver",
+        "derry sehri havalimani hakkinda konus"
+      ],
+      "responses": [
+        "Derry Şehri Havalimanı (İngilizce: City of Derry Airport) (IATA: LDY, ICAO: EGAE), Kuzey İrlanda'nın Derry kentinde bulunan bir havalimanıdır.",
+        "Havalimanı, 1967 yılında açılmıştır.",
+        "Havalimanı, 2023 yılında 179.095 yolcuya hizmet vermiştir."
+      ]
+    },
+    {
+      "tag": "ecinniler kultur ve edebiyat dergisi",
+      "patterns": [
+        "ecinniler kultur ve edebiyat dergisi nedir",
+        "ecinniler kultur ve edebiyat dergisi hakkinda bilgi ver",
+        "ecinniler kultur ve edebiyat dergisi ne demek",
+        "ecinniler kultur ve edebiyat dergisi anlat",
+        "bana ecinniler kultur ve edebiyat dergisi hakkinda bilgi ver",
+        "ecinniler kultur ve edebiyat dergisi hakkinda konus"
+      ],
+      "responses": [
+        "Ecinniler, 2020 yılından itibaren yayınlanan İstanbul merkezli, iki aylık bağımsız bir Türkçe kültür ve edebiyat dergisidir.",
+        "Şiir, öykü, deneme, masal, inceleme ve eleştiri gibi çeşitli türlerde eserlere yer verilen derginin her sayısında bir dosya konusu ele alınır.",
+        "Hem matbu hem dijital olarak yayımlanmaktadır."
+      ]
+    },
+    {
+      "tag": "postgresql",
+      "patterns": [
+        "postgresql nedir",
+        "postgresql hakkinda bilgi ver",
+        "postgresql ne demek",
+        "postgresql anlat",
+        "bana postgresql hakkinda bilgi ver",
+        "postgresql hakkinda konus"
+      ],
+      "responses": [
+        "PostgreSQL (/ˈpoʊstɡrɛs ˌkjuː ˈɛl/) ya da Postgres, özgür ve açık kaynak kodlu, SQL destekli bir ilişkisel veritabanı yönetim sistemidir.",
+        "İsmi konusunda, başlarda Kaliforniya Üniversitesi'nde geliştirilen Ingres veritabanının devamı niteliğinde olduğu için bu isme atıfta bulunularak POSTGRES adını aldı.",
+        "1996 yılında SQL desteğini vurgulamak maksatlı PostgreSQL şeklinde değiştirildi."
+      ]
+    },
+    {
+      "tag": "kate bornstein",
+      "patterns": [
+        "kate bornstein nedir",
+        "kate bornstein hakkinda bilgi ver",
+        "kate bornstein ne demek",
+        "kate bornstein anlat",
+        "bana kate bornstein hakkinda bilgi ver",
+        "kate bornstein hakkinda konus"
+      ],
+      "responses": [
+        "Katherine Vandam Bornstein (15 Mart 1948 doğumlu) Amerikalı yazar, oyun yazarı, performans sanatçısı, aktör ve toplumsal cinsiyet kuramcısıdır .",
+        "1986'da Bornstein, kendini cinsiyete uygun olmayan olarak tanımlamaya başladı ve doğumda erkek olarak belirtildikten ve cinsiyet değiştirme ameliyatı geçirdikten sonra \"Kendime kadın demiyorum ve erkek olmadığımı biliyorum\" dedi.",
+        "Bornstein artık kendini non-binary olarak tanımlıyor ve they/them ve she/her zamirlerini kullanıyor."
+      ]
+    },
+    {
+      "tag": "londonbeat",
+      "patterns": [
+        "londonbeat nedir",
+        "londonbeat hakkinda bilgi ver",
+        "londonbeat ne demek",
+        "londonbeat anlat",
+        "bana londonbeat hakkinda bilgi ver",
+        "londonbeat hakkinda konus"
+      ],
+      "responses": [
+        "Londonbeat, 1990'ların başında büyük ses getirmiş Britanyalı bir müzik grubudur.",
+        "Grubun en bilinen çalışmaları arasında \"I've Been Thinking About You\" da bulunmaktadır."
+      ]
+    },
+    {
+      "tag": "rusya ermenistani",
+      "patterns": [
+        "rusya ermenistani nedir",
+        "rusya ermenistani hakkinda bilgi ver",
+        "rusya ermenistani ne demek",
+        "rusya ermenistani anlat",
+        "bana rusya ermenistani hakkinda bilgi ver",
+        "rusya ermenistani hakkinda konus"
+      ],
+      "responses": [
+        "Rusya Ermenistanı, 1828'den itibaren Rus İmparatorluğu yönetimi altında Ermeni tarihi dönemidir.",
+        "Doğu Ermenistan, İran'ın 1826-1828 İran-Rus Savaşı'ndaki kaybını müteakiben Rusya ile imzaladığı Türkmençay Antlaşması ile Rus İmparatorluğu'nun bir parçası haline geldi.",
+        "Doğu Ermenistan, Rus İmparatorluğu'nun 1917'deki çöküşüne kadar bir parçası olarak kaldı."
+      ]
+    },
+    {
+      "tag": "eymen tahir",
+      "patterns": [
+        "eymen tahir nedir",
+        "eymen tahir hakkinda bilgi ver",
+        "eymen tahir ne demek",
+        "eymen tahir anlat",
+        "bana eymen tahir hakkinda bilgi ver",
+        "eymen tahir hakkinda konus"
+      ],
+      "responses": [
+        "Eymen Tahir şu anlamlara gelebilir: Eymen Tahir (Mısırlı futbolcu), 1966 doğumlu Mısırlı millî futbolcu.",
+        "Eymen Tahir (Cezayirli futbolcu), 1989 doğumlu Cezayirli futbolcu."
+      ]
+    },
+    {
+      "tag": "fire force: alev gucu",
+      "patterns": [
+        "fire force: alev gucu nedir",
+        "fire force: alev gucu hakkinda bilgi ver",
+        "fire force: alev gucu ne demek",
+        "fire force: alev gucu anlat",
+        "bana fire force: alev gucu hakkinda bilgi ver",
+        "fire force: alev gucu hakkinda konus"
+      ],
+      "responses": [
+        "Fire Force: Alev Gücü (Japonca: , romanize: En'en no Shōbōtai; \"Yanan İtfaiye\"), Atsushi Ohkubo tarafından yazılan bir manga serisidir.",
+        "Seri, Eylül 2015-Şubat 2022 tarihleri arasında Kodansha'nın Weekly Shōnen Magazine dergisinde 34 tankōbon cilt halinde yayınlandı.",
+        "David Production tarafından hazırlanan bir anime televizyon serisi Temmuz-Aralık 2019 tarihleri arasında yayınlandı."
+      ]
+    },
+    {
+      "tag": "marge champion",
+      "patterns": [
+        "marge champion nedir",
+        "marge champion hakkinda bilgi ver",
+        "marge champion ne demek",
+        "marge champion anlat",
+        "bana marge champion hakkinda bilgi ver",
+        "marge champion hakkinda konus"
+      ],
+      "responses": [
+        "Marjorie Celeste \"Marge\" Champion (evlilik öncesi soyadı: Belcher; d.",
+        "2 Eylül 1919, Los Angeles - ö.",
+        "21 Ekim 2020, Los Angeles, Kaliforniya), Amerikalı dansçı, koreograf ve oyuncu."
+      ]
+    },
+    {
+      "tag": "martin niemoller",
+      "patterns": [
+        "martin niemoller nedir",
+        "martin niemoller hakkinda bilgi ver",
+        "martin niemoller ne demek",
+        "martin niemoller anlat",
+        "bana martin niemoller hakkinda bilgi ver",
+        "martin niemoller hakkinda konus"
+      ],
+      "responses": [
+        "Emil Gustav Friedrich Martin Niemöller (14 Ocak 1892, Lippstadt, Almanya - 6 Mart 1984, Wiesbaden, Almanya), Alman ilahiyatçıdır.",
+        "Alman Protestan Kilisesi'nin Nazilerle iş birliği yapmasına muhalefet eden kilisenin (Bekennende Kirche) yöneticisi ve Dünya Kiliseler Konseyi (bugünkü Dünya Ekümenik Kiliseler Konseyi) başkanı.",
+        "Önceleri inanmış bir Nasyonal Sosyalist Alman İşçi Partisi seçmeni olan Niemöller, daha sonra kiliseler arası kavgalarda kendisini geliştirerek nasyonal sosyalizm karşıtı bir direnişçi olmuştur."
+      ]
+    },
+    {
+      "tag": "blackburn",
+      "patterns": [
+        "blackburn nedir",
+        "blackburn hakkinda bilgi ver",
+        "blackburn ne demek",
+        "blackburn anlat",
+        "bana blackburn hakkinda bilgi ver",
+        "blackburn hakkinda konus"
+      ],
+      "responses": [
+        "Blackburn, Birleşik Krallık'ın İngiltere ülkesinin Kuzey Batı bölgesinde bir kentsel yerleşkedir.",
+        "Törensel Lancashire kontluğuna bağlı olup 2009'dan itibaren yerel idare itibarıyla tek-seviyeli \"Blackburn ile Darwen\" Yerel İdaresi'nin merkezidir.",
+        "1974'ten itibaren içinde Darwin küçük kenti de bulunan Blackburn, Lancashire kontluğunun ikinci seviyede bir \"Blackburn\" Bölgesi\" olarak idare edilmiştir."
+      ]
+    },
+    {
+      "tag": "dehcho bolgesi",
+      "patterns": [
+        "dehcho bolgesi nedir",
+        "dehcho bolgesi hakkinda bilgi ver",
+        "dehcho bolgesi ne demek",
+        "dehcho bolgesi anlat",
+        "bana dehcho bolgesi hakkinda bilgi ver",
+        "dehcho bolgesi hakkinda konus"
+      ],
+      "responses": [
+        "Dehcho Bölgesi (İngilizce Dehcho Region), Kuzeybatı Toprakları'nın beş yönetim bölgesinden biridir.",
+        "Altı yerleşimden oluşan bölgenin yönetim merkezi Fort Simpson'dadır."
+      ]
+    },
+    {
+      "tag": "heaven upside down",
+      "patterns": [
+        "heaven upside down nedir",
+        "heaven upside down hakkinda bilgi ver",
+        "heaven upside down ne demek",
+        "heaven upside down anlat",
+        "bana heaven upside down hakkinda bilgi ver",
+        "heaven upside down hakkinda konus"
+      ],
+      "responses": [
+        "Heaven Upside Down, Amerikalı rock grubu Marilyn Manson'ın onuncu stüdyo albümü.",
+        "Loma Vista Recordings ve Caroline International tarafından 10 Ekim 2017'de yayınlandı.",
+        "\"We Know Where You Fucking Live\" albümün çıkış parçası olarak 11 Eylül'de yayınlanırken, \"Kill4Me\" 20 Eylül'de piyasaya sürüldü."
+      ]
+    },
+    {
+      "tag": "shunsuke fukuda",
+      "patterns": [
+        "shunsuke fukuda nedir",
+        "shunsuke fukuda hakkinda bilgi ver",
+        "shunsuke fukuda ne demek",
+        "shunsuke fukuda anlat",
+        "bana shunsuke fukuda hakkinda bilgi ver",
+        "shunsuke fukuda hakkinda konus"
+      ],
+      "responses": [
+        "17 Nisan 1986), Japon futbolcudur.",
+        "Profesyonel kariyerine 2009 yılında Omiya Ardija kulübünde başladı.",
+        "Daha sonra Kataller Toyama kulübüne transfer oldu."
+      ]
+    },
+    {
+      "tag": "ahmet karaevli",
+      "patterns": [
+        "ahmet karaevli nedir",
+        "ahmet karaevli hakkinda bilgi ver",
+        "ahmet karaevli ne demek",
+        "ahmet karaevli anlat",
+        "bana ahmet karaevli hakkinda bilgi ver",
+        "ahmet karaevli hakkinda konus"
+      ],
+      "responses": [
+        "Ahmet Karaevli (1949, Tekirdağ, Türkiye - 12 Nisan 2020), Türk siyasetçi.",
+        "ODTÜ Mühendislik Fakültesi Metalurji Mühendisliği Bölümü'nü bitirdi.",
+        "Proje Uzmanlığı, DESİYAB Teknik Yardımcılığı ve İzleme Müdürlüğü, XVII."
+      ]
+    },
+    {
+      "tag": "hafsa bint omer",
+      "patterns": [
+        "hafsa bint omer nedir",
+        "hafsa bint omer hakkinda bilgi ver",
+        "hafsa bint omer ne demek",
+        "hafsa bint omer anlat",
+        "bana hafsa bint omer hakkinda bilgi ver",
+        "hafsa bint omer hakkinda konus"
+      ],
+      "responses": [
+        "Hafsa bint Ömer (Arapça: , romanize: Ḥafṣa bint ʿUmar), İslam peygamberi Muhammed'in eşi ve ikinci İslam halifesi Ömer bin Hattab'ın kızıdır.",
+        "Kocası Huneys bin Huzafe el-Ensari'nin 625'teki Uhud Muharebesi'nde ölmesi üzerine dul kalmış ve babası Ömer bin Hattab'ın girişimi ile Muhammed ile evlenmiştir."
+      ]
+    },
+    {
+      "tag": "mahtumkulu bulvari",
+      "patterns": [
+        "mahtumkulu bulvari nedir",
+        "mahtumkulu bulvari hakkinda bilgi ver",
+        "mahtumkulu bulvari ne demek",
+        "mahtumkulu bulvari anlat",
+        "bana mahtumkulu bulvari hakkinda bilgi ver",
+        "mahtumkulu bulvari hakkinda konus"
+      ],
+      "responses": [
+        "Mahtumkulu Bulvarı (Türkmence: Magtymguly şaýoly), Türkmenistan'ın başkenti Aşkabat'ta bulunan bir bulvardır.",
+        "Bulvar, adını Mahtumkulu Firaki'den almakta olup başkentin en uzun ve en belirgin bulvarı olarak kabul edilir."
+      ]
+    },
+    {
+      "tag": "nezih unen",
+      "patterns": [
+        "nezih unen nedir",
+        "nezih unen hakkinda bilgi ver",
+        "nezih unen ne demek",
+        "nezih unen anlat",
+        "bana nezih unen hakkinda bilgi ver",
+        "nezih unen hakkinda konus"
+      ],
+      "responses": [
+        "1966, Bursa) Türk şarkıcı, söz yazarı.",
+        "Bursa'da doğdu ve 18 yaşında üniversite eğitimi için İstanbul’a taşınana kadar burada yaşadı.",
+        "Okul yıllarında müzik ve fotoğrafla yakından ilgilendi."
+      ]
+    },
+    {
+      "tag": "bahar, iran",
+      "patterns": [
+        "bahar, iran nedir",
+        "bahar, iran hakkinda bilgi ver",
+        "bahar, iran ne demek",
+        "bahar, iran anlat",
+        "bana bahar, iran hakkinda bilgi ver",
+        "bahar, iran hakkinda konus"
+      ],
+      "responses": [
+        "Bahar (Farsça: ), İran'ın Hamedan Eyaleti'nde şehir.",
+        "Nüfusun çoğunluğu Azeri'dir.",
+        "Ana geçim kaynağı tarım olan kentte, patates ve karpuz üretimi yapılmaktadır."
+      ]
+    },
+    {
+      "tag": "magnezyum sitrat",
+      "patterns": [
+        "magnezyum sitrat nedir",
+        "magnezyum sitrat hakkinda bilgi ver",
+        "magnezyum sitrat ne demek",
+        "magnezyum sitrat anlat",
+        "bana magnezyum sitrat hakkinda bilgi ver",
+        "magnezyum sitrat hakkinda konus"
+      ],
+      "responses": [
+        "Magnezyum sitrat sitrik asidin 1:1 oranında (1 magnezyum atom başına sitrat molekülü) karıştırılmasıyla oluşturulan tuz formunda bir magnezyum karışımdır.",
+        "\"Magnezyum sitrat\" adı bazen başka tuzlar için de kullanılabilir, örneğin magnezyum sitrat oranı 3:2 olan trimagnezyum sitrat.",
+        "Magnezyum sitrat tıbbi olarak büyük bir ameliyat ya da kolonoskopi öncesi bağırsağı boşaltmak amacıyla tuzlu müshil olarak kullanılır."
+      ]
+    },
+    {
+      "tag": "parkour",
+      "patterns": [
+        "parkour nedir",
+        "parkour hakkinda bilgi ver",
+        "parkour ne demek",
+        "parkour anlat",
+        "bana parkour hakkinda bilgi ver",
+        "parkour hakkinda konus"
+      ],
+      "responses": [
+        "Parkour, bir noktadan başka bir noktaya insan vücudunun yeteneklerini en verimli şekilde kullanıp, sınırlarını da zorlayarak, hızlı ve etkili biçimde hareket etmesini hedefleyen bir beden eğitimi türü ve yaşam tarzıdır.",
+        "Erkek sporcularına Traceur kadınlara ise Traceuse denir, \"iz bırakan\" manasına gelir.",
+        "Günümüzde şehir sporu olarak anılmaktadır."
+      ]
+    },
+    {
+      "tag": "sivriada",
+      "patterns": [
+        "sivriada nedir",
+        "sivriada hakkinda bilgi ver",
+        "sivriada ne demek",
+        "sivriada anlat",
+        "bana sivriada hakkinda bilgi ver",
+        "sivriada hakkinda konus"
+      ],
+      "responses": [
+        "Sivriada ya da Hayırsızada, Marmara Denizi'nde, İstanbul açıklarındaki Adalar olarak bilinen takımadaların en batıda olanıdır.",
+        "Eski adı, yine \"Sivri\" anlamına gelen Oxia (Yunanca: )'dır.",
+        "Piramide benzeyen sivri bir kayalıktan oluştuğu için Sivriada diye tanınır."
+      ]
+    },
+    {
+      "tag": "ikili takim",
+      "patterns": [
+        "ikili takim nedir",
+        "ikili takim hakkinda bilgi ver",
+        "ikili takim ne demek",
+        "ikili takim anlat",
+        "bana ikili takim hakkinda bilgi ver",
+        "ikili takim hakkinda konus"
+      ],
+      "responses": [
+        "İkili Takım (İngilizce özgün adıyla Double Team), Tsui Hark'ın yönetmenlik denemesinde, Jean-Claude Van Damme, Dennis Rodman ve Mickey Rourke'nin oynadığı 1997 Amerikan aksiyon komedi filmi.",
+        "Van Damme, Stavros olarak bilinen bir teröristi adalete teslim etmekle görevlendirilen terörle mücadele ajanı Jack Quinn'i canlandırmaktadır.",
+        "Stavros'un sevgilisi ve çocuğu bir suikast girişiminde öldürüldükten sonra, Quinn'in hamile karısını kaçırır ve işler kişiselleşir."
+      ]
+    },
+    {
+      "tag": "gunnar jarring",
+      "patterns": [
+        "gunnar jarring nedir",
+        "gunnar jarring hakkinda bilgi ver",
+        "gunnar jarring ne demek",
+        "gunnar jarring anlat",
+        "bana gunnar jarring hakkinda bilgi ver",
+        "gunnar jarring hakkinda konus"
+      ],
+      "responses": [
+        "Gunnar Jarring (1907 - 2002), İsveçli diplomat ve Türkolog.",
+        "Brunnby'de doğan Jarring, 1933'te Lund Üniversitesinde Doğu Türk dilleri üzerine çalışmasıyla doktorasını tamamlamış ve birçok ülkede diplomat olarak görev yapmış ve Türkoloji çalışmaları yürütmüştür.",
+        "Ali Nuri Bey üzerine birkaç makale neşretmiştir."
+      ]
+    },
+    {
+      "tag": "karapinar kumullari",
+      "patterns": [
+        "karapinar kumullari nedir",
+        "karapinar kumullari hakkinda bilgi ver",
+        "karapinar kumullari ne demek",
+        "karapinar kumullari anlat",
+        "bana karapinar kumullari hakkinda bilgi ver",
+        "karapinar kumullari hakkinda konus"
+      ],
+      "responses": [
+        "Karapınar kumulları, Konya ili Karapınar ilçesinde bulunan kumullar.",
+        "İlçe merkezinin güneybatısındaki 4.000 hektarlık kumullar, rüzgâr ile şehir merkezini tehdit eder hale geldi.",
+        "1960'larda kum fırtınaları ulaşımı, eğitimi aksattı, hastalıklar arttı."
+      ]
+    },
+    {
+      "tag": "kensington sarayi",
+      "patterns": [
+        "kensington sarayi nedir",
+        "kensington sarayi hakkinda bilgi ver",
+        "kensington sarayi ne demek",
+        "kensington sarayi anlat",
+        "bana kensington sarayi hakkinda bilgi ver",
+        "kensington sarayi hakkinda konus"
+      ],
+      "responses": [
+        "Kensington Sarayı (İngilizce: Kensington Palace), Birleşik Krallık'ın başkenti Londra'da bulunan bir kraliyet ikametgâhıdır.",
+        "yüzyıldan bu yana Britanya Kraliyet Ailesi'nin resmî ikametgâhıdır ve hâlen Cambridge, Gloucester ve Kent Dükü ve Düşesleri'nin resmî Londra ikâmetgâhıdır.",
+        "Kensington Sarayı, Historic Royal Palaces tarafından yönetilmektedir."
+      ]
+    },
+    {
+      "tag": "la taha",
+      "patterns": [
+        "la taha nedir",
+        "la taha hakkinda bilgi ver",
+        "la taha ne demek",
+        "la taha anlat",
+        "bana la taha hakkinda bilgi ver",
+        "la taha hakkinda konus"
+      ],
+      "responses": [
+        "La Taha, İspanya'nın on yedi özerk bölgesinden, ülkenin en çok nüfusa sahip olan ve güney sınırında bulunan, Endülüs otonom bölgesine bağlı sekiz eyaletinden Akdeniz'e kıyısı bulanan Granada'ya bağlı 170 belediyeden biridir.",
+        "La Taha belediyesinin nüfusu 2005 yılı nüfus sayımlarına göre 793 kişidir."
+      ]
+    },
+    {
+      "tag": "amphiptere",
+      "patterns": [
+        "amphiptere nedir",
+        "amphiptere hakkinda bilgi ver",
+        "amphiptere ne demek",
+        "amphiptere anlat",
+        "bana amphiptere hakkinda bilgi ver",
+        "amphiptere hakkinda konus"
+      ],
+      "responses": [
+        "Bir Amphiptere (Türkçe: Amfipter), Amphitere, Amphitere veya Phipthere olarak da adlandırılır.",
+        "İki kanatlı anlamına gelir ve Avrupa hanedanlık armalarında bulunan kanatlı bir yılan türüdür."
+      ]
+    },
+    {
+      "tag": "antarktika'nin kesfi'nde kahramanlik cagi",
+      "patterns": [
+        "antarktika'nin kesfi'nde kahramanlik cagi nedir",
+        "antarktika'nin kesfi'nde kahramanlik cagi hakkinda bilgi ver",
+        "antarktika'nin kesfi'nde kahramanlik cagi ne demek",
+        "antarktika'nin kesfi'nde kahramanlik cagi anlat",
+        "bana antarktika'nin kesfi'nde kahramanlik cagi hakkinda bilgi ver",
+        "antarktika'nin kesfi'nde kahramanlik cagi hakkinda konus"
+      ],
+      "responses": [
+        "Antarktika'nın Keşfi'nde Kahramanlık Çağı, 19.",
+        "yüzyılın sonunda başlayan ve I.",
+        "Dünya Savaşı'ndan sonra sona eren Antarktika'nın keşif dönemiydi."
+      ]
+    },
+    {
+      "tag": "deepin",
+      "patterns": [
+        "deepin nedir",
+        "deepin hakkinda bilgi ver",
+        "deepin ne demek",
+        "deepin anlat",
+        "bana deepin hakkinda bilgi ver",
+        "deepin hakkinda konus"
+      ],
+      "responses": [
+        "Deepin, kullanıcı deneyimine odaklanan, görsel estetiği ön planda tutan bir Linux dağıtımıdır.",
+        "Merkezi Çin'de bulunan Wuhan Deepin Technology firması tarafından geliştirilmiştir.",
+        "Deepin, Debian tabanlıdır ve varsayılan masaüstü ortamı olarak kendine özgü DDE (Deepin Desktop Environment) ile dikkat çeker."
+      ]
+    },
+    {
+      "tag": "rhea'nin halkalari",
+      "patterns": [
+        "rhea'nin halkalari nedir",
+        "rhea'nin halkalari hakkinda bilgi ver",
+        "rhea'nin halkalari ne demek",
+        "rhea'nin halkalari anlat",
+        "bana rhea'nin halkalari hakkinda bilgi ver",
+        "rhea'nin halkalari hakkinda konus"
+      ],
+      "responses": [
+        "Satürn'ün ikinci en büyük uydusu olan Rhea, taneciklerden oluşan bir disk içinde yer alan, üç dar ve nispeten yoğun kuşaklardan oluşan zayıf bir halka sistemine sahip olabilir.",
+        "Bu, bir uydunun etrafındaki halkaların ilk keşfi olacaktır.",
+        "Olası keşif, 6 Mart 2008'de Science dergisinde duyuruldu."
+      ]
+    },
+    {
+      "tag": "solanum aymaraesense",
+      "patterns": [
+        "solanum aymaraesense nedir",
+        "solanum aymaraesense hakkinda bilgi ver",
+        "solanum aymaraesense ne demek",
+        "solanum aymaraesense anlat",
+        "bana solanum aymaraesense hakkinda bilgi ver",
+        "solanum aymaraesense hakkinda konus"
+      ],
+      "responses": [
+        "Solanum aymaraesense, patlıcangiller familyasının Solanum cinsine üye bir bitki türüdür.",
+        "Bu tür bilimsel olarak ilk kez 1987'de Ochoa tarafından tanımlanmıştır."
+      ]
     }
   ],
   "_meta": {
