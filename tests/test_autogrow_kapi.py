@@ -149,22 +149,33 @@ class TestMaxPairsEsasVeriButcesi(unittest.TestCase):
 
     Bu sinif, 'kapi yukseltildi, veri artti' yanlis izlenimini engeller.
     Uretilen cift sayisi her zaman MAX_PAIRS'in USTUNDE oldugu icin veri
-    uretiliyor ama cogu KIRPILIYOR. Intent kapi buyutmek bu kirpmayi
-    azaltmaz, sadece ayni 70.000 cifti daha genis bir havuzdan
-    cekilmesini saglar (varyans artar, toplam artmaz).
+    uretiliyor ama cogu KIRPILIYOR.
+
+    KRITIK: kirpilan kisim bos degil. Bir intent N pattern x M cevap ->
+    N*M cift uretiyor; bilgi N+M'de, N*M'de degil. Olcum (6.364 intent):
+        benzersiz ctx 38.954 | benzersiz cevap 23.366 | cift 162.975
+    Yani 162.975 ciftin icinde yalnizca ~24.000 bagimsiz kalem var.
+    Bu yuzden olcdugumuz kriter 'cift sayisi' DEGIL, 'kapsanan benzersiz
+    ctx orani' — asagida test ediliyor.
     """
+
+    @staticmethod
+    def _uretilen(max_pairs):
+        import train_llm
+        from seqgen import load_pairs
+        yol = os.path.join(BASE, 'intents.json')
+        return load_pairs(yol, max_pairs=max_pairs, use_query=True,
+                          ctx_len=train_llm.CTX_CHARS)
 
     def test_uretilen_cift_max_pairsi_asiyor(self):
         """Tersi durursa darbogaz tasinmis demektir: o zaman bu test
         KIRMIZI olur ve yeni darbogazin nerede oldugunu gosterir."""
         import train_llm
-        from seqgen import load_pairs
 
         yol = os.path.join(BASE, 'intents.json')
         if not os.path.exists(yol):
             self.skipTest('intents.json yok')
-        uretilen = len(load_pairs(yol, max_pairs=10 ** 9, use_query=True,
-                                  ctx_len=train_llm.CTX_CHARS))
+        uretilen = len(self._uretilen(10 ** 9))
         self.assertGreater(
             uretilen, train_llm.MAX_PAIRS,
             'uretilen cift (%s) MAX_PAIRS (%s) altinda: kirpma YOK, yani '
@@ -172,11 +183,37 @@ class TestMaxPairsEsasVeriButcesi(unittest.TestCase):
             'Bu testi guncelle.'
             % (format(uretilen, ','), format(train_llm.MAX_PAIRS, ',')))
 
+    def test_max_pairs_benzersiz_ctxin_cogu_kapsiyor(self):
+        """MAX_PAIRS'in GERCEK islevi: benzersiz ctx'nin cogunu kapsamak.
+
+        Olcum (28.09) 6.364 intent ile:
+            MAX_PAIRS  benzersiz ctx  kapsama  benzersiz cevap
+             70.000      31.848         %81,8     22.570  (%96,6)
+            120.000      38.048         %97,7     23.359  (%99,97)
+            162.975      38.954        %100,0     23.366  (%100,0)
+        Esik %90: hem 120.000'i gecer hem de 70.000'e dusmeyi yakalar.
+        """
+        import train_llm
+
+        yol = os.path.join(BASE, 'intents.json')
+        if not os.path.exists(yol):
+            self.skipTest('intents.json yok')
+        tum = self._uretilen(10 ** 9)
+        tum_ctx = set(c for c, _r in tum)
+        secilen = self._uretilen(train_llm.MAX_PAIRS)
+        secilen_ctx = set(c for c, _r in secilen)
+        kapsama = 100.0 * len(secilen_ctx) / max(1, len(tum_ctx))
+        self.assertGreater(
+            kapsama, 90.0,
+            'MAX_PAIRS=%s iken benzersiz ctx kapsamasi sadece %.1f: '
+            'kirpma GERCEK kapi kaybetti. Olcumde 120.000 -> %%97,7, '
+            '70.000 -> %%81,8 idi.'
+            % (format(train_llm.MAX_PAIRS, ','), kapsama))
+
     def test_max_pairs_veri_butcesi_oldugu_belgeli(self):
-        """MAX_PAIRS bilincli bir zaman secimi; rastgele degil.
-        train_llm.py:31 'MAX_PAIRS=70000 ham cift N5 ile ~330k cift ->
-        epoch basina sure eski' diyor. Deger dusturulurse epoch kisalir
-        ama veri kaybolur; sessizce kaldirilmasin."""
+        """MAX_PAIRS bilincli bir olcum karari; rastgele degil.
+        Deger dusturulurse epoch kisalir ama veri kaybolur; sessizce
+        kaldirilmasin. 120.000'in gerekcesi train_llm.py yorumunda."""
         import train_llm
 
         self.assertGreaterEqual(

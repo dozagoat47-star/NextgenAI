@@ -140,7 +140,36 @@ WEIGHT_DECAY = 0.01   # AdamW ayrik cezasi. 0.01: 16.9M parametre / 68.8k
                       # vermiyordu.
 TIE_EMBED = True      # gomme <-> cikis bagliligi (varsayilan acik)
 CKPT_FREQ = 1   # her epoch kaydedilir -> Colab kesilse bile max ~1 epoch kayip, resume aninda
-MAX_PAIRS = 70000   # ham ciftlerin TAMAMI kullanilir (intents.json: ~68.654); eski 20k kirpiyordu
+MAX_PAIRS = 120000  # OLÇÜM (28.09): veri butcesi, rastgele degil.
+                      #
+                      # ESKI DEGER 70.000 ve yorumu "ham ciftlerin TAMAMI
+                      # kullanilir (intents.json: ~68.654)" idi. Yani deger
+                      # veriye gore konmus, epoch suresi icin degil. Ama veri
+                      # buyuyunce 6.364 intent'te uretilen cift 162.975'e
+                      # cikti ve 70.000 yine %57'sini kirpiyor.
+                      #
+                      # NEDEN 120.000 (olculerek, varsayarak degil):
+                      # load_pairs once karistirip sonra kesiyor, ve bir
+                      # intent N pattern x M cevap -> N*M cift uretiyor.
+                      # Bilgi N+M'de, N*M'de degil. 6.364 intent'te:
+                      #   benzersiz ctx 38.954 | benzersiz cevap 23.366
+                      # Ince tarama (benzersiz ctx / cevap artisi):
+                      #   70.000   31.848  (baz)      22.570  (baz)
+                      #   90.000   35.287  +%10,8     23.163  +%2,6
+                      #  120.000   38.048  +%19,5     23.359  +%3,5
+                      #  140.000   38.760  +%21,7     23.366  +%3,5
+                      #  162.975   38.954  +%22,3     23.366  +%3,5
+                      # Yani 120.000'te benzersiz ctx'nin %97,7'si, benzersiz
+                      # cevabin %99,97'si kapsanir. 120k -> 163k arasi +%37
+                      # sure verip yalnizca +%2,4 ctx ve +%7 CEVAP getiriyor;
+                      # 200.000/300.000/400.000 tamamen bos yazma.
+                      #
+                      # SURE: kaggle_start.sh yorumunda olculen 7,31 dk/epoch
+                      # (MAX_PAIRS=70.000'de) dogrusal olceklendiyor ->
+                      # 12,5 dk/epoch, EPOCHS=12 icin 159 dk. 9 saatlik
+                      # oturumda 40 epoch bosluk kalir. (Dogrusal varsayim:
+                      # epoch adimi veriyle orantili; dogrulamak icin
+                      #  !bash kaggle_start.sh bench )
 MAX_CTX_LEN = 48    # sorgu icin token butcesi (olcum: gercek sorgu max 25 token
                     # -> 48 asilir, hic kesme yok; soru butcesini kucultmek
                     # bilgi/yanit yerine degil, bos yere yer acar)
