@@ -779,10 +779,19 @@ class TestResponseBudget(unittest.TestCase):
         self.assertEqual(MAX_CTX_LEN + RESP_CHARS_MAX + 4, MAX_SEQ_LEN)
 
     def test_seqgen_uses_response_budget_not_literal_70(self):
-        """load_pairs icinde literal 70 KALMAMALI (sessizce geri gelmesin)."""
+        """load_pairs icinde literal 70 KALMAMALI (sessizce geri gelmesin).
+
+        ONEMLI: kaynak dosya yolu SABIT YAZILMAZ. Burada bir kez
+        gelistiricinin kendi makinelerine ait mutlak bir Windows yolu
+        vardi; GitHub Actions Linux'ta o yol olmadigi icin test her
+        kosuda FileNotFoundError ile duserdi. Repo yolu her zaman
+        BASE'ten turetilir.
+        """
         import io
-        src = io.open(r'C:\Users\cxc\Desktop\Nextgen_API\seqgen.py',
-                      encoding='utf-8').read()
+        kaynak = os.path.join(BASE, 'seqgen.py')
+        self.assertTrue(os.path.exists(kaynak),
+                        'seqgen.py bulunamadi: %s' % kaynak)
+        src = io.open(kaynak, encoding='utf-8').read()
         self.assertNotRegex(src, r'clean_chars\(\s*r\s*,\s*70\s*\)')
         self.assertIn('RESP_CHARS_MAX', src)
 
