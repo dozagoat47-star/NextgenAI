@@ -88,6 +88,91 @@ def is_harmful_tag(tag):
     return any(k in norm for k in HARMFUL_TAG)
 
 
+# ASCII OLMAYAN HARF tespiti. test_core.TestIntentsSchema.test_tags_latin'in
+# birebir kurali: c.isalpha() and ord(c) > 127. Rakam, tire, nokta,
+# alt cizgi ve bosluk serbest (tag'lar 'call of duty 4: modern
+# warfare' gibi olabiliyor).
+#
+# NEDEN GEREKIYOR: ascii_normalize once _LATIN_TRANSLATE tablosunu
+# uygular, sonra NFD ayristirmasiyla aksanlari atar. Ama bazi Latin
+# HARFLERI ayristirilamaz, dolayisiyla gecirilirler:
+#     U+01C1 (tik sesi, 'ǁkaras bolgesi')
+#     U+0111 (Bosna-Hersek d'si, 'đakovo')
+#     U+02BB (okina, 'liliʻuokalani')
+# Bunlar Wikipedia basliklarindan geldi ve intents.json'a yazildi;
+# test_core o intent'i elendi diye egitim oncesi kalkan dustu.
+def non_latin_letters(tag):
+    """Etiketteki ASCII disi harfler (bos liste = temiz)."""
+    return sorted({c for c in (tag or '')
+                   if c.isalpha() and ord(c) > 127})
+
+
+def is_latin_tag(tag):
+    """Etiket yalnizca ASCII harf iceriyor mu (test_core'in istedigi)."""
+    return not non_latin_letters(tag)
+
+
+def ascii_letters_only(tag):
+    """Etiketten ASCII disi harfleri at, sonra bosluklari topla.
+
+    Etiketi OLDUGU GIBI birakmak yerine duzeltmek tercih edilir:
+    Wikipedia'nin 'Dakovо' maddesi 'dakovo' olarak kazanilir. Yine de
+    sonuc bos veya Latin disi harf iceriyorsa None doner - kapidan
+    gecmemis olur.
+    """
+    if tag is None:
+        return None
+    t = ''.join(c for c in tag if not (c.isalpha() and ord(c) > 127))
+    t = re.sub(r'\s{2,}', ' ', t).strip()
+    if not t or not is_latin_tag(t):
+        return None
+    return t
+
+
+def normalize_tag_latin(intents):
+    """Intent listesini Latin olmayan harfli etiketten arindirir.
+
+    Etiket duzeltilebiliyorsa DUZELTILIR ve korunur; duzeltilemiyorsa
+    dusurulur. Boylece uretici kendi ciktisini kendi kendine
+    iyilestirir: intents.json'a elle mudahale gerekmez.
+
+    Returns:
+        (temizlenmis_liste, duzeltilen_etiketler, dusurulen_etiketler)
+    """
+    temiz = []
+    duzeltilen = []
+    dusurulen = []
+    for it in intents:
+        eski = it.get('tag', '')
+        yeni = eski if is_latin_tag(eski) else ascii_letters_only(eski)
+        if yeni is None or len(yeni) < MIN_TAG_CHARS:
+            if not is_latin_tag(eski):
+                dusurulen.append((eski, non_latin_letters(eski)))
+            continue
+        if not is_latin_tag(eski):
+            duzeltilen.append((eski, yeni))
+        # Duzeltilmis ad zaten kullanimda olabilir: AutoGrow ayni konuyu
+        # yeni isimle uretmis olabilir ya da iki kotu etiket ayni konuya
+        # (ornegin 'đakovo' ve 'akovo') donusebilir. Iki yolda da tek
+        # intent kalmali.
+        var = next((x for x in temiz if x.get('tag') == yeni), None)
+        if var is None:
+            if yeni == eski:
+                temiz.append(it)
+            else:
+                kopya = dict(it)
+                kopya['tag'] = yeni
+                temiz.append(kopya)
+        else:
+            for p in it.get('patterns') or []:
+                if p not in var['patterns']:
+                    var['patterns'].append(p)
+            for r in it.get('responses') or []:
+                if r not in var['responses']:
+                    var['responses'].append(r)
+    return temiz, duzeltilen, dusurulen
+
+
 def clean_responses(responses):
     """Yanit havuzunu kirpinti/yabanci-yazim/zararli icerikten arindirir."""
     seen = []
@@ -109,8 +194,18 @@ def clean_responses(responses):
 
 
 def clean_intent(intent):
-    """Tek intent'i tag normalize + yanit temizligiyle yeniden uretir."""
-    tag = ascii_normalize((intent.get('tag') or '').strip().lower()).strip()
+    """Tek intent'i tag normalize + yanit temizligiyle yeniden uretir.
+
+    Etiket iki adimdan gecer:
+      1) ascii_normalize  -> Turkce/yabanci aksan (NFD)
+      2) ascii_letters_only -> AYRISAMAYAN Latin harfler (U+01C1, U+0111,
+         U+02BB ...). 1. adim bunlari gecirir; 2. adim olmazsa kapidan
+         sonra duzer ve konu KAYBOLUR. Etiket tamamen harf disi bir seye
+         duserse bos string doner ve merge_by_tag eler; o durumda zaten
+         kullanilabilir bir konu adi kalmamistir.
+    """
+    ham = ascii_normalize((intent.get('tag') or '').strip().lower()).strip()
+    tag = ascii_letters_only(ham) or ''
     patterns = [ascii_normalize(p.strip()) for p in (intent.get('patterns') or [])]
     patterns = [p for p in patterns if p]
     responses = clean_responses(intent.get('responses'))
@@ -134,6 +229,9 @@ def merge_by_tag(intents):
     for it in intents:
         key = it['tag']
         if not key or len(key.strip()) < MIN_TAG_CHARS:
+            continue
+        if not is_latin_tag(key):
+            # Latin disi harfli etiket girmez (test_core kalkani).
             continue
         if key not in merged:
             merged[key] = {'tag': key, 'patterns': list(it['patterns']),

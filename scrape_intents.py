@@ -14,6 +14,8 @@ import re
 import random
 import requests
 
+from clean_intents import normalize_tag_latin
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 INTENTS_FILE = os.path.join(SCRIPT_DIR, 'intents.json')
 SCRAPED_FILE = os.path.join(SCRIPT_DIR, 'scraped_intents.json')
@@ -212,9 +214,32 @@ def scrape_topic(topic_tag, topic_data):
 
 
 def merge_intents(existing_file, new_intents):
-    """Yeni intents'lari mevcut intents.json ile birlestir."""
+    """Yeni intents'lari mevcut intents.json ile birlestir.
+
+    Ayrica yazilan intents.json'a Latin olmayan harf iceren etiket
+    GIRMEZ; varsa duzeltilir veya dusurulur. Bu, uretimin kendi
+    ciktisini kendi kendine iyilestirmesidir - intents.json'a elle
+    mudahale gerekmez.
+
+    Gerekce: Wikipedia basliklarindan U+01C1 (tik sesi), U+0111
+    (Bosna-Hersek d'si) ve U+02BB (okina) gibi karakterler geliyor.
+    ascii_normalize bunlari NFD ile ayristiramadigi icin geciriyor ve
+    intents.json'a yaziliyordu. test_core.TestIntentsSchema
+    .test_tags_latin bunu yakalayip CI'i dusuruyordu.
+    """
     with open(existing_file, 'r', encoding='utf-8') as f:
         existing_data = json.load(f)
+
+    mevcut = existing_data['intents']
+    mevcut, duzeltilen, dusurulen = normalize_tag_latin(mevcut)
+    if duzeltilen or dusurulen:
+        print(f"  [LATIN] {len(duzeltilen)} etiket duzeltildi, "
+              f"{len(dusurulen)} dusuruldu (ASCII disi harf)")
+        for eski, yeni in duzeltilen[:5]:
+            print(f"     - {eski} -> {yeni}")
+        for eski, harfler in dusurulen[:5]:
+            print(f"     - {eski} (harf: {harfler}) dusuruldu")
+    existing_data['intents'] = mevcut
 
     existing_tags = {i['tag'] for i in existing_data['intents']}
     added = 0

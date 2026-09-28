@@ -23,7 +23,9 @@ import requests
 
 from scrape_intents import split_sentences, merge_intents, INTENTS_FILE
 from corpus import Corpus
-from clean_intents import ascii_normalize, strip_foreign_scripts, is_harmful_tag
+from clean_intents import (ascii_letters_only, ascii_normalize,
+                            is_harmful_tag, non_latin_letters,
+                            strip_foreign_scripts)
 from finetune import atomic_write_json
 
 if sys.stdout.encoding.lower() not in ('utf-8', 'utf8'):
@@ -228,6 +230,17 @@ def build_intent(title, extract):
     # burada daha sert: 3.
     if len(clean.strip()) < MIN_TAG_CHARS:
         return None
+    # ASCII disi harf kalan basliklar reddedilir. ascii_normalize
+    # aksanlari NFD ile atar ama bazi Latin harfleri AYRISMAZ:
+    # U+01C1 (tik sesi), U+0111 (Bosna-Hersek d'si), U+02BB (okina).
+    # Bunlar gecerek intents.json'a yaziliyor ve
+    # test_core.TestIntentsSchema.test_tags_latin'i dusuruyordu.
+    duzeltilmis = ascii_letters_only(clean)
+    if duzeltilmis is None or len(duzeltilmis) < MIN_TAG_CHARS:
+        print(f"  [SKIP] {title} (etiket Latin disi harf iceriyor: "
+              f"{non_latin_letters(clean)})")
+        return None
+    clean = duzeltilmis
     if is_harmful_tag(clean):
         print(f"  [SKIP] {title} (guvenlik/icerik filtresi)")
         return None
