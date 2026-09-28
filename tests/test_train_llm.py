@@ -5,6 +5,7 @@ Optimizasyonun dogrulugu: PAD kuyrugu budanip benzer uzunluklar paketlense de
 2) transformator onundeki logitler budanan aralikta DEGISMEZ (kesme dogru).
 """
 import os
+import re
 import sys
 import tempfile
 import unittest
@@ -842,6 +843,150 @@ class TestResponseBudget(unittest.TestCase):
                          'tavan tam uygulanmali: %d != %d'
                          % (max(L), RESP_CHARS_MAX))
         self.assertIn(len(kisa), L, 'kisa yanit oldugu gibi kalmali')
+
+
+class TestVeriHazirlamaOlcumleri(unittest.TestCase):
+    """TOKEN_PER_PAIR ve ENC_CIFT_SN: encode loglarindaki BIRIM hatalari.
+
+    28.09'da bulunan iki hata (ikisi de ayni yanlis olcekten, 1/0,16 = 6,25
+    ~ 6000):
+      1. 'BPE-encode N cift (%.1fM token)' -> deger n * 0.16 idi, yani
+         BINLER cinsinden; 'M' ise MILYON. 315.883 ciftte 50.541M yaziyordu,
+         gercek 34,4M. 1.471 KAT.
+      2. 'BPE-encode basliyor: N cift (~%.1f dk)' -> est = n / 6000 idi ve
+         yorumu "'dakika' birimi" diyordu; bolum sonucu SANIYE. 315.883
+         ciftte "~52,6 dk" yaziyordu, gercek 9 dk. 5,8 KAT.
+    Kullaniciya gosterilen sureler bu yuzden 5-6 kat kotu, veri butcesi
+    gereksiz yere dar hesaplaniyordu.
+    """
+
+    N_KAGGLE = 315883   # kaggle_start.sh yorumundaki encode olcumu
+
+    def test_token_sayimi_milyon_birimiyle(self):
+        """n * TOKEN_PER_PAIR / 1e6 gercekten milyon olmali.
+
+        Eski formül (n * 0.16) 1.471 kat buyuk deger veriyordu.
+        """
+        import train_llm
+        yeni = self.N_KAGGLE * train_llm.TOKEN_PER_PAIR / 1e6
+        eski = self.N_KAGGLE * 0.16
+        self.assertAlmostEqual(yeni, 34.4, delta=0.5,
+                               msg='olculen 34,4M degil, %.1fM' % yeni)
+        self.assertLess(yeni, eski / 100,
+                        'token sayisi yine 1000 kat buyuk: TOKEN_PER_PAIR '
+                        'olcek degistiyse ya da /1e6 unutuldu')
+        # makul sinirlar: 256 token tavanina gore
+        self.assertLessEqual(train_llm.TOKEN_PER_PAIR, train_llm.MAX_SEQ_LEN,
+                             'cift basina token tavanini asiyor')
+
+    def test_encode_suresi_dakika_degil_saniye(self):
+        """est = n / 6000 -> saniye. Dakika olarak yaziliyordu.
+
+        Olculen hiz: 315.883 cift / 9 dk = 585 cift/sn.
+        """
+        import train_llm
+        est_sn = self.N_KAGGLE / train_llm.ENC_CIFT_SN
+        self.assertAlmostEqual(est_sn, 540, delta=20,
+                               msg='olculen 540 sn (9 dk) degil, %.0f sn'
+                                   % est_sn)
+        self.assertAlmostEqual(est_sn / 60, 9.0, delta=0.5,
+                               msg='9 dk degil, %.1f dk' % (est_sn / 60))
+        # eski formül est = n / 6000 idi ve "dk" diye YAZILIYORDU:
+        # ekranda 52,6 "dk" gorunuyordu, gercek 9 dk. 5,8 kat kotu tahmin.
+        eski_gosterilen_dk = self.N_KAGGLE / 6000.0
+        self.assertGreater(eski_gosterilen_dk, 9.0 * 4,
+                           'eski hiz 6000 cift/sn hala kodda olabilir: '
+                           '6,25 = 1/0,16 ile ayni yanlis olcek, iki sabit '
+                           'birlikte degismeli')
+        with open(os.path.join(BASE, 'train_llm.py'), encoding='utf-8') as f:
+            satirlar = f.read().splitlines()
+        # yorumlar disari: TOKEN_PER_PAIR/ENC_CIFT_SN yorumlari eski formulu
+        # ANLATMAK icin yaziyor; kod taramiyoruz, KODU tarIYorUZ.
+        kod = '\n'.join(s.split('#')[0] for s in satirlar)
+        self.assertNotIn('n / 6000.0', kod,
+                         'encode sure tahmini hala n / 6000.0 (birim hatasi)')
+        self.assertNotIn('n * 0.16', kod,
+                         'token sayimi hala n * 0.16 (binler cinsinden, '
+                         '"M" ise milyon -> 1000 kat)')
+
+    def test_sabitler_kaggle_start_sh_olcumuyle_tutarli(self):
+        """ENC_CIFT_SN, kaggle_start.sh yorumundaki "encode 9 dk" +
+        "OLCULDU: N cift" satirlarindan turetilmis olmali."""
+        import train_llm
+        sh = os.path.join(BASE, 'kaggle_start.sh')
+        if not os.path.exists(sh):
+            self.skipTest('kaggle_start.sh yok')
+        with open(sh, encoding='utf-8') as f:
+            metin = f.read()
+        m = re.search(r'OLCULDU:\s*(\d+)\s*cift', metin)
+        self.assertIsNotNone(m, 'kaggle_start.sh yorumunda "OLCULDU: N cift" '
+                                'bulunamadi: encode olcumu okunamiyor')
+        m_dk = re.search(r'encode\s+(\d+)\s*dk', metin)
+        self.assertIsNotNone(m_dk, 'kaggle_start.sh yorumunda "encode N dk" '
+                                   'bulunamadi')
+        n_olc = int(m.group(1))
+        dk_olc = float(m_dk.group(1))
+        beklenen = n_olc / (dk_olc * 60.0)
+        self.assertAlmostEqual(
+            train_llm.ENC_CIFT_SN, beklenen, delta=1.0,
+            msg='ENC_CIFT_SN=%s ama yorumdaki olcum (%s cift / %s dk) = %.0f '
+                'cift/sn. Yorumdaki encode suresi degistiyse kodu da '
+                'guncelle.' % (train_llm.ENC_CIFT_SN, format(n_olc, ','),
+                               dk_olc, beklenen))
+
+    def test_token_per_pair_canli_olcume_uyuyor(self):
+        """SABIT gercek encode ile tutarli mi? (kucuk orneklem, ~6 sn)
+
+        ONEMLI: olcum RAG + kb-map ACIK yolda yapilir, cunku gercek kosu
+        boyle (kaggle_start.sh: --rag --kb-map knowledge_map.jsonl). RAG'siz
+        encode 49 token/cift verir, RAG'li 109 -> fark 2,2 KAT. Sabit gercek
+        kosuyu tanimlar.
+
+        Encode yolu degisirse (kb_budget, RESP_CHARS_MAX, BPE vocab) bu
+        sabit sapar.
+        """
+        import random
+        import train_llm
+        from llm import LLM, encode_llm, load_tokenizer
+        from seqgen import load_pairs
+
+        try:
+            tok = load_tokenizer()
+        except Exception as e:                       # pragma: no cover
+            self.skipTest('tokenizer yuklenemedi: %s' % str(e)[:60])
+        if tok is None:                              # pragma: no cover
+            self.skipTest('tokenizer dosyasi yok')
+        intents = os.path.join(BASE, 'intents.json')
+        if not os.path.exists(intents):
+            self.skipTest('intents.json yok')
+        dummy = LLM(None, d_model=4, num_blocks=1, num_heads=1,
+                    max_ctx_len=train_llm.MAX_CTX_LEN,
+                    max_seq_len=train_llm.MAX_SEQ_LEN,
+                    seed=train_llm.SEED, tokenizer=tok)
+        pairs = load_pairs(intents,
+                           max_pairs=train_llm.coz_max_pairs(yaz=False),
+                           use_query=True, ctx_len=train_llm.CTX_CHARS)
+        kb = train_llm.build_kb_lut(os.path.join(BASE, 'knowledge_map.jsonl'))
+        self.assertGreater(len(kb), 0, 'kb-map bos: RAG yolu olculemiyor')
+        ornek = random.Random(11).sample(pairs, 250)
+        top = 0
+        for ctx, resp in ornek:
+            rr = train_llm.refine_resp(resp)
+            if rr is None:
+                continue
+            seq, _m = encode_llm(dummy, ctx, rr, context=kb.get(ctx))
+            seq = np.asarray(seq)
+            L = int(np.argmax(seq == PAD)) if (seq == PAD).any() \
+                else int(seq.shape[0])
+            top += max(1, L)
+        canli = top / float(len(ornek))
+        self.assertAlmostEqual(
+            canli, train_llm.TOKEN_PER_PAIR,
+            delta=0.12 * train_llm.TOKEN_PER_PAIR,
+            msg='canli olcum %.1f token/cift ama TOKEN_PER_PAIR=%s. Encode '
+                'yolu degismis olabilir (BPE vocab, RESP_CHARS_MAX, '
+                'MAX_SEQ_LEN, KB_TEXT_CHARS); olcumu tazele.'
+                % (canli, train_llm.TOKEN_PER_PAIR))
 
 
 if __name__ == '__main__':

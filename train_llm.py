@@ -209,6 +209,25 @@ KB_TEXT_CHARS = 300 # kb parcasindan kullanilacak karakter sayisi (200 -> 300;
 #                    # inference'ta brain'in ilettigi ~500 karaktere yaklasir).
 SEED = 7
 
+# ---- VERI HAZIRLAMA OLÇÜMLERI (28.09, 4.000 ciftin GERÇEK encode'u) ----
+TOKEN_PER_PAIR = 108.8   # cift basina GERCEK token (kirpmali, RAG+kb-map acik,
+                         # max_seq 256). Olcum: encode_llm -> PAD kuyrugu
+                         # budanmis gercek uzunluk. Maske (loss) 38,6 token.
+                         #
+                         # ONCEDE '%.1fM' bicimiyle n * 0.16 yaziliyordu:
+                         # 0,16 "binler" cinsinden ama M "milyon" demek ->
+                         # 315.883 ciftte 50.541M yaziyordu, GERCEK 34,4M.
+                         # 1.471 KAT HATA. Duzeltildi, olcum sabitlendi.
+ENC_CIFT_SN = 585.0     # encode hizi, cift/sn (4 cekirdek, Kaggle T4x2).
+                        # KAYNAK: kaggle_start.sh ust yorumundaki OLCUM
+                        # "encode 9 dk" @ 315.883 cift -> 585 cift/sn.
+                        #
+                        # ONCEDE n / 6000.0 vardi ve YORUMU "'dakika' birimi"
+                        # diyordu: bolum sonucu SANIYE idi, dakika degil ->
+                        # 315.883 ciftte "~52,6 dk" yaziyordu, GERCEK 9 dk.
+                        # 5,8 KAT HATA. (1/0,16 = 6,25 ~ 6000: iki sabit de
+                        # ayni yanlis olcekten geliyordu.)
+
 SAVE_DIR = os.environ.get('SAVE_DIR', BASE)
 os.makedirs(SAVE_DIR, exist_ok=True)
 CKPT = os.path.join(SAVE_DIR, 'llm_ckpt.pt')
@@ -431,9 +450,10 @@ def make_batches(pairs_, B, dummy, ctx_map):
     """
     items = sorted(pairs_, key=lambda pr: len(pr[0]))
     n = len(items)
-    est = n / 6000.0   # ~6k cift/sn pul (4 cekirdek, BPE); 'dakika' birimi
-    print(f'BPE-encode basliyor: {n} cift (~{est:.1f} dk, tek sefer; '
-          f'sonra onbellegi kullanilir)', flush=True)
+    est_sn = n / ENC_CIFT_SN   # olculen hiz; SN cinsinden
+    print(f'BPE-encode basliyor: {n} cift (~{est_sn:.0f} sn = '
+          f'{est_sn / 60:.1f} dk, tek sefer; sonra onbellek kullanilir)',
+          flush=True)
     t0e = time.time()
     enc_all = None
     if (sys.platform.startswith('linux') and n >= 20000
@@ -452,7 +472,8 @@ def make_batches(pairs_, B, dummy, ctx_map):
                         print(f'  encode: {done}/{n} (%.0fs)' % (time.time() - t0e),
                               flush=True)
             print('BPE-encode %d cift (%.1fM token) %d cekirdekle %.0fs' % (
-                n, n * 0.16, nw, time.time() - t0e), flush=True)
+                n, n * TOKEN_PER_PAIR / 1e6, nw, time.time() - t0e),
+                flush=True)
         except Exception as e:
             enc_all = None
             print('paralel encode atlandi (sirali):', str(e)[:120], flush=True)
@@ -755,7 +776,12 @@ MS_PER_PAIR = 1.3884  # ms/cift. KAYNAK: kaggle_start.sh ust yorumundaki
                       # 9 saatlik oturuma ~1,46 MILYON cift sigiyor).
                       # Olcum satiri okunmadan varsayim yapilmayacak:
                       # test_olculen_sabitler_birlikte_tutarli bunu kapatir.
-ENCODE_DK = 9.0       # ilk kez BPE encode, bir kez
+ENCODE_DK = 9.0       # ilk kez BPE encode, bir kez. OLCUM 315.883 ciftte
+                      # 9 dk; butce 119.961 ciftken gercek ~3,4 dk. 9 dk
+                      # KORUYUCU UST SINIR olarak birakildi: cift sayisi
+                      # veri hazirligindan sonra belli oluyor, tavan
+                      # hesaplanirken bilinmiyor. Yanlislik 5,6 dk (bütce
+                      # 405 dk), yani ihmal edilebilir.
 VARSAYILAN_BOSLUK = 0.75   # oturumun %75'i veriye, %25'i bosluk/erteleme
 
 
@@ -1203,7 +1229,8 @@ def main():
         d = prepare_data(RAG, NATURAL=NATURAL, tokenizer=load_tokenizer(),
                          kb_map_path=args.kb_map, max_ctx_len=mxc, max_seq_len=mxs,
                          batch_size=bs, chatgrow_path=args.chatgrow,
-                         limit_pairs=args.limit_pairs)
+                         limit_pairs=args.limit_pairs,
+                         max_pairs_cap=args.max_pairs_cap)
         ex = next((c for c in d['ctx_map'].values() if c), None)
         print('DRY-RUN OK: train batch', len(d['tr']), '| val batch',
               len(d['va']), '| tokenizer', d['tokenizer'].vocab_size
