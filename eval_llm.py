@@ -500,19 +500,27 @@ def main():
     ap.add_argument('--knowledge-bias', type=float, default=0.0,
                     help='llm.sample konu cekimi bonusu (1.2 onerilen; '
                          '0.0 = kapali, egitimli taban cizgisi)')
+    ap.add_argument('--model', default=None, metavar='PATH',
+                    help='olculecek modelin llm_model.json yolu '
+                         '(varsayilan model/llm_model.json). Ayni mimarideki '
+                         'iki modeli DOSYA DEGISTIRMEDEN karsilastirmak icin: '
+                         '--model model/yeni/llm_model.json')
     args = ap.parse_args()
 
     if args.compare:
         return compare_reports(args.compare[0], args.compare[1],
                                args.compare_key)
 
-    model = load_llm()
+    model = load_llm(args.model) if args.model else load_llm()
     if model is None:
-        print('model/llm_model.json bulunamadi - once egitilmis model kopyala')
+        print('%s bulunamadi - once egitilmis model kopyala'
+              % (args.model or 'model/llm_model.json'))
         return 2
     items = _load_items(args.rag, args.n, natural=args.natural)
     print(f'degerlendirme seti: {len(items)} cift (rag={args.rag})',
           flush=True)
+    if args.model:
+        print('olculecek model   : %s' % args.model, flush=True)
     info = (f'd={model.d_model} blok={model.num_blocks} '
             f'kafa={model.num_heads} ff_mult={getattr(model, "ff_dim", 0) // model.d_model} '
             f'max_ctx={model.max_ctx_len} max_seq={model.max_seq_len} '
