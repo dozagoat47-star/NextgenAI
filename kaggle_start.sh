@@ -10,7 +10,8 @@
 #         !python -m pip install --quiet numpy
 #   4) Ikinci hucresine:
 #         !bash kaggle_start.sh train
-#      (EPOCH vermezsen LLM_EPOCHS=70 kullanilir; 9 saatlik oturuma sigar)
+#      (EPOCH vermezsen EPOCHS=12 kullanilir; veri butcesi intents ile
+#       buyur, sure butcesi 1,4 milyon cift -> pratikte baglamaz)
 #      (once deneme istersen:  !bash kaggle_start.sh verify   )
 #      (1 epoch suresi olcmek icin:  !bash kaggle_start.sh bench )
 #   5) Egitim sonrasi indirme hucresi (asagidaki INDIRME notuna bak).
