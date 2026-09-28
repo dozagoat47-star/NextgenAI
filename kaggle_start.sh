@@ -17,7 +17,12 @@
 #
 #   SURE NOTU (OLCULDU: 315883 cift, d=384/6 blok, T4x2, max_seq 256):
 #   encode 9 dk (bir kez) + val olan epoch 7.5 dk + val atlanan epoch 7.1 dk
-#   -> ort 7.31 dk/epoch. 9 saatlik oturum icin en fazla ~70 epoch.
+#   -> ort 7.31 dk/epoch = 1,3884 ms/cift (train_llm.MS_PER_PAIR).
+#   DIKKAT: bu olcum 315.883 CIFTTE alindi. Onceki yorumlar epoch suresini
+#   70.000 cift uzerinden yanlis olceklendiriyordu (6,266 ms/cift, 4,5 KAT
+#   HATA) ve sure butcesini gereksiz yere dar gosteriyordu. Gercekte 9
+#   saatlik oturuma ~1,4 MILYON cift sigiyor: ZAMAN BUTCESI pratikte
+#   baglayici DEGIL, veri butcesi (MAX_PAIRS) asil kisittir.
 #   Erken durdurma (patience) val yukselmeye baslayinca keser; EPOCH
 #   vermezsen 70 kullanilir, yine olusturulabilir. Daha uzun egitim istersen
 #   LLM_EPOCHS=150 gibi ver ve Kaggle oturum suren yeterli olsun.
@@ -52,6 +57,27 @@ if compgen -G 'chatgrow_*.jsonl' > /dev/null; then
   echo "[0/3] ChatGrow verisi bulundu, egitim hattina eklenecek."
   CGARG="--chatgrow $(ls chatgrow_*.jsonl | tr '\n' ' ')"
 fi
+
+# ---------------- VERI BUTCESI: SURE TAVANI (28.09) -----------------------
+# MAX_PAIRS artik veriden OTOMATIK hesaplaniyor (train_llm.py
+# coz_max_pairs): amaci 'butun ciftleri kullanmak' degil, 'benzersiz
+# ctx'nin cogunu kapsamak'. Intentler buyudugu icin butce de buyur
+# (6.364 intent -> ~120.000; 20.000 intent -> ~377.000).
+#
+# BURADA sure tamani hesaplanir cunku oturum suresi ve EPOCHS sadece
+# burada biliniyor. Iki olculmus sabit:
+#   7,31 dk/epoch  (MAX_PAIRS=70.000'de, bu dosyanin ust yorumu)
+#   9 dk encode    (bir kez)
+# Bu ikisi dogrusal olceklendirilir ve bosluk payi birakilir.
+# TAVAN FORMULU train_llm.sure_ve_hesapla()'da TEK DOGRULUK KAYNAGI olarak
+# yazilidir (bash'ta yazilsaydi test edilemezdi; ilk yazimda saat->dk cevirisi
+# iki kez yapildigi icin tavan 316.000 yerine 9.575 cift cikti ve egitimi
+# mahvedecekti). Burada sadece oturum bilgisi (9 saat) ve EPOCHS aktarilir.
+OTURUM_DK="${LLM_OTURUM_DK:-540}"
+MPCAP=$(python -c "import train_llm as t; print(t.sure_ve_hesapla(oturum_dk=$OTURUM_DK, epochs=$EPOCHS))")
+echo "[0/3] Veri butcesi tavani: $MPCAP cift ($OTURUM_DK dk oturum, $EPOCHS epoch,"
+echo "      %75 kullanim, 9 dk encode; 7,31 dk/epoch olcusunden)"
+MPCARGS="--max-pairs-cap $MPCAP"
 
 # Kapasite: varsayilan d=384 / 6 blok (~22.9M). Env ile asilabilir:
 #   LLM_CAP=256 LLM_BLOCKS=4 bash kaggle_start.sh train ...
@@ -101,13 +127,13 @@ case "$MODE" in
     # Erken durdurma esigini ETKILEMEZ: patience artik epoch cinsinden.
     python train_llm.py --rag --kb-map knowledge_map.jsonl --natural "$NATURAL" $CGARG \
       --epochs "$EPOCHS" --patience "$PATIENCE" \
-      --batch-size 128 --val-every 2 $DPARGS $REGARGS 2>&1 | tee kaggle_train.log
+      --batch-size 128 --val-every 2 $DPARGS $REGARGS $MPCARGS 2>&1 | tee kaggle_train.log
     DONE='yes'
     ;;
   bench)
     echo "[1/3] 1-epoch zamanlama (cache/encode + 1 epoch, birlikte olculur)"
     python train_llm.py --rag --kb-map knowledge_map.jsonl --natural "$NATURAL" $CGARG \
-      --epochs 1 --batch-size 128 --val-every 1 --fresh $DPARGS $REGARGS 2>&1 | tee kaggle_bench.log
+      --epochs 1 --batch-size 128 --val-every 1 --fresh $DPARGS $REGARGS $MPCARGS 2>&1 | tee kaggle_bench.log
     echo ""
     echo "[2/3] Son egitim satiri (epoch suresi '| NN.Ns' bolumundedir):"
     grep 'epoch ' kaggle_bench.log | tail -1
@@ -120,7 +146,7 @@ case "$MODE" in
     echo "[1/3] dry-run dogrulama (GPU gerekmez, ~1-2 dk; TAM encode YAPILMAZ)"
     echo "      Ayni veri bayraklari -> onbellek parmak izi bench/train ile ayni."
     python train_llm.py --dry-run --rag --kb-map knowledge_map.jsonl --natural "$NATURAL" \
-      --batch-size 128 --limit-pairs 4000 $CGARG $DPARGS $REGARGS
+      --batch-size 128 --limit-pairs 4000 $CGARG $DPARGS $REGARGS $MPCARGS
     echo "[2/3] OK - ilk-kelime hizalama ve RAG hatti hazir."
     echo "[3/3] Tam egitim icin:  !bash kaggle_start.sh train"
     ;;

@@ -100,17 +100,18 @@ class TestPipelineCaps(unittest.TestCase):
 
     Zincir: intents.json (AutoGrow, tavan AUTOGROW_MAX_INTENTS) ->
     knowledge_map.jsonl (enrich_intents, tavan --kb-limit) ->
-    LLM egitim verisi (train_llm, tavan MAX_PAIRS).
+    LLM egitim verisi (train_llm, tavan coz_max_pairs / MAX_PAIRS).
 
     28.09 DUZELTMESI: eski test 'kb-limit >= kapı * MAX_PATTERNS' diyordu,
     yani intent kapi buyutulunca kb-limit de büyümek ZORUNDAYDI. Bu
     yanlisti: knowledge_map satiri ancak train_llm'in O satiri bir egitim
     ciftinde ctX olarak kullandiginda ise yarar. Tuketilen cift sayisi
-    MAX_PAIRS=70.000 ile sinirlidir. Olcum: 6.000 intent -> 156.825 cift,
-    %55'i zaten kirpilip atiliyor. 120.000 satirlik kb-limit'in 50.000
-    satiri hic kullanilamaz; build 19 dk -> 58 dk, git 4 kat.
-    Dogru zincir: intent kapi buyur -> MAX_PAIRS buyur -> kb-limit
-    yalnizca MAX_PAIRS'i asamaz.
+    veri butcesi (coz_max_pairs) ile sinirlidir. Olcum: 6.364 intent ->
+    162.975 cift, butce 119.961, yani %26'si kirpilip atiliyor.
+    120.000 satirlik kb-limit'in 50.000 satiri hic kullanilamaz; build
+    19 dk -> 58 dk, git 4 kat.
+    Dogru zincir: intent kapi buyur -> veri butcesi buyur -> kb-limit
+    yalnizca veri butcesini asamaz.
     """
 
     def test_intent_cap_is_not_a_blocker(self):
@@ -143,23 +144,25 @@ class TestPipelineCaps(unittest.TestCase):
           - Ama yazilan satirlar ancak train_llm tarafindan tuketilir ve
             tuketilen cift sayisi MAX_PAIRS ile sinirlidir.
 
-        Olcum (28.09): 6.000 intent -> 156.825 cift uretiyor,
-        MAX_PAIRS=70.000 bunun %55'ini kirpiyor. Yani 120.000 satirlik
-        knowledge_map'in 50.000 satiri OLSA OLSA kullanilamaz; sadece
-        build suresi 19 dk -> 58 dk olur ve git'e 4 kat fazla yazilir.
-        Boylece buyutmek BOS YAZMA'dir.
+        Olcum (28.09): 6.364 intent -> 162.975 cift uretiyor, veri butcesi
+        (coz_max_pairs) 119.961. Yani 120.000 satirlik knowledge_map'in
+        50.000 satiri OLSA OLSA kullanilamaz; sadece build suresi
+        19 dk -> 58 dk olur ve git'e 4 kat fazla yazilir.
 
-        Bu yuzden dogru ust sinir MAX_PAIRS'dir, intent kapi degil.
+        Bu yuzden dogru ust sinir veri butcesidir, intent kapi degil.
+        NOT: MAX_PAIRS artik sabit degil (0 = otomatik), bu yuzden
+        coz_max_pairs() ile COZULUR.
         """
         import enrich_intents
         import train_llm
 
         n = enrich_intents._default_kb_limit()
+        butce = train_llm.coz_max_pairs(yaz=False)
         self.assertLessEqual(
-            n, train_llm.MAX_PAIRS,
-            'kb-limit %d > MAX_PAIRS %d: en fazla %d satir kullanilabilir, '
+            n, butce,
+            'kb-limit %d > veri butcesi %d: en fazla %d satir kullanilabilir, '
             'fazlasi hem bos build suresi hem bos git yazimi.'
-            % (n, train_llm.MAX_PAIRS, train_llm.MAX_PAIRS))
+            % (n, butce, butce))
 
     def test_kb_limit_has_useful_floor(self):
         """kb-limit anlamli bir zenginlestirme tabani olmali (>= 40.000)."""
@@ -169,8 +172,8 @@ class TestPipelineCaps(unittest.TestCase):
         self.assertGreaterEqual(
             n, 40000,
             'kb-limit %d cok dusuk: RAG zenginlestirmesi pratikte yok '
-            'olur. 40.000 = 19 dk build (olculdu) ve MAX_PAIRS 70.000 '
-            'ciftin yuzde 57sini kapsar.' % n)
+            'olur. 40.000 = 19 dk build (olculdu) ve veri butcesinin '
+            '(coz_max_pairs) uzerinde.' % n)
 
     def test_kb_limit_budget_is_measurable(self):
         """Tavan buyutuldugunde sure olcumle izlenir: build_knowledge_map

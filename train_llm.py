@@ -140,36 +140,45 @@ WEIGHT_DECAY = 0.01   # AdamW ayrik cezasi. 0.01: 16.9M parametre / 68.8k
                       # vermiyordu.
 TIE_EMBED = True      # gomme <-> cikis bagliligi (varsayilan acik)
 CKPT_FREQ = 1   # her epoch kaydedilir -> Colab kesilse bile max ~1 epoch kayip, resume aninda
-MAX_PAIRS = 120000  # OLÇÜM (28.09): veri butcesi, rastgele degil.
-                      #
-                      # ESKI DEGER 70.000 ve yorumu "ham ciftlerin TAMAMI
-                      # kullanilir (intents.json: ~68.654)" idi. Yani deger
-                      # veriye gore konmus, epoch suresi icin degil. Ama veri
-                      # buyuyunce 6.364 intent'te uretilen cift 162.975'e
-                      # cikti ve 70.000 yine %57'sini kirpiyor.
-                      #
-                      # NEDEN 120.000 (olculerek, varsayarak degil):
-                      # load_pairs once karistirip sonra kesiyor, ve bir
-                      # intent N pattern x M cevap -> N*M cift uretiyor.
-                      # Bilgi N+M'de, N*M'de degil. 6.364 intent'te:
-                      #   benzersiz ctx 38.954 | benzersiz cevap 23.366
-                      # Ince tarama (benzersiz ctx / cevap artisi):
-                      #   70.000   31.848  (baz)      22.570  (baz)
-                      #   90.000   35.287  +%10,8     23.163  +%2,6
-                      #  120.000   38.048  +%19,5     23.359  +%3,5
-                      #  140.000   38.760  +%21,7     23.366  +%3,5
-                      #  162.975   38.954  +%22,3     23.366  +%3,5
-                      # Yani 120.000'te benzersiz ctx'nin %97,7'si, benzersiz
-                      # cevabin %99,97'si kapsanir. 120k -> 163k arasi +%37
-                      # sure verip yalnizca +%2,4 ctx ve +%7 CEVAP getiriyor;
-                      # 200.000/300.000/400.000 tamamen bos yazma.
-                      #
-                      # SURE: kaggle_start.sh yorumunda olculen 7,31 dk/epoch
-                      # (MAX_PAIRS=70.000'de) dogrusal olceklendiyor ->
-                      # 12,5 dk/epoch, EPOCHS=12 icin 159 dk. 9 saatlik
-                      # oturumda 40 epoch bosluk kalir. (Dogrusal varsayim:
-                      # epoch adimi veriyle orantili; dogrulamak icin
-                      #  !bash kaggle_start.sh bench )
+MAX_PAIRS = 0   # 0 = OTOMATIK (veriden olcerak, coz_max_pairs). >0 elle tavan.
+                  # Bu bir veri butcesidir, epoch suresi ayari DEGILDIR; sure
+                  # tavana kaggle_start.sh'den gelir (--max-pairs-cap). Kod
+                  # butceyi hesaplar, insan unutmaz.
+                  #
+                  # ESKI DEGER 70.000 ve yorumu "ham ciftlerin TAMAMI
+                  # kullanilir (intents.json: ~68.654)" idi. Yani deger
+                  # veriye gore konmus, epoch suresi icin degil. Ama veri
+                  # buyuyunce 6.364 intent'te uretilen cift 162.975'e cikti
+                  # ve 70.000 yine %57'sini kirpiyor -> yorum gecersiz.
+                  #
+                  # OLCUM: bir intent N pattern x M cevap -> N*M cift uretiyor.
+                  # Bilgi N+M'de, N*M'de degil. 6.364 intent'te:
+                  #   benzersiz ctx 38.954 | benzersiz cevap 23.366
+                  # Ince tarama (benzersiz ctx / cevap artisi):
+                  #   70.000   31.848  (baz)      22.570  (baz)
+                  #   90.000   35.287  +%10,8     23.163  +%2,6
+                  #  120.000   38.048  +%19,5     23.359  +%3,5
+                  #  140.000   38.760  +%21,7     23.366  +%3,5
+                  #  162.975   38.954  +%22,3     23.366  +%3,5
+                  # => 120.000'te benzersiz ctx'nin %97,7'si, benzersiz
+                  # cevabin %99,97'si kapsanir. 120k -> 163k arasi +%37
+                  # sure verip yalnizca +%2,4 ctx ve +%7 CEVAP getiriyor;
+                  # 200.000/300.000/400.000 tamamen bos yazma.
+                  #
+                  # NEDEN SABIT DEGIL: intents 6.364 -> 20.000 olunca
+                  # benzersiz ctx ~122.000'e cikar ve 120.000 yeniden darbo
+                  # gaz olur. Karpanlar olcumle sabitlendi; butce intents
+                  # ile birlikte buyur.
+                  #
+                  # SURE: 7,31 dk/epoch (MAX_PAIRS=70.000'de, kaggle_start.sh
+                  # yorumunda OLCULEN) dogrusal olceklendiyor. Tavan
+                  # kaggle_start.sh'de hesaplanir (9 saatlik oturum ve EPOCHS
+                  # orada bilindigi icin) ve --max-pairs-cap ile gelir.
+                  # Dogrulama:  !bash kaggle_start.sh bench
+MAX_PAIRS_CTX_CARPAN = 3.08      # olcum: 120.000 / 38.954 benzersiz ctx
+MAX_PAIRS_INTENT_CARPAN = 18.85  # olcum: 120.000 / 6.364 intent
+                                  # (ikisi ayni olcumu ifade eder; biri
+                                  #  dogrudan olculmus, digeri turetilmis)
 MAX_CTX_LEN = 48    # sorgu icin token butcesi (olcum: gercek sorgu max 25 token
                     # -> 48 asilir, hic kesme yok; soru butcesini kucultmek
                     # bilgi/yanit yerine degil, bos yere yer acar)
@@ -733,10 +742,88 @@ def load_chatgrow_pairs(path, ctx_len=CTX_CHARS, resp_len=None, max_pairs=20000)
     return pairs[:max_pairs]
 
 
+MS_PER_PAIR = 1.3884  # ms/cift. KAYNAK: kaggle_start.sh ust yorumundaki
+                      # OLCUM: "315883 cift, d=384/6 blok, T4x2, max_seq 256
+                      # -> ort 7,31 dk/epoch". 7,31 dk = 438,6 sn ->
+                      # 438.600 ms / 315.883 cift = 1,3884 ms/cift.
+                      # Epoch adimi veriyle dogrusal (dogrulama:
+                      # kaggle_start.sh bench). Iki taraf da SABIT.
+                      #
+                      # DANGER: burada ilk yazimda 70.000 cift varsayildi ve
+                      # 6,266 ms/cift cikti — 4,5 KAT YANLIStI ve zaman
+                      # tavanini gereksiz yere 316.000'a cekti (halbuki
+                      # 9 saatlik oturuma ~1,46 MILYON cift sigiyor).
+                      # Olcum satiri okunmadan varsayim yapilmayacak:
+                      # test_olculen_sabitler_birlikte_tutarli bunu kapatir.
+ENCODE_DK = 9.0       # ilk kez BPE encode, bir kez
+VARSAYILAN_BOSLUK = 0.75   # oturumun %75'i veriye, %25'i bosluk/erteleme
+
+
+def sure_ve_hesapla(oturum_dk=540, epochs=12, encode_dk=ENCODE_DK,
+                    bosluk=VARSAYILAN_BOSLUK, ms_per_pair=MS_PER_PAIR):
+    """SURE TAVANI: kac cift bu oturumda sigar? (cift sayisi, dk cinsinden)
+
+    NEDEN BURADA: oturum suresi ve EPOCHS sadece kaggle_start.sh'da
+    biliniyor ama formul bash'ta yazilirsa test EDILEMEZ. Tek dogruluk
+    kaynagi burada; kaggle_start.sh bunu cagirir.
+
+    DANGER: saat->dk cevirisi iki kez yapilirsa sonuc 1000 kere kucuk
+    olur (ilk yazimda boyle bir hata olustu: 316.000 yerine 9.575 cift,
+    yani egitim 120.000 -> 9.575 cifte dusertilirdi). Bu yuzden asagida
+    dakika cinsinden islem yapilir ve test taban degerleri dogrular.
+    """
+    kalan_dk = oturum_dk * bosluk - encode_dk
+    if kalan_dk <= 0 or epochs <= 0:
+        return 0
+    dk_per_epoch = kalan_dk / epochs
+    # dk -> sn -> ms, sonra ms_per_pair'a bol. Tek ceviri; iki kez
+    # yapildiginda sonuc 1000 kere kuculur.
+    return int(dk_per_epoch * 60 * 1000 / ms_per_pair)
+
+
+def coz_max_pairs(intents_path=None, ust_tavan=0, yaz=True):
+    """Veri butcesini intents SAYISINDAN hesapla (0 = otomatik).
+
+    Neden sabit degil: MAX_PAIRS'in isi 'butun ciftleri kullanmak' degil,
+    'benzersiz ctx'nin cogunu kapsamak'. Olcum (28.09) su ivme:
+        intents 6.364 -> butce 120.000 -> benzersiz ctx kapsamasi %97,7
+    Ayni yapi intents 20.000'e cikarsa benzersiz ctx ~122.000 olur ve sabit
+    120.000 yeniden darbo gaz olur. Bu yuzden butce intents ile buyur.
+
+    ust_tavan: kaggle_start.sh'den gelen SURE tavani (--max-pairs-cap).
+    Veri ihtiyaci buyuk, zaman yoksa TAVAN KAZANIR ve bu yazdirilir —
+    sessizce kismamak yerine gorunur kilinir.
+    """
+    import json as _json
+    yol = intents_path or INTENTS
+    n = 0
+    if os.path.exists(yol):
+        with io.open(yol, 'r', encoding='utf-8') as f:
+            n = len(_json.load(f).get('intents', []))
+    if MAX_PAIRS > 0:            # elle tavan varsa ona saygi
+        n_butce, kaynak = MAX_PAIRS, 'elle (MAX_PAIRS)'
+    else:
+        n_butce = int(round(MAX_PAIRS_INTENT_CARPAN * n))
+        kaynak = 'otomatik (%s x %d intent)' % (MAX_PAIRS_INTENT_CARPAN, n)
+    tavan = ust_tavan or 0
+    if tavan and n_butce > tavan:
+        if yaz:
+            print('[butce] veri butcesi %s > zaman tavani %s: TAVAN '
+                  'KAZANDI, %s cift kullanilacak (ihtiyac: %s)'
+                  % (format(n_butce, ','), format(tavan, ','),
+                     format(tavan, ','), format(n_butce, ',')), flush=True)
+        n_butce = tavan
+    if yaz:
+        print('[butce] MAX_PAIRS=%s (%s, zaman tavani %s)'
+              % (format(n_butce, ','), kaynak,
+                 format(tavan, ',') if tavan else 'yok'), flush=True)
+    return n_butce
+
+
 def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
                  FIRST_WORD_STABILIZE=True, max_ctx_len=MAX_CTX_LEN,
                  max_seq_len=MAX_SEQ_LEN, batch_size=BATCH_SIZE,
-                 chatgrow_path=None, limit_pairs=0):
+                 chatgrow_path=None, limit_pairs=0, max_pairs_cap=0):
     """Veri + RAG hattini HAZIRLAR (yalnizca numpy; torch gerektirmez).
     --dry-run bu fonksiyonu calistirip dogrular; egitim de ayni yolu kullanir.
 
@@ -760,8 +847,27 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
     tokenizer (BPETokenizer) verilirse BPE modu kullanilir (subword vocab);
     yoksa eski karakter sozlugu (build_llm_vocab) kullanilir."""
     assert os.path.exists(INTENTS), f'intents.json bulunamadi: {INTENTS}'
-    pairs = load_pairs(INTENTS, max_pairs=MAX_PAIRS, use_query=True,
+    butce = coz_max_pairs(INTENTS, ust_tavan=max_pairs_cap)
+    pairs = load_pairs(INTENTS, max_pairs=butce, use_query=True,
                        ctx_len=CTX_CHARS)
+    # Butcenin isini GERCEKTEN yaptigini olc: benzersiz ctx kapsamasi.
+    # Karpanlar (MAX_PAIRS_INTENT_CARPAN) olcumle sabitlendi; intents
+    # yapisi degisirse bu sayi saptar ve saptamasi GORUNUR olur.
+    _ham = load_pairs(INTENTS, max_pairs=10 ** 9, use_query=True,
+                      ctx_len=CTX_CHARS)
+    _tum_ctx = set(c for c, _ in _ham)
+    _alinan_ctx = set(c for c, _ in pairs)
+    # NOT: .format() kullanildi, %-bicimleme DEGIL: yuzde isareti icin
+    # '%%' kacisi gerekirdi ve bu dosyada defalarca '%' ile biten
+    # bozuk mesajlar uretti.
+    print('[butce] ham {0:,} cift -> butce {1:,} ({2:.1f}%); benzersiz ctx '
+          '{3:,}/{4:,} = {5:.1f}% kapsama, benzersiz cevap {6:,}'.format(
+              len(_ham), len(pairs),
+              100.0 * len(pairs) / max(1, len(_ham)),
+              len(_alinan_ctx), len(_tum_ctx),
+              100.0 * len(_alinan_ctx) / max(1, len(_tum_ctx)),
+              len(set(r for _c, r in pairs))), flush=True)
+    del _ham, _tum_ctx, _alinan_ctx
     if chatgrow_path:
         cg = load_chatgrow_pairs(chatgrow_path)
         src = chatgrow_path if isinstance(chatgrow_path, str) \
@@ -952,6 +1058,12 @@ def main():
                     help='enrich_intents.py uretimi knowledge_map.jsonl; '
                          'RAG desen->parca eslemesini corpus.search yerine '
                          'bu haritadan alir (deterministik, --rag ile birlikte)')
+    ap.add_argument('--max-pairs-cap', type=int, default=0, metavar='N',
+                    help='veri butcesinin SURE tavani. 0 = tavan yok. '
+                         'kaggle_start.sh oturum suresi ve EPOCHS bilindigi '
+                         'icin bunu hesaplayip gonderir; veri ihtiyaci '
+                         'tavani asarsa TAVAN KAZANIR ve yazdirilir '
+                         '(MAX_PAIRS veri butcesidir, sure ayari degil)')
     ap.add_argument('--natural', type=int, default=0, metavar='K',
                     help='her cevabin K dogal varyantiyla veriyi buyut (orijinal dahil)')
     ap.add_argument('--chatgrow', default=None, nargs='+', metavar='PATH',
@@ -1114,7 +1226,8 @@ def main():
     # fork tabanli cok-cekirdekli BPE-encode bu sayede guvenli)
     d = prepare_data(RAG, NATURAL=NATURAL, tokenizer=load_tokenizer(),
                      kb_map_path=args.kb_map, max_ctx_len=mxc, max_seq_len=mxs,
-                     batch_size=bs, chatgrow_path=args.chatgrow)
+                     batch_size=bs, chatgrow_path=args.chatgrow,
+                     max_pairs_cap=args.max_pairs_cap)
     vocab = d['vocab']
     tok = d['tokenizer']
     V = tok.vocab_size if tok is not None else len(vocab)
