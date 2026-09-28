@@ -47,7 +47,28 @@ USER_AGENT = "NextgenAI/1.0 (educational chatbot; local test) requests/2.0"
 #
 # Deger build_knowledge_map butcesiyle sinirli (asagi olculdu); istenirse
 # AUTOGROW_MAX_INTENTS ortam degiskeniyle kapatilabilir.
-AUTOGROW_MAX_INTENTS = int(os.environ.get('AUTOGROW_MAX_INTENTS', 6000))
+#
+# 28.09 YUKSILTILDI 6.000 -> 20.000. Gerekce olcumu:
+#   - 6.000 kapisi DOLUYDU (6.000/6.000): intent uretimi durmus, soru
+#     buyumeye devam ediyordu.
+#   - buyume hizi 7.790 intent/gun (son 14 saatte 4.598 intent, 2.98 MB).
+#   - 842 bayt/intent -> 20.000 intent = 16,1 MB intents.json.
+#   - model ETKILENMEZ: bilgi intentleri siniflandirici DEGILDIR,
+#     model.json num_intents 40'da sabit kalir. yalnizca arama/LUT
+#     maliyeti artar (knowledge_map butcesi).
+#   - knowledge_map butcesi ayri bir butce: kbmap.yml --kb-limit 40000
+#     kullanir, yani 20.000 intent bu butcede FIRLA yer alir.
+# Bu deger build suresiyle degil, veri butcesiyle sinirlandirildi; build
+# maliyeti artik kosu basina tavanla (asagida) kisitlanir.
+AUTOGROW_MAX_INTENTS = int(os.environ.get('AUTOGROW_MAX_INTENTS', 20000))
+
+# KOSU BASINA TAVAN (28.09). Olcum: autogrow.yml saatlik (24 kosu) +
+# autogrow-deep.yml gunluk (1 kosu) = 25 kosu/gun; 7.790/25 = ortalama
+# 312 intent/kosu. Tavan 400: normal akis DEGISMER (ort. 312 < 400),
+# ama sicak bir kosu (60 dk derin tarama, bol kaliteli baslik) tek
+# commit'te binlerce intent dokup gecmis ve dosyayi sismaz.
+# 0 = tavansiz (eski davranis).
+AUTOGROW_MAX_PER_RUN = int(os.environ.get('AUTOGROW_MAX_PER_RUN', 400))
 MAX_PATTERNS = 6
 MAX_RESPONSES = 3
 
@@ -444,10 +465,26 @@ def main():
     total_added = total_updated = 0
     round_no = 0
     sep = "=" * 50
+    # Kosu basina tavan: butce bitince dongu KIRILIR, yeni intent
+    # uretilmez. Boylece intents.json'in tek commit'te ne kadar
+    # buyudugu sinirli kalir (git maliyeti karesel).
+    butce = AUTOGROW_MAX_PER_RUN
     while True:
+        if butce > 0 and total_added >= butce:
+            print(f"\n[TAVAN] Kosu basi intent sinirina ulasildi "
+                  f"({total_added}/{butce}). Dongu durduruluyor.")
+            break
         round_no += 1
         print("\n" + sep + "\n  TUR " + str(round_no) + "\n" + sep)
-        result = grow_once(args.source, args.count)
+        # Kalan butce kadar cek: son turda 8 yerine 3 iste, gerekmeden
+        # uretilen intent'ler havada kalmasin.
+        count = args.count
+        if butce > 0:
+            kalan = butce - total_added
+            if kalan <= 0:
+                break
+            count = max(1, min(args.count, kalan))
+        result = grow_once(args.source, count)
         if result is None:
             break
         total_added += result[0]
@@ -463,6 +500,9 @@ def main():
         time.sleep(5)
 
     print(f"\nOZET: toplam yeni {total_added}, guncellenen {total_updated}")
+    if butce > 0 and total_added >= butce:
+        print(f"Kosu tavani {butce} ULASTI: intents.json buyumesi "
+              f"bir sonraki kosuya birakildi.")
     print(f"Gecen sure: {(time.time() - start) / 60:.1f} dk")
     print("Sira: python train.py")
 

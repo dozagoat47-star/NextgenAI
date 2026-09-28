@@ -141,11 +141,23 @@ class TestKnowledgeMapData(unittest.TestCase):
         with io.open(_KB, encoding='utf-8') as f:
             for line in f:
                 r = json.loads(line)
-                if len(r['ctx']) > 40:
-                    long_keys.append(r['ctx'])
-        self.assertGreater(len(long_keys), 0)
-        for k in long_keys:
-            self.assertGreater(len(clean_chars(k, CTX_CHARS)), 40)
+                # OLULECEK KISIM: temizlenmis hali. Ham ctx'ye bakmak
+                # yaniltici: clean_chars markdown gurultusunu (orn. '&')
+                # sildigi icin ham 41 -> temiz 40 olabilir; bu 40'lk
+                # boolean'da kesilmis bir desen DEGIL, sadece noktalama
+                # kaybi. 27.09'da 3 yeni kayit ('track & field ...')
+                # bu yuzden test dustu.
+                t = clean_chars(r['ctx'], CTX_CHARS)
+                if len(t) > 40:
+                    long_keys.append(t)
+        self.assertGreater(len(long_keys), 0,
+                           'hicbir temiz ctx 40 karakteri asmadi')
+        for t in long_keys:
+            self.assertGreater(len(t), 40)
+            # ASIL KORUMA: anahtar 64'e kirpilmemeli, yoksa lut'ta
+            # iki farkli desen ayni anahtara duser.
+            self.assertLessEqual(len(t), CTX_CHARS,
+                                 'ctx 64 karakteri asti: %r' % t)
 
 
 class TestBrainAsciiFallback(unittest.TestCase):

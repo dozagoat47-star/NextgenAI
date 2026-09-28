@@ -41,3 +41,21 @@ jobs:
 
       - name: Run test suite
         run: python -m unittest discover -s tests -v
+
+      - name: Veri dosyalarina dokunulmadi mi
+        # 28.09: bir tam kosudan sonra corpus.jsonl 'M' cikti (+1 satir).
+        # Suclu yol bulunamadi ve 3 kosudan sonra tekrarlamadi, ama "ara
+        # sira oluyor" bir durum BIRAKILAMAZ: kirli agac sessizce bir
+        # sonraki push'a girer. Testler bittikten SONRA git'e soruyoruz
+        # (test sirasindan bagimsiz, tam kapsam).
+        run: |
+          if ! git diff --quiet -- corpus.jsonl corpus_ids.jsonl \
+                                 intents.json knowledge_map.jsonl; then
+            echo "::error::Test kosusu veri dosyasini degistirdi."
+            git diff --stat -- corpus.jsonl corpus_ids.jsonl \
+                                 intents.json knowledge_map.jsonl
+            git diff -- corpus.jsonl corpus_ids.jsonl \
+                         intents.json knowledge_map.jsonl | head -40
+            exit 1
+          fi
+          echo "Veri dosyalari temiz."

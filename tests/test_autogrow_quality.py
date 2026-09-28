@@ -95,14 +95,22 @@ class TestTopicCategories(unittest.TestCase):
 
 
 class TestPipelineCaps(unittest.TestCase):
-    """Tavanlar arasi invaryant: ikinci darbogaz birakilmamali.
+    """Tavanlar arasi invaryant: her tavanin GERCEKTE neyi sinirladigi
+    bilinsin, yoksa biri birakilinca sessiz darbogaz olur.
 
     Zincir: intents.json (AutoGrow, tavan AUTOGROW_MAX_INTENTS) ->
     knowledge_map.jsonl (enrich_intents, tavan --kb-limit) ->
-    LLM egitim verisi (train_llm --kb-map).
+    LLM egitim verisi (train_llm, tavan MAX_PAIRS).
 
-    Intent tarani kaldirilip kb-limit eski degerde kalirsa knowledge_map
-    6.000'da doyar ve yeni bilgi yine modele giremez - sessiz darbogaz.
+    28.09 DUZELTMESI: eski test 'kb-limit >= kapı * MAX_PATTERNS' diyordu,
+    yani intent kapi buyutulunca kb-limit de büyümek ZORUNDAYDI. Bu
+    yanlisti: knowledge_map satiri ancak train_llm'in O satiri bir egitim
+    ciftinde ctX olarak kullandiginda ise yarar. Tuketilen cift sayisi
+    MAX_PAIRS=70.000 ile sinirlidir. Olcum: 6.000 intent -> 156.825 cift,
+    %55'i zaten kirpilip atiliyor. 120.000 satirlik kb-limit'in 50.000
+    satiri hic kullanilamaz; build 19 dk -> 58 dk, git 4 kat.
+    Dogru zincir: intent kapi buyur -> MAX_PAIRS buyur -> kb-limit
+    yalnizca MAX_PAIRS'i asamaz.
     """
 
     def test_intent_cap_is_not_a_blocker(self):
@@ -124,23 +132,63 @@ class TestPipelineCaps(unittest.TestCase):
                 os.environ['AUTOGROW_MAX_INTENTS'] = eski
             importlib.reload(autogrow)
 
-    def test_kb_limit_covers_max_intent_patterns(self):
+    def test_kb_limit_does_not_exceed_trainable_pairs(self):
+        """kb-limit, EGTIMDE KULLANILABILECEK satir sayisini asmamali.
+
+        28.09 YENI. Onceki test 'kb-limit >= kapı * MAX_PATTERNS' idi
+        yani 20.000 intent icin 120.000 satir istiyordu. Oysa:
+
+          - build_knowledge_map limiti SATIRA uygular (enrich_intents.py:107
+            ve :114 'if rows >= limit: break' -> rows = yazilan satir).
+          - Ama yazilan satirlar ancak train_llm tarafindan tuketilir ve
+            tuketilen cift sayisi MAX_PAIRS ile sinirlidir.
+
+        Olcum (28.09): 6.000 intent -> 156.825 cift uretiyor,
+        MAX_PAIRS=70.000 bunun %55'ini kirpiyor. Yani 120.000 satirlik
+        knowledge_map'in 50.000 satiri OLSA OLSA kullanilamaz; sadece
+        build suresi 19 dk -> 58 dk olur ve git'e 4 kat fazla yazilir.
+        Boylece buyutmek BOS YAZMA'dir.
+
+        Bu yuzden dogru ust sinir MAX_PAIRS'dir, intent kapi degil.
+        """
+        import enrich_intents
+        import train_llm
+
+        n = enrich_intents._default_kb_limit()
+        self.assertLessEqual(
+            n, train_llm.MAX_PAIRS,
+            'kb-limit %d > MAX_PAIRS %d: en fazla %d satir kullanilabilir, '
+            'fazlasi hem bos build suresi hem bos git yazimi.'
+            % (n, train_llm.MAX_PAIRS, train_llm.MAX_PAIRS))
+
+    def test_kb_limit_has_useful_floor(self):
+        """kb-limit anlamli bir zenginlestirme tabani olmali (>= 40.000)."""
         import enrich_intents
 
         n = enrich_intents._default_kb_limit()
-        en_fazla_desen = autogrow.AUTOGROW_MAX_INTENTS * autogrow.MAX_PATTERNS
         self.assertGreaterEqual(
-            n, en_fazla_desen,
-            'kb-limit ikinci darbogaz: %d desen uretilebilir ama tavan %d'
-            % (en_fazla_desen, n))
+            n, 40000,
+            'kb-limit %d cok dusuk: RAG zenginlestirmesi pratikte yok '
+            'olur. 40.000 = 19 dk build (olculdu) ve MAX_PAIRS 70.000 '
+            'ciftin yuzde 57sini kapsar.' % n)
 
     def test_kb_limit_budget_is_measurable(self):
         """Tavan buyutuldugunde sure olcumle izlenir: build_knowledge_map
-        29.1 ms/desen (4.584 desen = 133 sn) + corpus.load 189 sn."""
+        marjinal 24-31 ms/satir + corpus.load 26 sn.
+
+        28.09 olcumu (gercek veriyle, 4 kademe):
+            limit    sure       marjinal
+              500     43,9 sn   -
+             1500     74,6 sn   30,74 ms/satir
+             3000    110,3 sn   23,79 ms/satir
+             6000    183,4 sn   24,38 ms/satir
+        -> marjinal ~24 ms/satir. 40.000 satir = 19,4 dk + corpus 0,4 dk.
+        30 dk tavani kendi koydugumuz butce; Actions job'i 6 saat, yani
+        fiziksel engel degil."""
         import enrich_intents
 
         n = enrich_intents._default_kb_limit()
-        saniye = n * 0.0291
+        saniye = n * 0.0241   # olculen marjinal katsayi
         self.assertLess(
             saniye, 30 * 60,
             'kb-limit gunluk ise sigmaz: %.0f dk' % (saniye / 60))
