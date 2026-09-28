@@ -279,7 +279,7 @@ def fetch_topic_posts(base, topic_id):
     return out
 
 
-def discourse_topics(base, category, want, max_pages=60):
+def discourse_topics(base, category, want, max_pages=60, order='posts'):
     """Sayfali konu listesi. ASIL ONEMLI: /latest.json sayfalanmazsa
     her kosuda ayni 30 konu okunur.
 
@@ -290,6 +290,17 @@ def discourse_topics(base, category, want, max_pages=60):
     (ci workflow) ust sinir 30 cift idi. Olcum: --limit 200 -> 30 cift.
 
     Artik sayfa sayfa ilerlenir; her sayfa arasinda nazik beklenir.
+
+    IKINCE TUZAK - SIRALAMA (27.09 olcumu):
+      order='posts' yorum sayisina gore siralar, yani pencereyi
+      "en cok konusulan" basliklar doldurur ve EN YENILER HIC GIRMEZ.
+      Olcum (forum.pardus.org.tr, want=400):
+        order='posts'   -> 400 baslik, en yeni 2026-08-21, ort 31.5 yorum
+        order='created' -> 400 baslik, en yeni 2026-09-28, ort  5.8 yorum
+        kesisim         -> 16 baslik (400'den) = forumun %96'si hic gorulmemis
+      Bu yuzden 'posts' penceresi donuyor: her kosuda ayni basliklar,
+      dosya bayt bayt ayni kaliyor. order=None/'' dersen Discourse'un
+      varsayilan siralamasi (en yeni once) kullanilir.
     """
     listing = '/latest.json'
     if category:
@@ -299,7 +310,10 @@ def discourse_topics(base, category, want, max_pages=60):
     topics = []
     sayfa = 0
     while len(topics) < want and sayfa < max_pages:
-        data = discourse_get(base, listing, {'order': 'posts', 'page': sayfa})
+        params = {'page': sayfa}
+        if order:
+            params['order'] = order
+        data = discourse_get(base, listing, params)
         if not data:
             break
         tl = data.get('topic_list') or {}
@@ -315,11 +329,18 @@ def discourse_topics(base, category, want, max_pages=60):
     return topics[:want]
 
 
-def build_discourse_chats(base, category, limit):
-    """Discourse forumundan (query -> yanit) ciftleri kurar (kimliksiz)."""
+def build_discourse_chats(base, category, limit, order='posts'):
+    """Discourse forumundan (query -> yanit) ciftleri kurar (kimliksiz).
+
+    order='posts'  -> zengin konular (ort. 31.5 yorum, cok yanitli) ama
+                      pencere donuk: hep ayni basliklar.
+    order='created'-> en yeni basliklar (her kosu yeni veri) ama ort.
+                      5.8 yorum, cogu cevapsiz -> verim dusuk.
+    Ikisi birlikte kullanilir (ci workflow iki ayri dosyaya yazar).
+    """
     chats = []
     seen = set()
-    topics = discourse_topics(base, category, limit)
+    topics = discourse_topics(base, category, limit, order=order)
     picked = 0
     for topic in topics:
         if picked >= limit:
@@ -353,6 +374,72 @@ def build_discourse_chats(base, category, limit):
     return chats
 
 
+# --- Birlestirme (--merge) -------------------------------------------------
+# Neden: iki pencere de "en iyi N baslik" penceresi. Uzerine yazarsak
+# dosya her kosuda ayni kac cifti tutar (posts penceresi 19 kosudur
+# tam 30'da dondu, sonra 335'te). Birlestirme eklenince yeni ciftler
+# dosyaya EKLENIR, eskiler korunur; ayni soru tekrar bulunursa yanitlar
+# guncellenir (konuya yeni cevap gelmis olabilir).
+
+def chat_key(chat):
+    """Bir ciftin kimligi.
+
+    topic_id varsa (Discourse) O TEK BASINA yeter: konu no degismez, soru
+    metni sonradan duzeltilebilir. Sorgu metnine baglanmak ayni konudan
+    iki kopya biriktirirdi. topic_id yoksa (Reddit/HF) normalleştirilmis
+    soru kullanilir.
+    """
+    tid = chat.get('topic_id')
+    if tid is not None:
+        return (chat.get('source') or '', tid)
+    soru = ascii_normalize((chat.get('query') or '').lower())
+    return (chat.get('source') or '', '', soru)
+
+
+def read_chats(path):
+    """jsonl dosyasini okur; boz satir olursa atar (veri kaybi yok)."""
+    out = []
+    if not path or not os.path.exists(path):
+        return out
+    with io.open(path, encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                j = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(j, dict) and j.get('query'):
+                out.append(j)
+    return out
+
+
+def merge_chats(eski, yeni, keep=0):
+    """Eski + yeni ciftleri birlestirir.
+
+    - Yeni cift eklenir (sona).
+    - Ayni kimlik yeniden bulunursa YANITLAR guncellenir, sira korunur.
+    - keep > 0 ise en eskiler dusurulur (dosya sismesin).
+    """
+    sirali = {}          # key -> kayit (Python 3.7+ dict sirali)
+    for c in eski:
+        sirali[chat_key(c)] = c
+    eklenen = guncellenen = 0
+    for c in yeni:
+        k = chat_key(c)
+        if k in sirali:
+            sirali[k] = c            # yeni cevaplar varsa guncelle
+            guncellenen += 1
+        else:
+            sirali[k] = c
+            eklenen += 1
+    sonuc = list(sirali.values())
+    if keep > 0 and len(sonuc) > keep:
+        sonuc = sonuc[-keep:]         # en yenileri koru
+    return sonuc, eklenen, guncellenen
+
+
 def main():
     ap = argparse.ArgumentParser(description='ChatGrow: gercek sohbet verisi toplama')
     ap.add_argument('--source', default='reddit',
@@ -367,6 +454,15 @@ def main():
     ap.add_argument('--category', default='', metavar='SLUG',
                     help='discourse kategorisi (or. genel-sohbet); bos = tum site')
     ap.add_argument('--limit', type=int, default=LISTING_LIMIT)
+    ap.add_argument('--order', default='posts',
+                    choices=['posts', 'created', 'none'],
+                    help='discourse siralamasi: posts=en cok yorumlu '
+                         '(zengin ama donuk pencere) | created=en yeni '
+                         '(her kosu yeni veri) | none=varsayilan')
+    ap.add_argument('--merge', action='store_true',
+                    help='--out dosyasindaki eski ciftleri KORU, yeniyi ekle')
+    ap.add_argument('--keep', type=int, default=0,
+                    help='--merge ile en fazla N cift tut (0 = sinirsiz)')
     ap.add_argument('--out', default='chatgrow_sohbet.jsonl')
     ap.add_argument('--sample', type=int, default=0,
                     help='insan denetimi icin ilk N cifti ekrana yaz')
@@ -391,9 +487,11 @@ def main():
         if not args.forum:
             print('HATA: --forum URL\'si gerekli (or. https://forum.topluluk.org)')
             return 2
+        order = None if args.order == 'none' else args.order
         print(f"[1/3] Discourse taraniyor: {args.forum} "
-              f"({args.category or 'tum site'})")
-        all_chats = build_discourse_chats(args.forum, args.category, args.limit)
+              f"({args.category or 'tum site'}, siralama: {args.order})")
+        all_chats = build_discourse_chats(args.forum, args.category,
+                                          args.limit, order=order)
         print(f"      {len(all_chats)} sohbet cifti bulundu")
     else:
         if not cid or not csec:
@@ -409,6 +507,13 @@ def main():
             print(f"      {len(chats)} sohbet cifti bulundu")
             all_chats.extend(chats)
     random.shuffle(all_chats)
+
+    if args.out and args.merge:
+        eski = read_chats(args.out)
+        all_chats, eklenen, guncellenen = merge_chats(eski, all_chats,
+                                                     keep=args.keep)
+        print(f"      birlestirme: {eklenen} yeni, {guncellenen} guncellendi, "
+              f"{len(all_chats)} toplam")
 
     if args.out:
         with io.open(args.out, 'w', encoding='utf-8') as f:

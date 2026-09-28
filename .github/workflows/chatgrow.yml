@@ -27,11 +27,19 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      - name: Discourse'u tara (kimlik gerekmez)
+      - name: Discourse'u tara - zengin konular (order=posts)
         run: |
-          python chatgrow.py --source discourse \
+          python chatgrow.py --source discourse --order posts \
             --forum https://forum.pardus.org.tr \
-            --limit 400 --out chatgrow_discourse_pardus.jsonl
+            --limit 400 --merge --keep 800 \
+            --out chatgrow_discourse_pardus.jsonl
+
+      - name: Discourse'u tara - yeni basliklar (order=created)
+        run: |
+          python chatgrow.py --source discourse --order created \
+            --forum https://forum.pardus.org.tr \
+            --limit 1000 --merge --keep 2500 \
+            --out chatgrow_discourse_pardus_yeni.jsonl
 
       - name: Commit and push if changed
         run: |
