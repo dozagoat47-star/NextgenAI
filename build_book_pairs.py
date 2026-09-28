@@ -52,6 +52,13 @@ import time
 
 from fetch_hf_turkish import (clean_chars, cut_at_word, jaccard, dedupe_pairs,
                               ALLOWED_EXTRAS, MAXSEP, SEED)
+# RESP_CHARS_MAX seqgen'de tek kaynak (hafif modul). CTX_CHARS train_llm'de
+# ama onu import etmek torch yuzunden 3,9 sn ekliyor ve bu kucuk uretici
+# scriptine agir geliyor; bu yuzden deger burada tekrarlanip
+# tests/test_hf_sohbet.py::test_butce_kaynaklariyla_ayni ile
+# kilitlenir (asil kaynak: train_llm.CTX_CHARS / seqgen.RESP_CHARS_MAX).
+from seqgen import RESP_CHARS_MAX
+CTX_CHARS = 64
 
 # --- kaynak eserler (kategori adi) ------------------------------------------
 
@@ -265,8 +272,24 @@ def main(argv=None):
     ap.add_argument('--max-pairs', type=int, default=8000)
     ap.add_argument('--per-cat', type=int, default=1600,
                     help='kategori basina en fazla eser')
-    ap.add_argument('--ctx-len', type=int, default=300, help='ctx_kr (budama)')
-    ap.add_argument('--resp-len', type=int, default=300)
+    # 29.09: varsayilan 300/300 idi ama loader clean_chars(q, 64) ve
+    # clean_chars(x, 204) ile KAPALI sekilde kesiyor. Uretici kelime
+    # sonunda kessse bile 300 > 204 oldugu icin loader 204'te yeniden
+    # SERT kesiyor -> hasar ureticiye hic girmiyordu.
+    # OLCUM (8 dosyaya toplu denetim):
+    #   chatgrow_kitap_20260925_1122.jsonl  (300/300) 48/609  = %7,88 hasar
+    #   chatgrow_kitap_20260928_0609.jsonl  (299/298) 26/609  = %4,27 hasar
+    #   chatgrow_hf_20260928_0600.jsonl     (48/140)  0/1.200 = %0,00 hasar
+    # HF ureticisinin varsayilani 48/140 loader'in ALTINDA oldugu icin
+    # hasar vermiyor; kitap ureticisi 300/300 ile ustunde kalmisti.
+    # Kural: uretici butcesi <= loader butcesi. Degerler CTX_CHARS ve
+    # MAX_SEQ_LEN - MAX_CTX_LEN - 4 (= 204) ile ayni kaynaktan gelir.
+    ap.add_argument('--ctx-len', type=int, default=CTX_CHARS,
+                    help='ctx_kr (budama). Loader butcesini ASMAMALI '
+                         '(CTX_CHARS=%d)' % CTX_CHARS)
+    ap.add_argument('--resp-len', type=int, default=RESP_CHARS_MAX,
+                    help='Yanit butcesi. Loader butcesini ASMAMALI (%d)'
+                         % RESP_CHARS_MAX)
     ap.add_argument('--seed', type=int, default=SEED)
     args = ap.parse_args(argv)
 

@@ -249,6 +249,27 @@ class TestYanitKirpmaKelimeSonunda(unittest.TestCase):
         self.assertIn("if ' ' not in ctx_c:", kaynak,
                       'bosluksuz ctx kapisi eksik')
 
+    def test_butce_kaynaklariyla_ayni(self):
+        """Uretici butcesi loader butcesini ASMAMALI.
+
+        29.09 olcumu: build_book_pairs varsayilani 300/300 iken loader
+        clean_chars(q, 64) / clean_chars(x, 204) ile KAPALI sekilde
+        kesiyordu -> 300 > 204 oldugu icin hasar ureticiye hic girmiyor,
+        dosyaya gomuluyordu:
+            chatgrow_kitap_20260925_1122  48/609 = %7,88
+            chatgrow_kitap_20260928_0609  26/609 = %4,27
+        Kural: uretici butcesi <= loader butcesi.
+        """
+        import build_book_pairs as BB
+        from train_llm import CTX_CHARS, MAX_CTX_LEN, MAX_SEQ_LEN
+        from seqgen import RESP_CHARS_MAX as RS
+        self.assertEqual(BB.CTX_CHARS, CTX_CHARS,
+                         'build_book_pairs.CTX_CHARS kaynaktan ayrildi')
+        self.assertEqual(BB.RESP_CHARS_MAX, RS,
+                         'build_book_pairs.RESP_CHARS_MAX kaynaktan ayrildi')
+        # loader'in gercekten kullandigi yanit butcesi
+        self.assertEqual(MAX_SEQ_LEN - MAX_CTX_LEN - 4, RS)
+
     def test_book_pairs_kelime_sonunda_keser(self):
         """build_book_pairs de ayni kurali kullanmali (300 krk sert kesme)."""
         import build_book_pairs as BP

@@ -431,6 +431,71 @@ class TestSureTavani(unittest.TestCase):
             % (format(butce, ','), format(tavan, ',')))
 
 
+    def _sync_ps1(self):
+        yol = os.path.join(BASE, 'sync_chatgrow.ps1')
+        if not os.path.exists(yol):
+            self.skipTest('sync_chatgrow.ps1 yok')
+        with io.open(yol, encoding='utf-8') as f:
+            return f.read()
+
+    def test_sync_tohumu_kosudan_turetiliyor(self):
+        """29.09 OLCUMU: tohum sabit 7 -> script 19 kosuda 16'si no-op.
+
+        '.. icerik mevcut bir HF dosyasiyla ayni; yeni dosya atildi'
+        Betigin amaci 'Kaggle en taze dosyayi glob'la alir'; sabit tohum
+        bunu gerceklastirmiyor, sadece ayni 1.200 cifti indirip atiyor.
+        """
+        sh = self._sync_ps1()
+        m = re.search(r'\[int\]\$Seed\s*=\s*(-?\d+)', sh)
+        self.assertIsNotNone(m, 'param([int]$Seed = ...) bulunamadi')
+        self.assertEqual(int(m.group(1)), 0,
+                         'tohum sabit: her kosuda ayni ciftler uretilip '
+                         'atiliyor (no-op). Varsayilan 0 = kosudan turet.')
+        self.assertIn('if ($Seed -le 0)', sh,
+                      '$Seed 0 ise kosudan turetilmiyor')
+        self.assertIn('Get-Date', sh,
+                      'tohum turetmesi zaman tabanli degil')
+        # HF adimi tohumu kullanmaya devam etmeli
+        self.assertIn('--seed $Seed', sh,
+                      'HF adimi $Seed kullanmiyor -> hep ayni veri')
+
+    def test_sync_kitap_dosyasi_sabit_adli(self):
+        """Zaman damgali kitap adi -> uretici her degistiginde dosya birikiyor.
+
+        build_book_pairs.py deterministik (SEED sabit) ve katalog tukenmis:
+        her kosuda ayni 609 cift. Son kosuda 609 ciftin yalniz 29'u
+        benzersizdi (%95 tekrar).
+        """
+        sh = self._sync_ps1()
+        self.assertNotIn('chatgrow_kitap_$(', sh,
+                         'kitap ciktisi yine zaman damgali ad kullaniyor')
+        self.assertIn("'chatgrow_kitap.jsonl'", sh,
+                      'kitap ciktisi sabit ad degil')
+        # tohumu almamali: kitap yarisi deterministik kalmali (commit gurultusu yok)
+        kitap_blok = sh.split('--- 2)')[1].split('--- 3)')[0] if '--- 2)' in sh else ''
+        self.assertNotIn('--seed', kitap_blok,
+                         'kitap adimi tohum aliyor -> her kosuda farkli '
+                         'veri, gereksiz commit')
+
+    def test_sync_kitap_butceyi_ustune_cikmiyor(self):
+        """29.09: sync script'i --ctx-len 300 --resp-len 300 veriyordu.
+
+        Loader clean_chars(x, 204) ile KAPALI sekilde kesiyor; uretici
+        300'de kelime sonunda kessse bile 300 > 204 oldugu icin hasar
+        dosyaya gomuluyordu (48/609 = %7,88). Script artik arguman
+        vermiyor; ureticinin varsayilani loader butcesine esit ve
+        testler kilitliyor.
+        """
+        sh = self._sync_ps1()
+        # yorum satirlari kod degildir (dosyada '--ctx-len VERILMEZ' diye
+        # yaziyor); sadece CALISTIRILAN satirlara bak
+        kod = '\n'.join(s for s in sh.splitlines()
+                        if not s.lstrip().startswith('#'))
+        self.assertNotIn('--ctx-len', kod, 'kitap adimi ctx butcesi veriyor')
+        self.assertNotIn('--resp-len', kod, 'kitap adimi resp butcesi veriyor')
+        # gercekten build_book_pairs cagrisi var mi
+        self.assertIn('build_book_pairs.py', kod)
+
     def test_patience_en_az_iki_kotu_olcum(self):
         """29.09: patience=2, --val-every 2 -> TEK kotu val OLCUMU.
 
