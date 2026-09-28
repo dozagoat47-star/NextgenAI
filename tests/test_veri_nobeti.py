@@ -30,6 +30,15 @@ if BASE not in sys.path:
 VERI = ['corpus.jsonl', 'corpus_ids.jsonl', 'intents.json',
         'knowledge_map.jsonl']
 
+# chatgrow_*.jsonl de proje kuralinda veri dosyasidir (uretici script'ler
+# disinda elle degistirilmez) ama 29.09'a kadar nabotce disinda kalmisti.
+# Bunlar yeniden uretildigi icin (fetch_hf_turkish / build_book_pairs)
+# test kosusunun degistirmemesi ayrica korunur.
+import glob as _glob
+CHATGROW = sorted(os.path.basename(p) for p in
+                  _glob.glob(os.path.join(BASE, 'chatgrow_*.jsonl')))
+VERI_TUMU = VERI + CHATGROW
+
 # Modul yuklenirken anlik durum (2. koruma)
 _ANLIK = {}
 for _d in VERI:
@@ -63,14 +72,22 @@ def _ozet(yol):
 class TestVeriDosyalariDokunulmaz(unittest.TestCase):
 
     def test_veri_dosyalari_git_head_ile_ayni(self):
-        """calisma agacinda bu dort dosya kirli mi? (yetkili olcum)"""
-        fark = _git_diff(VERI)
+        """calisma agacinda bu dosyalar kirli mi? (yetkili olcum)"""
+        fark = _git_diff(VERI_TUMU)
         if fark is None:
             self.skipTest('git erisilemiyor, HEAD karsilastirmasi yapilamadi')
         self.assertEqual(
             fark, '',
             'TEST KOSUSU VERI DOSYASINI DEGISTIRDI. Elle duzelt:\n'
-            '    git checkout -- %s\n%s' % (' '.join(VERI), fark))
+            '    git checkout -- %s\n%s' % (' '.join(VERI_TUMU), fark))
+
+    def test_chatgrow_dosyalari_nobotcede(self):
+        """chatgrow_*.jsonl de nabotce dahil olmali (29.09 eklendi)."""
+        self.assertTrue(CHATGROW,
+                        'chatgrow_*.jsonl bulunamadi; glob bozuk mu?')
+        for d in CHATGROW:
+            self.assertTrue(d.startswith('chatgrow_'), d)
+            self.assertTrue(d.endswith('.jsonl'), d)
 
     def test_bu_modul_icin_degisiklik_yok(self):
         """Bu modulun kendi testleri veri dosyasini degistirmemeli."""

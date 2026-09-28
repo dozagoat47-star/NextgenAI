@@ -42,6 +42,7 @@ def _default_kb_limit():
 
 from bpe import clean_text as _clean
 from naturalize import natural_variants
+from fetch_hf_turkish import cut_at_word
 
 
 def _latin(tag):
@@ -121,8 +122,15 @@ def build_knowledge_map(intents, limit=6000, kb_text_chars=300):
             if not chunk:
                 skipped += 1
                 continue
-            text = ((chunk.get('title') or '') + '. ' +
-                    (chunk.get('text') or ''))[:kb_text_chars]
+            # 29.09: [:kb_text_chars] SERT kesiyordu -> 29.982 satirin
+            # 17.558'i (%58,6) kelime ortasinda bitiyordu. Bu metin RAG
+            # kosullandirmasinda kullanildigi icin model boslukta kesilmis
+            # bir bilgiyi de kopyalayabiliyor. Once birlestir, sonra KELIME
+            # SONUNDA kes. kbmap.yml bu scripti zamanli calistirdigi icin
+            # duzeltme bir sonraki kosuda otomatik uygulanir.
+            text = cut_at_word(
+                (chunk.get('title') or '') + '. ' + (chunk.get('text') or ''),
+                kb_text_chars)
             if len(text.strip()) < 20:
                 skipped += 1
                 continue

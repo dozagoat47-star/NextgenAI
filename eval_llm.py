@@ -34,8 +34,9 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE)
 
 from llm import load_llm
-from train_llm import (INTENTS, MAX_PAIRS, CTX_CHARS, build_kb_lut,
-                       refine_resp, group_split, stabilize_first_words)
+from train_llm import (INTENTS, CTX_CHARS, build_kb_lut,
+                       refine_resp, group_split, stabilize_first_words,
+                       coz_max_pairs)
 from naturalize import naturalize_pairs
 from seqgen import load_pairs
 
@@ -356,7 +357,12 @@ def _load_items(rag, limit, natural=0):
     gormedi). Ayrica her ornekte FARKLI bir ctx secilir; boylece tek bir
     soru 5 varyantiyla sayilmaz.
     """
-    pairs = load_pairs(INTENTS, max_pairs=MAX_PAIRS, use_query=True,
+    # 29.09: MAX_PAIRS ham modul sabitini KULLANMA. 0 = OTOMATIK
+    # (coz_max_pairs) oldugu icin load_pairs'a 0 gondermek BOS KUME
+    # donuyordu -> degerlendirme sessizce 0.000 basiyordu. Cozumleme
+    # egitimle AYNI olmali, yoksa farkli bir veri dagilimi olculur.
+    butce = coz_max_pairs(yaz=False)
+    pairs = load_pairs(INTENTS, max_pairs=butce, use_query=True,
                        ctx_len=CTX_CHARS)
     pairs = [(ctx, rr) for ctx, r in pairs if (rr := refine_resp(r)) is not None]
     pairs = stabilize_first_words(pairs)
@@ -364,7 +370,13 @@ def _load_items(rag, limit, natural=0):
         pairs = naturalize_pairs(pairs, k=natural)
     tr_pairs, va_pairs, _va_ctx = group_split(pairs, val_frac=0.1)
     print(f'degerlendirme seti kaynagi: VAL kumesi (egitimde gorulmedi) | '
-          f'val {len(va_pairs)} cift, train {len(tr_pairs)} cift', flush=True)
+          f'butce {format(butce, ",")} | val {len(va_pairs)} cift, '
+          f'train {len(tr_pairs)} cift', flush=True)
+    if not va_pairs:
+        raise SystemExit(
+            'HATA: degerlendirme kumesi BOS. Eski surum burada sessizce '
+            'devam edip tum metrikleri 0.000 basiyordu. Veri yuklenemedi; '
+            'intents.json ve --natural degerini kontrol et.')
 
     kb_pre = {}
     if rag and os.path.exists(KB_MAP):

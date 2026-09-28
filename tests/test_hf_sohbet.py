@@ -100,6 +100,169 @@ class TestCutAtWord(unittest.TestCase):
         self.assertEqual(bozuk, 0, '%d kirpma yarim kelime birakti' % bozuk)
 
 
+class TestYanitKirpmaKelimeSonunda(unittest.TestCase):
+    """29.09: YANIT hatti ctx'in tersini uyguluyordu -> sohbet verisinin
+    %79,4'u kelime ortasinda bitiyordu.
+
+    OLCUM (dosyalar uzerinde, loader hic calistirilmadan):
+      chatgrow_hf_sohbet.jsonl   yanit tavani 204 | 3.825 tavana dayanmis
+                                 | 3.726 (%97,4) YARIM KELIME
+      chatgrow_hf_20260924_1948  yanit tavani 140 | 2.110 | 2.048 (%97,1)
+      chatgrow_kitap_*           yanit tavani 300 |    24 |    24 (%100)
+      load_chatgrow_pairs sonrasi: 8.734/10.995 = %79,4 yanit, %87,4 ctx
+      intents.json: 0/169.977 (TEMIZ -- sorun yalnizca chatgrow'da)
+    """
+
+    def _ciftler(self, n=40, cap=140):
+        """cap'te sert kesilen, kelime ortasinda biten yanitlar uretir."""
+        out = []
+        rng = __import__('random').Random(7)
+        for i in range(n):
+            kelimeler = ['w%d' % (i * 7 + j) for j in range(30)]
+            s = ' '.join(rng.choice(kelimeler) for _ in range(30))
+            out.append(s)
+        return out
+
+    def test_refine_resp_sert_kesmeyi_kullanmaz(self):
+        """refine_resp cumle sonu bulamazsa KELIME SONUNDA kesmeli."""
+        s = ('burada uzun bir aciklama var ve devam ediyor boylece '
+             'fakat hic nokta isareti yok')
+        r = FH.refine_resp(s, 40)
+        self.assertIsNotNone(r)
+        self.assertLessEqual(len(r), 40)
+        tam = FH.clean_chars(s, None)
+        self.assertTrue(tam.startswith(r.rstrip()),
+                        'kirpma metnin bir onek olmali')
+        if len(r) < len(tam):
+            self.assertIn(tam[len(r)], (' ', ''),
+                          'kirpma noktasi BOSLUKTA olmali (yarim kelime yasak)')
+
+    def test_ureticinin_yanit_hatti_once_kirpmaz(self):
+        """ASIL HATA: refine_resp(clean_chars(resp, LEN), maxc=LEN).
+
+        clean_chars once LEN'e indirir, refine_resp 'len <= maxc' dalina duser.
+        29.09: bu yuzden sohbet verisinin %79,4'u yarim kelimeydi.
+        """
+        s = ('bu bir ornek yanit metni ve oldukca uzun bir sey '
+             'cunku devam ediyor boylece')
+        yanlis = FH.refine_resp(FH.clean_chars(s, 20), maxc=20)
+        dogru = FH.refine_resp(FH.clean_chars(s, None), maxc=20)
+        self.assertEqual(yanlis, FH.clean_chars(s, 20),
+                         'beklenen: once kirpma onarimi calistirmaz (hata)')
+        # TERSI: dogru cagri 20'de degil, son BOSLUKTA biter
+        self.assertEqual(dogru, 'bu bir ornek yanit')
+        self.assertNotEqual(dogru, yanlis)
+        tam = FH.clean_chars(s, None)
+        self.assertIn(tam[len(dogru)], (' ', ''),
+                      'dogru cagri da yarim kelime birakmamali')
+
+    def test_ureticinin_yuruttugu_yanitlar_kelime_sonunda_biter(self):
+        """Ucuz dogru kural: once normalize, sonra refine_resp.
+
+        Ureticinin YANIT hattinda her zaman kullanmasi gereken iki adim.
+        """
+        bozuk = 0
+        for s in self._ciftler(60):
+            r = FH.refine_resp(FH.clean_chars(s, None), maxc=140)
+            if r is None:
+                continue
+            if len(r) >= 140 and r[-1] not in ' .!?,;:':
+                bozuk += 1
+        self.assertEqual(bozuk, 0,
+                         '%d yanit tavana dayanip yarim kelime kaldi' % bozuk)
+
+    def test_bozuk_desen_kaynak_kodu_yasaklar(self):
+        """Regresyon noketasi: TERSI desen kaynak koda girmeyecek."""
+        with open(os.path.join(BASE, 'fetch_hf_turkish.py'),
+                  encoding='utf-8') as fh:
+            kaynak = fh.read()
+        duz = ' '.join(kaynak.split())
+        self.assertNotIn('refine_resp(clean_chars(resp, args.resp_len)', duz,
+                         'once clean_chars ile kirpmak onarimi calistirmaz')
+        self.assertNotIn('r[:maxc].strip()', duz,
+                         'sert kesme yasak; cut_at_word kullan')
+
+    def test_refine_resp_butceyi_asmaz(self):
+        """29.09: cumle sonu aramasi maxc+8'e bakiyordu -> 204'te 210 krk.
+
+        Butceyi asan yanit, loader'da clean_chars(x, 204) ile SERT kesildigi
+        icin yarim kelimeye donusuyordu. Sondanin ciktisi 210 krkta bulundu.
+        """
+        asilan = 0
+        for s in self._ciftler(120):
+            # her metni noktali tumce olarak zenginlestir: sonrasi 204+ olsun
+            zengin = s + '. ' + ' '.join('ek%d' % i for i in range(40))
+            r = FH.refine_resp(FH.clean_chars(zengin, None), maxc=204)
+            if r is None:
+                continue
+            if len(r) > 204:
+                asilan += 1
+        self.assertEqual(asilan, 0,
+                         '%d yanit butceyi asti (loader sert keser)' % asilan)
+
+    def test_uretilen_cift_loaderda_kirpma_kaybettirmez(self):
+        """Uretici -> loader zinciri butun bos (birebir ayni metin)."""
+        from train_llm import load_chatgrow_pairs
+        import tempfile
+        import json as _json
+        gecersiz = 0
+        ornekler = []
+        with tempfile.TemporaryDirectory() as d:
+            yol = os.path.join(d, 'chatgrow_t.jsonl')
+            with open(yol, 'w', encoding='utf-8') as f:
+                for s in self._ciftler(150):
+                    zengin = s + '. ' + ' '.join('ek%d' % i for i in range(40))
+                    c = FH.cut_at_word(FH.clean_chars(s, None), 64)
+                    r = FH.refine_resp(FH.clean_chars(zengin, None), maxc=204)
+                    if c and r:
+                        f.write(_json.dumps({'query': c, 'answer': [r]},
+                                            ensure_ascii=False) + '\n')
+            for c, r in load_chatgrow_pairs([yol]):
+                # loader kirpmis olmamali: cift aynen gecmeli
+                if c != FH.cut_at_word(FH.clean_chars(c, None), 64) or \
+                        r != FH.clean_chars(r, 204):
+                    gecersiz += 1
+                    if len(ornekler) < 3:
+                        ornekler.append((c[-30:], r[-30:]))
+        self.assertEqual(gecersiz, 0,
+                         'loader %d cifti KIRPTA (yarim kelime). orn: %s'
+                         % (gecersiz, ornekler))
+
+    def test_bosluksuz_ctx_elenir(self):
+        """29.09: cut_at_word bosluksuz metinde kelime siniri bulamaz.
+
+        Olcum (yeni sohbet dosyasi, 5.714 cift): 99 bosluksuz ctx (%1,73),
+        80 ctx'nin 24'u tam 64 krkta SERT kesilmis. Hepsi URL/sinif adi
+        gibi dogal Turkce olmayan girdi. Uretici bunlari elemeli.
+        """
+        # 64'ten UZUN ve bosluksuz: rfind(' ') = -1 -> sert kesme
+        uzun = 'sifirdanbirbir' * 8
+        self.assertNotIn(' ', uzun)
+        self.assertGreater(len(uzun), 64)
+        kes = FH.cut_at_word(uzun, 64)
+        self.assertEqual(len(kes), 64,
+                         'bosluksuz metinde cut_at_word sert kesiyor')
+        # ureticinin kapisi: bosluk yoksa cift eklenmez
+        with open(os.path.join(BASE, 'fetch_hf_turkish.py'),
+                  encoding='utf-8') as fh:
+            kaynak = fh.read()
+        self.assertIn("if ' ' not in ctx_c:", kaynak,
+                      'bosluksuz ctx kapisi eksik')
+
+    def test_book_pairs_kelime_sonunda_keser(self):
+        """build_book_pairs de ayni kurali kullanmali (300 krk sert kesme)."""
+        import build_book_pairs as BP
+        s = ' '.join('kelime%d' % i for i in range(60))
+        k = BP.cut_at_word(BP.clean_chars(s, None), 50)
+        self.assertLessEqual(len(k), 50)
+        self.assertIn(s[len(k)], (' ', ''), 'yarim kelime birakildi')
+        with open(os.path.join(BASE, 'build_book_pairs.py'),
+                  encoding='utf-8') as fh:
+            kaynak = fh.read()
+        self.assertNotIn('clean_chars(ctx, ctx_max)', kaynak)
+        self.assertNotIn('clean_chars(resp, resp_max)', kaynak)
+
+
 class TestDilKapilari(unittest.TestCase):
     """Stopword tabanli ayirim (28.09 olcumuyle secildi).
 

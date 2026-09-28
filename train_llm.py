@@ -1039,8 +1039,16 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
     tr = make_batches(tr_pairs, batch_size, dummy, ctx_map)
     va = make_batches(va_pairs, batch_size, dummy, ctx_map)
     print('train batch:', len(tr), '| val batch:', len(va), flush=True)
-    print('ornek cift:', (clean_chars(tr_pairs[0][0], 30),
-                          clean_chars(tr_pairs[0][1], 30)), flush=True)
+    # 29.09: once 30 krk'a SERT kesip gosteriyordu; ekranda yarim cumle
+    # gorununce veri bozuk sanildi. Kirpma isareti (… ) + GERCEK uzunluk
+    # yazilir, boylece ekrandaki kisaltma veriden ayirt edilir.
+    def _goster(s, n=30):
+        s = clean_chars(s, None)
+        return (s[:n] + u'…') if len(s) > n else s
+    _c0, _r0 = tr_pairs[0]
+    print('ornek cift (%d/%d krk): (%r, %r)' % (len(_c0), len(_r0),
+                                                _goster(_c0), _goster(_r0)),
+          flush=True)
     try:
         # v4: pickle YOK. Tum batch'ler (Bmax, T0)_cadde TEK duz diziye pad'lenir;
         # gercek (B,T) olculeri sh_tr/sh_va ile saklanir. Dinamik budama sonrasi

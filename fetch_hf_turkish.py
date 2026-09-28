@@ -94,16 +94,28 @@ def cut_at_word(s, max_len):
 
 
 def refine_resp(r, maxc):
-    """Cevabi cumle sonunda budar (yarim kelime ezberi olmaz)."""
+    """Cevabi cumle sonunda budar (yarim kelime ezberi olmaz).
+
+    CUMLE SONU ARAMASI maxc ICINDE kalmalidir. 29.09 olcumu: eski
+    `range(15, min(len(r), maxc + 8))` butceyi 8 karakter asiyordu
+    (204 -> 210 krk). Sonuc: ureticiden temiz cikan yanit, loader'da
+    clean_chars(x, 204) ile 204'e SERT kesildigi icin yine yarim kelime
+    oluyordu. Arama [15, maxc) araligina indirildi -> cikti ASLA butceyi
+    asmaz, loader'in kesmesi tetiklenmez.
+    """
     r = (r or '').strip()
     if len(r) < 10:
         return None
     if len(r) > maxc:
         cut = 0
-        for i in range(15, min(len(r), maxc + 8)):
+        for i in range(15, min(len(r), maxc)):
             if r[i] in '.?:!':
                 cut = i
-        r = r[:cut + 1].strip() if cut > 0 else r[:maxc].strip()
+        # 29.09: cumle sonu bulunamadiysa SERT kesme yasak. r[:maxc] kelime
+        # ortasinda birakir ve modele "kelimenin ortasinda dur" aliskanligi
+        # ogretir. Olcum: 204 butcesinde kalan 3.825 yanitin %97,4'u yarim
+        # kelimeyle bitiyordu.
+        r = r[:cut + 1].strip() if cut > 0 else cut_at_word(r, maxc)
     if not r:
         return None
     return r
@@ -538,9 +550,24 @@ def main(argv=None):
             # Olcum: sert kesme metnin %59,8'inde yarim kelime birakiyordu
             # ('... neden kullanilir? gerekl').
             ctx_c = cut_at_word(clean_chars(ctx, None), args.ctx_len)
-            resp_c = refine_resp(clean_chars(resp, args.resp_len),
+            # 29.09: yanit hatti da ayni kurala uyuyordu ama TERSI uygulaniyordu.
+            # clean_chars(resp, LEN) once 204'e indiriyor, sonra refine_resp
+            # eline 'len <= maxc' olan bir metin alip onarim dalina hic girmiyor.
+            # test_oncesiz_kirpma_gerekir bu tuzagi tam olarak adlandiriyor; ctx
+            # icin duzeltilmis, yanit icin unutulmus. Ayni tuzak PARDUS.
+            resp_c = refine_resp(clean_chars(resp, None),
                                  maxc=args.resp_len)
             if not ctx_c or not resp_c:
+                continue
+            # 29.09: cut_at_word kelime siniri BULAMAZ bosluksuz metinde
+            # (rfind(' ') = -1) ve s[:LEN] doner -> sert kesme. Olcum
+            # (yeni sohbet dosyasi, 5.714 cift): 99 bosluksuz ctx (%1,73),
+            # 80 ctx'nin 24'u tam 64 krkta sert kesilmis. Bunlar URL, sinif
+            # adi, birlestirilmis kelime gibi DOGAL TURKCE OLMAYAN girdiler
+            # ('...mysql.cj.jdbc.exceptions...', '...dasqua-2115-2310-metal').
+            # Kirpmak onlari duzeltmez; modele URL/sinif adi yazmayi
+            # ogretir. Kapi: en az bir bosluk.
+            if ' ' not in ctx_c:
                 continue
             if args.cot and 'Kisa dusunce' in ctx_c:
                 continue                    # ctx'e CoT karistirme

@@ -311,5 +311,49 @@ class TestRealModelEval(unittest.TestCase):
         self.assertLessEqual(agg['gen_index'], 1.0)
 
 
+class TestButceBoslukHatasi(unittest.TestCase):
+    """29.09: eval_llm degerlendirme kumesini BOS birakti, metrikler 0.000.
+
+    MAX_PAIRS ham modul sabiti 0'dir ('0 = otomatik', coz_max_pairs). 0'i
+    load_pairs'a vermek 0 cift dondurur -> val kumesi bos -> tum skorlar
+    sessizce 0.000 basilir. Gozle gorunmez: rapor yine uretilir.
+
+    Kanit (bu hatadan sonra yapilan ilk olcum):
+        degerlendirme seti: 0 cift (rag=False)
+        ALTIN KAPSAMA  (gold_recall)   : 0.000
+        QA skoru     (0-1, alaka-ust) : 0.000
+    """
+
+    def test_hamsabit_kullanilmiyor(self):
+        """_load_items icinde MAX_PAIRS sabiti GECMEMELI."""
+        import eval_llm
+        import inspect
+        kaynak = inspect.getsource(eval_llm._load_items)
+        self.assertNotIn('max_pairs=MAX_PAIRS', kaynak,
+                         'ham MAX_PAIRS (0) kullanildi -> bos degerlendirme')
+        self.assertIn('coz_max_pairs', kaynak,
+                      'egitimle ayni butce cozumlemesi kullanilmalı')
+
+    def test_butce_cozumlemesi_egitimle_ayni(self):
+        from train_llm import MAX_PAIRS, coz_max_pairs
+        self.assertEqual(MAX_PAIRS, 0,
+                         'bu test MAX_PAIRS=0 varsayimina dayanir')
+        self.assertGreater(coz_max_pairs(yaz=False), 0,
+                           'coz_max_pairs bos butce dondurdu')
+
+    def test_bos_kume_sessizce_gecmiyor(self):
+        """Bos val kumesi hata olmalı, 0.000 metrik degil."""
+        import eval_llm
+        import inspect
+        kaynak = inspect.getsource(eval_llm._load_items)
+        self.assertIn('raise SystemExit', kaynak,
+                      'bos degerlendirme kumesi sessizce 0 basiyor')
+
+    def test_kaynak_kodu_bos_kume_kontrolu_iceriyor(self):
+        with io.open(os.path.join(BASE, 'eval_llm.py'), encoding='utf-8') as f:
+            kaynak = ' '.join(f.read().split())
+        self.assertIn('degerlendirme kumesi BOS', kaynak)
+
+
 if __name__ == '__main__':
     unittest.main()

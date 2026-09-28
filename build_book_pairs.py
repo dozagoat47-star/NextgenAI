@@ -50,7 +50,7 @@ import re
 import sys
 import time
 
-from fetch_hf_turkish import (clean_chars, jaccard, dedupe_pairs,
+from fetch_hf_turkish import (clean_chars, cut_at_word, jaccard, dedupe_pairs,
                               ALLOWED_EXTRAS, MAXSEP, SEED)
 
 # --- kaynak eserler (kategori adi) ------------------------------------------
@@ -200,8 +200,10 @@ def build_poem_continuation(verses, ctx_max=300, resp_max=300):
     for i in range(2, len(verses)):
         ctx = ' '.join(verses[max(0, i - 2):i])
         resp = verses[i]
-        ctx = clean_chars(ctx, ctx_max)
-        resp = clean_chars(resp, resp_max)
+        # 29.09: once normalize, sonra KELIME SONUNDA kes. clean_chars sert
+        # kesiyordu (300 krkte 24 yanitin 24'u yarim kelimeydi).
+        ctx = cut_at_word(clean_chars(ctx, None), ctx_max)
+        resp = cut_at_word(clean_chars(resp, None), resp_max)
         if len(ctx) < 20 or len(resp) < 10:
             continue
         pairs.append((ctx, resp))
@@ -244,8 +246,9 @@ def build_continuation(wts, ctx_max=300, resp_max=300):
         half = len(sents) // 2
         ctx = ' '.join(sents[:half])
         resp = ' '.join(sents[half:])
-        ctx = clean_chars(ctx, ctx_max)
-        resp = clean_chars(resp, resp_max)
+        # 29.09: ayni kural (once normalize, sonra kelime sonunda kes).
+        ctx = cut_at_word(clean_chars(ctx, None), ctx_max)
+        resp = cut_at_word(clean_chars(resp, None), resp_max)
         if len(ctx) < 20 or len(resp) < 20:
             continue
         pairs.append((ctx, resp))

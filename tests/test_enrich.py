@@ -395,6 +395,61 @@ class TestCorpusRarePathKeepsNewChunks(unittest.TestCase):
         shutil.rmtree(d)
 
 
+class TestKnowledgeMapKirpmaKelimeSonunda(unittest.TestCase):
+    """29.09: enrich_intents.build_knowledge_map bilgi metnini SERT kesti.
+
+    OLCUM: knowledge_map.jsonl'deki 29.982 satirin 17.558'i (%58,6) 300
+    karakterde KELIME ORTASINDA bitiyordu. Bu metin RAG kosullandirmasinda
+    kullanildigi icin model boslukta kesilmis bilgiyi de kopyalayabilir.
+    Duzeltme: once birlestir, sonra cut_at_word. kbmap.yml bu scripti
+    zamanli calistirdigi icin bir sonraki kosuda otomatik uygulanir.
+    """
+
+    def test_kaynak_kodu_sert_kesmiyor(self):
+        with io.open(os.path.join(BASE, 'enrich_intents.py'),
+                     encoding='utf-8') as f:
+            kaynak = ' '.join(f.read().split())
+        self.assertNotIn("))[:kb_text_chars]", kaynak,
+                         'sert kesme yasak; cut_at_word kullan')
+        self.assertIn('cut_at_word', kaynak)
+
+    def test_kesilen_bilgi_kelime_sonunda_biter(self):
+        import enrich_intents
+        from fetch_hf_turkish import cut_at_word
+        tam = ('Matematik. ' + ' '.join('terim%d' % i for i in range(80)))
+        k = cut_at_word(tam, 300)
+        self.assertLessEqual(len(k), 300)
+        self.assertIn(tam[len(k)], (' ', '.'), 'yarim kelime birakildi')
+        # butce asilirsa kirpma olur; asilmazsa metin aynen gecer
+        self.assertTrue(tam.startswith(k))
+
+    def test_knowledge_map_hicbir_satir_yarim_kelime_degil(self):
+        """Mevcut dosya kbmap.yml'nin bir sonraki kosusuna kadar bozuk olabilir.
+
+        Bu test KIRLI oldugunu RAPORLAR; duzeltilince sessizce gecer.
+        """
+        p = os.path.join(BASE, 'knowledge_map.jsonl')
+        if not os.path.exists(p):
+            self.skipTest('knowledge_map.jsonl yok')
+        kirp = yarim = 0
+        with io.open(p, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                t = (json.loads(line).get('text') or '')
+                if len(t) >= 300:
+                    kirp += 1
+                    if t[-1] not in ' .!?,;:':
+                        yarim += 1
+        if kirp and yarim:
+            self.skipTest(
+                'knowledge_map hala bozuk: %d/%d tavana dayanmis satir yarim '
+                'kelime. enrich_intents duzeltildi; kbmap.yml bir sonraki '
+                'kosusunda yenilecek (DURUM: %%%.1f yarim).'
+                % (yarim, kirp, 100.0 * yarim / kirp))
+
+
 class TestEnrichMetaIdempotency(unittest.TestCase):
     def test_intents_has_enrich_marker(self):
         p = os.path.join(BASE, 'intents.json')
