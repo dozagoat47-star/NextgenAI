@@ -47,11 +47,20 @@ MODE="${1:-verify}"
 # belirler. 12 -> lr_horizon=12, yani LR butun butce boyunca LR_MIN'e iner
 # (eski 10 epoch'lik kosunun lr_horizon=10'u ile kiyaslanabilir).
 EPOCHS="${2:-${LLM_EPOCHS:-12}}"
-# Sabir EPOCH cinsinden (bkz. train_llm.py). 2 = --val-every 2 ile TEK kotu
-# val OLCUMU, yani val TEK SEFER yukselince dur (kullanici tercihi).
-# Eski deger 6 idi = 3 kotu olcum; gurultu yuzunden gec duruluyordu.
-# Yan etki: lr_horizon 26 -> 12 (EPOCHS da 12 oldugu icin).
-PATIENCE="${LLM_PATIENCE:-2}"
+# Sabir EPOCH cinsinden (bkz. train_llm.py) ve --val-every 2 ile 1 kotu
+# val OLCUMU = 2 epoch demektir.
+#
+# 29.09 OLCUMU: patience=2 ile kosu 6. epoch'ta BITTI, val kaybi 0,5827
+# (4. epoch) -> 0,5901 (6. epoch), yani %1,3 artti. Ama ayni noktada acc
+# HALA YUKSELIYORDU (0,876 -> 0,885) ve train kaybi hizla iniyordu
+# (0,4784 -> 0,3425). lr_horizon=12 idi, yani kosu LR'nin tam inmedigi
+# yerde kesildi; 27.09 kosusu 12 epoch'a tamamlamisti. Tek kotu olcum
+# gurultuyle erken durduruyor.
+#
+# 4 = iki kotu olcum (4 epoch). lr_horizon etkilenmez:
+# min(EPOCHS=12, patience+20=24) = 12 -> LR programi AYNI kalir, sadece
+# erken durma gevser. 12 epoch x ~18 dk = ~3,6 saat (9 saat oturuma sigar).
+PATIENCE="${LLM_PATIENCE:-4}"
 
 CGARG=''
 if compgen -G 'chatgrow_*.jsonl' > /dev/null; then

@@ -431,5 +431,38 @@ class TestSureTavani(unittest.TestCase):
             % (format(butce, ','), format(tavan, ',')))
 
 
+    def test_patience_en_az_iki_kotu_olcum(self):
+        """29.09: patience=2, --val-every 2 -> TEK kotu val OLCUMU.
+
+        Olcum: kosu 6. epoch'ta bitti. val kaybi 0,5827 (4. ep) -> 0,5901
+        (6. ep), yani %1,3 artti; ama acc HALA YUKSELIYORDU (0,876 ->
+        0,885) ve train kaybi hizla iniyordu (0,4784 -> 0,3425).
+        lr_horizon=12 idi, kosu LR tam inmeden kesildi. 27.09 kosusu 12
+        epoch'a tamamlamisti.
+
+        Yan etkisi olmayan tek duzeltme: patience 2 -> 4. lr_horizon
+        min(EPOCHS=12, patience+20=24) = 12 oldugu icin LR programi AYNI.
+        """
+        yol = os.path.join(BASE, 'kaggle_start.sh')
+        if not os.path.exists(yol):
+            self.skipTest('kaggle_start.sh yok')
+        with open(yol, encoding='utf-8') as f:
+            sh = f.read()
+        m = re.search(r'PATIENCE="\$\{LLM_PATIENCE:-(\d+)\}"', sh)
+        self.assertIsNotNone(m, 'PATIENCE varsayilani bulunamadi')
+        p = int(m.group(1))
+        self.assertGreaterEqual(
+            p, 4,
+            'patience=%d ama --val-every 2 ile bu TEK kotu val olcumudur '
+            '(2 epoch). Gurultu erken durduruyor; en az iki olcum gerekir.'
+            % p)
+        # LR programi degismemis olmali
+        EPOCHS = int(re.search(r'EPOCHS="\$\{2:-\$\{LLM_EPOCHS:-(\d+)\}\}"',
+                               sh).group(1))
+        self.assertEqual(min(EPOCHS, p + 20), EPOCHS,
+                         'patience artisi lr_horizon\'i degistirdi; '
+                         'LR programi kasten ayni kalmaliydi')
+
+
 if __name__ == '__main__':
     unittest.main()
