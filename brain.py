@@ -1593,17 +1593,56 @@ class ChatBot:
         t = ' '.join(self.ascii_normalize(text.strip().lower()).split())
         return t.startswith(REFUSAL_LEAD)
 
+    def _tag_content_words(self, tag):
+        """Bir sohbet intent'inin GERCEK icerik kelimeleri.
+
+        ONCEKI HALI YANLISTI: kapi sorguyu tag'in ADINA karsilastiriyordu
+        (str(tag) -> {'spor'}). "futbol nedir" icerik kelimeleri {futbol}
+        oldugu icin kesisim bos cikiyor, dogru cevap reddediliyordu:
+
+            intents.json'da  tag 'spor' -> patterns: [..., "futbol nedir", ...]
+            yanit[0]        = "Futbol dunyanin en populer sporudur, 11
+                               kisilik takimlar oynar!"
+            siniflandirici  = tag=spor, prob=0.999   (DOGRU buldu)
+            kapisi          = _tag_shares_content_word('spor', 'futbol nedir')
+                             = False                (yanlissa reddetti)
+            sonuc           = "Bu konuda bilgim yok..."  (cevap elde varken)
+
+        Olculmus etki: "X nedir" sorularinin %90'i "bilgim yok" donuyordu.
+        Tag bir ETIKETTIR, icerik intent'in YANITLARINDADIR.
+        """
+        aday = set()
+        for y in (self.intents.get(tag) or ()):
+            aday |= self._content_words(str(y))
+        if isinstance(tag, str):
+            aday |= self._content_words(tag)
+        kws = getattr(self, 'intent_kws', None)
+        if kws and tag in kws:
+            # intent_kws KOK saklar ('kaleci' -> 'kalec'); soru kelimeleri de
+            # koklendigi icin ayni normalizasyondan gecirilir, aksi halde
+            # ham 'kaleci' ile koklu 'kalec' karsilastirilir ve hep eler.
+            for w in kws[tag]:
+                if w not in STOPWORDS:
+                    aday |= self._content_words(str(w))
+        return aday
+
     def _tag_shares_content_word(self, tag, query):
         """Sohbet intent'i soruyla bir icerik kelimesi paylasiyor mu?
 
         Bilgi sorusu retrieval'da bulunamadiysa, sohbet intent'ine gecmek
         ancak konu gercekten iliskiliyse mantikli. Aksi halde bot 0.95+ guvenle
         alakasiz bir yanit uydurur ("suyun formulu nedir" -> teknoloji).
+
+        Karsilastirma artik intent'in YANITLARI + anahtar kelimeleri ile
+        yapilir, tag adiyla degil (bkz. _tag_content_words, onceki hata).
+        Regresyon korumasi duruyor: alakasiz bir konuda ("suyun formulu nedir"
+        -> teknoloji) yanit kumesinde 'suyu'/'formulu' gecmez, kapi yine
+        kapanir.
         """
         qw = self._content_words(query)
         if not qw:
             return False
-        return bool(qw & self._content_words(str(tag)))
+        return bool(qw & self._tag_content_words(tag))
 
     def _knowledge_tag_credible(self, tag, query):
         """Bilgi-intent override'i inandirici bir eslesme mi?
