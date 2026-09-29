@@ -9,6 +9,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 import os
 import json
+import hashlib
 import random
 import re
 import secrets
@@ -339,6 +340,76 @@ def is_factual_query(text):
                                    [' ne ', ' kim ', ' nerede ', ' nasil ', ' kac ', ' hangi ', ' neden '])
 
 
+def learned_chunk_id(slug, text, exists):
+    """Internetten gelen bilgi icin HICBIR SEYI EZMEYEN id uretir.
+
+    OLCULEN HATA (29.09): id = slug idi ve `Corpus.append_many` ayni id'yi
+    GUNCELLER (corpus.py:1109, "ayni id guncellenir"). "matematik nedir"
+    sorusunda AutoGrow'un 3.240 baytlik tanimi, internetten gelen tek
+    cumleyle degistirildi. Iki kayip birden: (a) zengin metin kalici olarak
+    yok edildi, (b) her benzer soru ayni ezmeyi tekrar ediyor.
+
+    KURALLAR:
+      * ayni baslik + ayni metin  -> ayni id. Soruyu tekrar etmek korpusu
+        buyutmez, ayni kayit guncellenir (ozgunluk korunur).
+      * ayni baslik + farkli metin -> FARKLI id. Kayit sifirlanmaz.
+      * id cakisirsa sayac eklenir. 8 haneli hash'te pratikte olmaz;
+        yine de belirleyicilik (determinism) bozulmasin diye var.
+
+    `exists`: id -> bool. Disaridan verilir ki testte sahte sozluk
+    kullanilabilsin (gercek korpusu okumadan).
+    """
+    h = hashlib.sha1(text.encode('utf-8', 'ignore')).hexdigest()[:8]
+    base = ('ogr_%s_%s' % (slug, h)) if slug else ('ogr_%s' % h)
+    if not exists(base):
+        return base
+    i = 2
+    while exists('%s_%d' % (base, i)):
+        i += 1
+    return '%s_%d' % (base, i)
+
+
+def learn_from_internet(knowledge, message):
+    """Internet bilgisini corpus'a kaydeder, ama HICBIR KAYIT EZMEZ.
+
+    Ogrenmenin amaci eksik olguyu tamamlamaktir. Varli bir olguyu internet
+    metniyle degistirmek ogrenme degil, veri bozmadir - 29.09'ta olan da
+    buydu. Iki koruma birlikte calisir:
+
+      1) Baslik zaten korpussa HIC YAZILMAZ. Ayni baslikta ikinci bir
+         kayit acmak da zararli: arama iki kayittan birini sececegi icin
+         (corpus.py:995) zengin metin sessizce kaybolabilirdi.
+      2) Yazilacaksa id metin hash'i tasiyacak (yukarida). Yani bir
+         baslik zaten yoksa bile id cakissiz kalir.
+
+    Doner: yazilan id, ya da None (yazilmadi).
+    """
+    title = (knowledge.get('title') or '').strip()
+    text = (knowledge.get('answer') or '').strip()
+    if not text:
+        # Bos metni kaydetmek, sonra o bos kaydin sorulmasi -> "bilgim yok"
+        # yerine bos cevap demek. Ogrenme bos yere yapilmis olur.
+        return None
+
+    slug = corpus._slug(title)
+    if slug and slug in corpus._slug_idx:
+        print("[CHAT] Internet bilgisi yazilmadi, baslik zaten korpusta: %s"
+              % title)
+        return None
+
+    # id kumesi yalnizca yazma aninda kurulur (bu yol nadirdir: korpus
+    # cevabi reddedilip internete dusuldugunde calisir).
+    ids = set(c.get('id') for c in corpus.chunks)
+    chunk_id = learned_chunk_id(slug or 'bilgi', text, lambda i: i in ids)
+    Corpus.append_many([{'id': chunk_id,
+                         'title': title,
+                         'text': text,
+                         'patterns': message,
+                         'source': 'learned'}])
+    corpus.refresh()
+    return chunk_id
+
+
 def fallback_answer(message):
     """Dataset cevabina guvenilmezse: corpus -> internet (sessizce ogrenerek) -> bilmiyorum.
 
@@ -369,15 +440,15 @@ def fallback_answer(message):
         if knowledge:
             # Ogrenme: internetten gelen bilgi corpus'a yazilir; bir dahaki
             # soruya kutuphane aninda cevap verir (yeniden egitim gerekmez).
+            # ANCAK hicbir kayit ezilmez: 29.09'ta id=slug idi ve
+            # append_many ayni id'yi guncelliyordu, "matematik nedir"
+            # sorusu AutoGrow'un 3.240 baytlik tanimini internet cumlesiyle
+            # sildi. Kural ve olcum: learn_from_internet.
             try:
-                slug = bot.ascii_normalize(knowledge['title'].strip().lower()).replace(' ', '_')
-                Corpus.append_many([{'id': slug,
-                                     'title': knowledge['title'],
-                                     'text': knowledge['answer'],
-                                     'patterns': message,
-                                     'source': 'learned'}])
-                corpus.refresh()
-                print("[CHAT] Internet bilgisi corpus'a kaydedildi: " + knowledge['title'])
+                chunk_id = learn_from_internet(knowledge, message)
+                if chunk_id:
+                    print("[CHAT] Internet bilgisi corpus'a kaydedildi: %s (%s)"
+                          % (knowledge.get('title', ''), chunk_id))
             except Exception as e:
                 print(f"[CHAT] Corpus kaydinda hata: {e}")
             raw = knowledge.get('raw') or knowledge['answer']
