@@ -28,4 +28,5 @@ _dbg_*
 _verify_task.ps1
 chatgrow_kitap_mini.jsonl
 eval_llm_report_*.json
+olcum_raporlari/
 .sisyphus/
