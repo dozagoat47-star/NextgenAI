@@ -719,6 +719,9 @@ class ChatBot:
         self.model = None
         self.intents = {}
         self.all_patterns = []
+        # TAM pattern -> tag dizini (normalizasyonlu anahtar). Yanit yolunda
+        # ilk bakilan sey bu olmalidir; bkz. _exact_pattern_tag.
+        self.pattern_tags = {}
         self.vocabulary = []
         self.intent_tags = []
         self.stem_cache = {}
@@ -960,6 +963,37 @@ class ChatBot:
 
         self.intents = {intent['tag']: intent['responses'] for intent in data['intents']}
         self.all_patterns = []
+        # TAM ESLESME DIZINI. Olcum (25.09): intents.json'da 67.708 pattern
+        # var ve sorular BIREBIR olarak duruyor --
+        #     "ekonomi nedir" -> tag 'ekonomi'
+        #     "islam nedir"   -> tag 'islam'
+        #     "muzik nedir"   -> tag 'musiki'
+        # Ama yanit yolunda bu dizin HIC kullanilmiyordu: all_patterns duz
+        # liste ve yalnizca otomatik tamamlama icin. Tek dize yolu 40 sinifli
+        # sinir agi + bulanik IDF eslesmesiydi; o da olgu sorularini yapmiyor,
+        # sadece yakin bir sohbet sinifi buluyor:
+        #     "ekonomi nedir"      -> tag 'dusuk karbonlu ekonomi' (0.9+)
+        #     "siber guvenlik nedir" -> tag 'sib kuh ilcesi'
+        #     "islam nedir"        -> tag "2017 islami dayanisma oyunlari..."
+        # sonra brain.py:1746'daki `chosen_tag in self.intent_tags` sartı
+        # tutmadigi icin "bilgim yok" donuyordu - %60 oraninda.
+        #
+        # Cakisma kurali: 67.708 pattern'in sadece 16'si birden fazla intent'te
+        # gecuyor (%0,02) ve 16'nin 16'sinda da sohbet sinifi listede BIRINCI.
+        # Bu yuzden onceligin sohbet sinifine verilmesi 16/16'yi dogru cozer.
+        # Yine de tek sozlu varsa o kullanilir; birden fazla sohbet sinifi
+        # varsa karar verilmez (belirsiz) ve mevcut akis devreye girer.
+        self.pattern_tags = {}
+        for intent in data['intents']:
+            for pattern in intent['patterns']:
+                anahtar = self._pattern_key(pattern)
+                if not anahtar:
+                    continue
+                oncekiler = self.pattern_tags.get(anahtar)
+                if oncekiler is None:
+                    self.pattern_tags[anahtar] = (intent['tag'],)
+                elif intent['tag'] not in oncekiler:
+                    self.pattern_tags[anahtar] = oncekiler + (intent['tag'],)
         for intent in data['intents']:
             for pattern in intent['patterns']:
                 self.all_patterns.append(pattern.lower())
@@ -1593,6 +1627,38 @@ class ChatBot:
         t = ' '.join(self.ascii_normalize(text.strip().lower()).split())
         return t.startswith(REFUSAL_LEAD)
 
+    def _pattern_key(self, text):
+        """Tam eslesme dizininin anahtari: veri ve sorgu AYNI formata girer.
+
+        Normalizasyon olcumle secildi, varsayimla degil:
+            non-ascii pattern : 66 / 67.708  -> ascii_normalize sart
+            bosluklu pattern  : 0            -> strip yine de guvenli
+            noktalamali biten : 1            -> son '?!.' atilir
+        Boylece "Futbol Nedir?" -> "futbol nedir" == intents.json'daki anahtar.
+        """
+        if not text:
+            return ''
+        t = self.ascii_normalize(str(text).strip().lower())
+        t = re.sub(r'\s+', ' ', t).strip('?!.,;: ')
+        return t
+
+    def _exact_pattern_tag(self, text):
+        """Sorgu bir pattern'inin TAM karsiligi mi? O zaman tag'i dondur.
+
+        Donmus tag ya sohbet sinifidir (self.intent_tags) ya da bilgi
+        intent'idir; cagiran taraf ayirt eder. Eslesme yoksa veya birden
+        fazla sohbet sinifi cakisiyorsa None doner -> mevcut akis.
+        """
+        adaylar = self.pattern_tags.get(self._pattern_key(text))
+        if not adaylar:
+            return None
+        if len(adaylar) == 1:
+            return adaylar[0]
+        sohbet = [t for t in adaylar if t in self.intent_tags]
+        if len(sohbet) == 1:
+            return sohbet[0]
+        return None
+
     def _tag_content_words(self, tag):
         """Bir sohbet intent'inin GERCEK icerik kelimeleri.
 
@@ -1713,8 +1779,22 @@ class ChatBot:
 
         negated, neg_content = self.detect_negation(user_input)
 
+        # TAM PATTERN DIZINI. Bilinen en guclu sinyal; sorgu intents.json'daki
+        # bir pattern'inin birebir karsiligiysa siniflandiriciya hic
+        # guvenilmez. Olcum (25.09): 67.708 pattern var, sorularin cogu
+        # birebir duruyordu ama yanit yolunda bu dizin YOKTU -> bot 40
+        # sinifli agin cop bir bilgi intent'i seciyor, "bilgim yok" donuyordu.
+        tam_tag = self._exact_pattern_tag(user_input)
+
         chosen_tag, probability, unclear, resp_words = self._classify(
             user_input, negated_content=neg_content if negated else None)
+
+        # TAM eslesme bir SOHBET sinifini gosteriyorsa siniflandirici secimini
+        # gecersiz kilar ("muzik nedir" -> musiki, "spor nedir" -> spor).
+        if tam_tag in self.intent_tags:
+            chosen_tag = tam_tag
+            unclear = False
+            probability = max(probability, self.confidence_threshold)
 
         # OLUMSUZ ICERIK: "Futbol sevmiyorum" -> onaylamaci sport yaniti yerine
         # destekleyici yanit verilmeli.
@@ -1739,6 +1819,17 @@ class ChatBot:
         # Bu yuzden retrieval bos dondugunde sohbet intent'ine SADECE soruyla
         # ortak bir icerik kelimesi varsa gecilir; yoksa durustce "bilmiyorum".
         if self._is_knowledge_question(user_input):
+            # TAM eslesme bir BILGI intent'ini gosteriyorsa retrieval'a
+            # guvenilmez: siniflandirici ayni soruya 0.9+ guvenle
+            # "dusuk karbonlu ekonomi" / "2017 islami dayanisma oyunlari"
+            # gibi ALAKASIZ tag'lar seciyordu, sonuc "bilgim yok" idi.
+            #   "ekonomi nedir" -> 'ekonomi'  (veride birebir pattern)
+            #   "islam nedir"   -> 'islam'    (veride birebir pattern)
+            # Birebir eslesmede guven kapisi (credibility) gerekmez: konu
+            # zaten o intent'in icinde tanimli.
+            if tam_tag and tam_tag not in self.intent_tags:
+                kb = self._select_response(tam_tag, resp_words)
+                return self._try_kb_rephrase(user_input, kb)
             kbt = self._select_knowledge(
                 resp_words, exclude=neg_content if negated else None)
             if kbt:
