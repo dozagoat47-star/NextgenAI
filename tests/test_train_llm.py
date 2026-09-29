@@ -860,39 +860,66 @@ class TestVeriHazirlamaOlcumleri(unittest.TestCase):
     gereksiz yere dar hesaplaniyordu.
     """
 
-    N_KAGGLE = 315883   # kaggle_start.sh yorumundaki encode olcumu
+    N_KAGGLE = 921748   # 29.09 kaggle kosusundaki egitim cifti sayisi
 
     def test_token_sayimi_milyon_birimiyle(self):
         """n * TOKEN_PER_PAIR / 1e6 gercekten milyon olmali.
 
         Eski formül (n * 0.16) 1.471 kat buyuk deger veriyordu.
+
+        NEDEN SABIT SAYI (34,4) YOK: o deger 28.09'daki TOKEN_PER_PAIR'in
+        (108,8) ciktiydi, yani bu test sabiti DEGERINE degil sadece
+        YANLIS DEGERE kilitliyordu. Sabit 29.09'da %18 bayatlayinca
+        (gercek 89,3) test "gecmeye devam etmeli" diye kalsaydi ya da
+        kirsilip gercek regresyonu gizlerdi.
+
+        DİKKAT: yeni zaten MİLYON cinsindendir (/1e6 bolunmus), yani
+        921.748 x 89,3 / 1e6 = 82,3 degeri "82,3 milyon token" demektir.
+        Bandi 1e6..1e7 yazmak 1000 KAT hatayi yakalamaz, tam tersine
+        her dogru degeri reddederdi. Tavan MAX_SEQ_LEN'den turetilir:
+        hicbir cift 256 tokeni asamaz, o yuzden 921.748 x 256 / 1e6 =
+        236,0 olan bir ust sinir her zaman gecerlidir.
         """
         import train_llm
         yeni = self.N_KAGGLE * train_llm.TOKEN_PER_PAIR / 1e6
         eski = self.N_KAGGLE * 0.16
-        self.assertAlmostEqual(yeni, 34.4, delta=0.5,
-                               msg='olculen 34,4M degil, %.1fM' % yeni)
+        tavan = self.N_KAGGLE * train_llm.MAX_SEQ_LEN / 1e6
+        self.assertGreater(yeni, 1.0,
+                           'token sayisi milyon biriminde degil: %.1fM cok '
+                           'kucuk (cift basina %.1f token)'
+                           % (yeni, train_llm.TOKEN_PER_PAIR))
+        self.assertLessEqual(yeni, tavan,
+                             'token sayisi max_seq tavanini asiyor: %.1fM > '
+                             '%.1fM' % (yeni, tavan))
         self.assertLess(yeni, eski / 100,
                         'token sayisi yine 1000 kat buyuk: TOKEN_PER_PAIR '
                         'olcek degistiyse ya da /1e6 unutuldu')
         # makul sinirlar: 256 token tavanina gore
         self.assertLessEqual(train_llm.TOKEN_PER_PAIR, train_llm.MAX_SEQ_LEN,
                              'cift basina token tavanini asiyor')
+        # cift basina olcum kisa bir orneklemle de dogrulanir; 250 orneklem
+        # +-12% toleransla yetiyor (canli olcum 90,6, gercek 89,3 +- 0,96).
+        self.assertGreaterEqual(train_llm.TOKEN_PER_PAIR, 30.0,
+                                'cift basina token 30 altina dustu: encode '
+                                'yolu kirpiliyor olabilir (once 89,3 idi)')
 
     def test_encode_suresi_dakika_degil_saniye(self):
         """est = n / 6000 -> saniye. Dakika olarak yaziliyordu.
 
-        Olculen hiz: 315.883 cift / 9 dk = 585 cift/sn.
+        Olculen hiz (29.09): 1.024.172 cift / 1541 sn = 664,5 cift/sn.
+        N_KAGGLE egitim ciftidir (921.748); o kismin olculen suresi
+        1385 sn. Val kismi ayrica 156 sn, yani toplam 1541 sn.
         """
         import train_llm
         est_sn = self.N_KAGGLE / train_llm.ENC_CIFT_SN
-        self.assertAlmostEqual(est_sn, 540, delta=20,
-                               msg='olculen 540 sn (9 dk) degil, %.0f sn'
+        # egitim kismi icin olculen 1385 sn (+-%2 kabul payi)
+        self.assertAlmostEqual(est_sn, 1385, delta=30,
+                               msg='olculen 1385 sn (23,1 dk) degil, %.0f sn'
                                    % est_sn)
-        self.assertAlmostEqual(est_sn / 60, 9.0, delta=0.5,
-                               msg='9 dk degil, %.1f dk' % (est_sn / 60))
+        self.assertAlmostEqual(est_sn / 60, 23.08, delta=0.6,
+                               msg='23,1 dk degil, %.1f dk' % (est_sn / 60))
         # eski formül est = n / 6000 idi ve "dk" diye YAZILIYORDU:
-        # ekranda 52,6 "dk" gorunuyordu, gercek 9 dk. 5,8 kat kotu tahmin.
+        # ekranda 153,6 "dk" gorunuyordu, gercek 23,1 dk. 6,7 kat kotu.
         eski_gosterilen_dk = self.N_KAGGLE / 6000.0
         self.assertGreater(eski_gosterilen_dk, 9.0 * 4,
                            'eski hiz 6000 cift/sn hala kodda olabilir: '
@@ -909,9 +936,69 @@ class TestVeriHazirlamaOlcumleri(unittest.TestCase):
                          'token sayimi hala n * 0.16 (binler cinsinden, '
                          '"M" ise milyon -> 1000 kat)')
 
+    def test_encode_logu_dongusel_olcum_yapmiyor(self):
+        """Log'un token sayisi CANLI olcum olmali: n * TOKEN_PER_PAIR degil.
+
+        29.09'da bulunan hata: log satiri
+            print('BPE-encode %d cift (%.1fM token) ...' % (n, n * TOKEN_PER_PAIR / 1e6))
+        sabitin KENDISIYLE carpimini yaziyordu. Bu dongusel bir olcum:
+        sabit %18 yanlissa ("100,3M token") log da yanlisi kanitladi ve
+        kaggle_train.log'a bakip sabiti dogrulanmis sanmak iki hatayi ust
+        uste bindirdi. Artik _toplam_token(enc_all) gercek sayiyor.
+
+        Buradaki test iki seyi birden korur: kodda n * TOKEN_PER_PAIR
+        KALMAMALI ve _toplam_token gercekten PAD oncesi uzunlugu saymali.
+        """
+        import train_llm
+        with open(os.path.join(BASE, 'train_llm.py'), encoding='utf-8') as f:
+            satirlar = f.read().splitlines()
+        yorumsuz = '\n'.join(s.split('#')[0] for s in satirlar)
+        # Dokumantasyon ve dizeler KOD DEGILDIR. 29.09'daki hatanin
+        # aciklamasi _toplam_token docstring'inde "n * TOKEN_PER_PAIR"
+        # diye YAZILIYOR; yalnizca '#' yorumlarini silsen test kendi
+        # dogruladigi seyi reddeder. Onceki iki birim hatasi da tam
+        # boyle: yorum "binler" derken kod "milyon" yaziyordu.
+        kod = re.sub(r'"""[\s\S]*?"""', '', yorumsuz)
+        kod = re.sub(r"'''[\s\S]*?'''", '', kod)
+        kod = re.sub(r"'[^'\n]*'", '', kod)
+        kod = re.sub(r'"[^"\n]*"', '', kod)
+        self.assertNotIn('n * TOKEN_PER_PAIR', kod,
+                         'encode logu hala n * TOKEN_PER_PAIR yaziyor: bu '
+                         'dongusel, sabit ne kadar yanlissa log da o kadar '
+                         'yanlis kanitlar. _toplam_token(enc_all) kullan.')
+        self.assertNotIn('n*TOKEN_PER_PAIR', kod,
+                         'encode logu hala n*TOKEN_PER_PAIR yaziyor (bosluk '
+                         'oynama denemesi degil, ayni hata)')
+
+        PAD = train_llm.PAD
+        # NOT: PAD 0'idir. "PAD'siz" bir dizi yazarken 0 KULLANMA, yoksa
+        # seq.index(PAD) 0 doner ve cift sayisi yanlis olur (ilk yazimda
+        # range(9) kullandin ve 17 beklerken 7 ulasti). Sifirdan baslayan
+        # gercek kod dizilerinde de ayni tuzak vardir, ama encode_llm
+        # cift basina en az 1 token uretiyor.
+        self.assertEqual(PAD, 0, 'PAD 0 degilse bu testin verileri gecerli '
+                                  'degil: asagida 0 kullanmiyoruz')
+        # PAD oncesi: 2 + 5 + (PAD yok -> 3) = 10
+        enc = [([1, 2, PAD, PAD], None),
+               ([1, 2, 3, 4, 5, PAD, PAD, PAD], None),
+               ([7, 8, 9], None)]
+        self.assertEqual(train_llm._toplam_token(enc), 2 + 5 + 3)
+        # numpy dizisi de calismali
+        import numpy as np
+        enc_np = [(np.array([1, 2, 3, PAD, PAD], dtype=np.int32), None)]
+        self.assertEqual(train_llm._toplam_token(enc_np), 3)
+        # bos girdi sifir, exception atmaz
+        self.assertEqual(train_llm._toplam_token([]), 0)
+        self.assertEqual(train_llm._toplam_token(None), 0)
+
     def test_sabitler_kaggle_start_sh_olcumuyle_tutarli(self):
-        """ENC_CIFT_SN, kaggle_start.sh yorumundaki "encode 9 dk" +
-        "OLCULDU: N cift" satirlarindan turetilmis olmali."""
+        """ENC_CIFT_SN, kaggle_start.sh yorumundaki OLCUM satirlarindan
+        turetilmis olmali.
+
+        SANIYE tercih edilir: 28.09'a kadar yorum "encode 9 dk" diyordu ve
+        "dk" birimi iki kez karistirilmis bir hatanin kaynagiydi. Saniye
+        tam sayidir, dk ondalik gerektirir; belirsizlik olmaz.
+        """
         import train_llm
         sh = os.path.join(BASE, 'kaggle_start.sh')
         if not os.path.exists(sh):
@@ -921,18 +1008,22 @@ class TestVeriHazirlamaOlcumleri(unittest.TestCase):
         m = re.search(r'OLCULDU:\s*(\d+)\s*cift', metin)
         self.assertIsNotNone(m, 'kaggle_start.sh yorumunda "OLCULDU: N cift" '
                                 'bulunamadi: encode olcumu okunamiyor')
-        m_dk = re.search(r'encode\s+(\d+)\s*dk', metin)
-        self.assertIsNotNone(m_dk, 'kaggle_start.sh yorumunda "encode N dk" '
-                                   'bulunamadi')
         n_olc = int(m.group(1))
-        dk_olc = float(m_dk.group(1))
-        beklenen = n_olc / (dk_olc * 60.0)
+        m_sn = re.search(r'encode\s+(\d+)\s*sn', metin)
+        m_dk = re.search(r'encode\s+(\d+(?:[.,]\d+)?)\s*dk', metin)
+        if m_sn:
+            beklenen = n_olc / float(m_sn.group(1))
+        elif m_dk:
+            beklenen = n_olc / (float(m_dk.group(1).replace(',', '.')) * 60.0)
+        else:
+            self.fail('kaggle_start.sh yorumunda "encode N sn" veya "encode '
+                      'N dk" bulunamadi')
         self.assertAlmostEqual(
             train_llm.ENC_CIFT_SN, beklenen, delta=1.0,
-            msg='ENC_CIFT_SN=%s ama yorumdaki olcum (%s cift / %s dk) = %.0f '
+            msg='ENC_CIFT_SN=%s ama yorumdaki olcum (%s cift) = %.1f '
                 'cift/sn. Yorumdaki encode suresi degistiyse kodu da '
                 'guncelle.' % (train_llm.ENC_CIFT_SN, format(n_olc, ','),
-                               dk_olc, beklenen))
+                               beklenen))
 
     def test_token_per_pair_canli_olcume_uyuyor(self):
         """SABIT gercek encode ile tutarli mi? (kucuk orneklem, ~6 sn)

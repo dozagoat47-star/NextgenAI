@@ -313,16 +313,34 @@ class TestSureTavani(unittest.TestCase):
     """
 
     def test_olculen_degeri_uretiyor(self):
-        """9 saat / 12 epoch -> 1.426.101 cift (33 dk/epoch x 12 = 396 dk).
+        """9 saat / 12 epoch -> tavan, iki olcumden turetilmis olmali.
 
-        Duzeltilmis zaman modeli: 1,3884 ms/cift (7,31 dk / 315.883 cift).
-        Ilk yazimda 6,266 ms/cift kullanildi (70.000 cift varsayimi) ve tavan
-        316.000'a dustu — 4,5 kat dar. Gercekte 9 saatlik oturuma ~1,4 MILYON
-        cift sigiyor, yani zaman butcesi pratikte HIC baglayici degil.
+        SABIT SAYI YOK (29.09 duzeltmesi): once 1.426.101 yaziliydi ve
+        olcum sabitleri guncellenince kirildi. Kirilan sey KOD DEGILDI,
+        testin kendi bayatligiydi. Bunun yerine:
+          1) sonucu sabitlerden YENIDEN hesaplayip ayni cifti beklemek
+             (formulun kendi degisimini yakalar),
+          2) bir MIKTAR araligi beklemek (birim hatasini yakalar:
+             saat->dk iki kez bolunse sonuc 1000 kucuk olur).
+
+        Gercek: 540 dk x 0,75 bosluk = 405 dk; - 26 dk encode = 379 dk;
+        379/12 = 31,58 dk/epoch; x 60.000 / 1,5139 ms = 1.251.733 cift.
         """
         import train_llm
-        self.assertEqual(train_llm.sure_ve_hesapla(oturum_dk=540, epochs=12),
-                         1426101)
+        tavan = train_llm.sure_ve_hesapla(oturum_dk=540, epochs=12)
+        kalan = 540 * train_llm.VARSAYILAN_BOSLUK - train_llm.ENCODE_DK
+        beklenen = int((kalan / 12.0) * 60000 / train_llm.MS_PER_PAIR)
+        self.assertEqual(tavan, beklenen,
+                         'sure_ve_hesapla sabitlerden turetilmiyor: %d != %d'
+                         % (tavan, beklenen))
+        # miktar araligi: saat->dk iki kez bolunse 1.252 yerine ~1 gelirdi
+        self.assertGreater(tavan, 1000000,
+                           'zaman tavani asiri dar: 9 saatlik oturuma 1 milyon '
+                           'cift sigmali (birim hatasi ihtimali)')
+        self.assertLess(tavan, 2000000,
+                        'zaman tavani asiri genis: 9 saatlik oturuma 2 milyonu '
+                        'asan cift sigmaz (olcum saniyeden gunlere kaymis '
+                        'olabilir)')
 
     def test_tavan_oturum_butcesini_asmaz(self):
         """ASIL INVARIANT: tavan x epoch x ms/cift <= kullanilabilir sure.
@@ -352,14 +370,21 @@ class TestSureTavani(unittest.TestCase):
         self.assertGreater(cok, 0, 'EPOCHS=25 tavanı 0 oldu: egitim yapamaz')
 
     def test_olculen_sabitler_birlikte_tutarli(self):
-        """MS_PER_PAIR, kaggle_start.sh yorumundaki OLCUMDEN gelir:
-        7,31 dk / 315.883 cift = 1,3884 ms.
+        """MS_PER_PAIR, kaggle_start.sh yorumundaki EPOCH OLCUMU'nden gelir.
 
-        BURADA YAPILAN HATA: ilk yazimda 70.000 cift varsayildi ->
+        BURADA YAPILAN HATA (29.09'da bulundu): test 7,31 dk'yi SABIT SAYI
+        olarak tutuyordu ama cift sayisini yorumdan OKUYORDU. Yorum
+        guncellenince (cift sayisi 315.883 -> 921.748) iki farkli olcum
+        birlestirildi: 7,31 dk / 921.748 cift = 0,43 ms, koddaki 1,5139
+        ile uyusmadi. Yani test, dogru olan kodu reddetti.
+
+        Duzeltme: epoch suresi de yorumdan okunur ("ort N sn/epoch") ve
+        cift sayisiyla ayni etiketli bloktan ("EPOCH OLCUMU:") alinir.
+        Boylece iki olcum birbirine karisamaz.
+
+        Daha onceki hata: ilk yazimda 70.000 cift varsayildi ->
         6,266 ms/cift -> 4,5 KAT YANLIS -> zaman tavani gereksiz yere
-        316.000'a dustu ve 20.000 intents'e kadar veri kirpilmis olurdu.
-        Test, olcum satirindaki SAYIYI koda baglar; sayi degisirse ya da
-        yorum degisirse kirmizi olur.
+        316.000'a dustu. Test, olcum satirindaki SAYIYI koda baglar.
         """
         import train_llm
         sh = os.path.join(BASE, 'kaggle_start.sh')
@@ -367,18 +392,24 @@ class TestSureTavani(unittest.TestCase):
             self.skipTest('kaggle_start.sh yok')
         with open(sh, encoding='utf-8') as f:
             metin = f.read()
-        m = re.search(r'OLCULDU:\s*(\d+)\s*cift', metin)
+        m = re.search(r'EPOCH\s+OLCUMU:\s*(\d+)\s*cift', metin)
         self.assertIsNotNone(
-            m, 'kaggle_start.sh yorumunda "OLCULDU: N cift" bulunamadi: '
-               'zaman sabiti hangi veriyle olculdu artik OKUNAMAZ')
+            m, 'kaggle_start.sh yorumunda "EPOCH OLCUMU: N cift" bulunamadi: '
+               'epoch hizi hangi veriyle olculdu artik OKUNAMAZ')
         cift_olcumu = int(m.group(1))
-        ms = 7.31 * 60 * 1000 / cift_olcumu
+        m_sn = re.search(r'ort\s+(\d+(?:[.,]\d+)?)\s*sn/epoch', metin)
+        self.assertIsNotNone(
+            m_sn, 'kaggle_start.sh yorumunda "ort N sn/epoch" bulunamadi: '
+                  'epoch suresi koda baglanamiyor')
+        sn_olcumu = float(m_sn.group(1).replace(',', '.'))
+        ms = sn_olcumu * 1000 / cift_olcumu
         self.assertAlmostEqual(
             train_llm.MS_PER_PAIR, ms, delta=0.01,
             msg='MS_PER_PAIR=%s ama kaggle_start.sh yorumundaki olcum '
-                '(7,31 dk / %s cift) = %.4f ms. Yorumdaki cift sayisi '
+                '(%.2f sn / %s cift) = %.4f ms. Yorumdaki olcum '
                 'degistiyse kodu da guncelle.'
-                % (train_llm.MS_PER_PAIR, format(cift_olcumu, ','), ms))
+                % (train_llm.MS_PER_PAIR, sn_olcumu, format(cift_olcumu, ','),
+                   ms))
 
     def test_kaggle_start_sh_tek_dogruluk_kaynagini_kullanir(self):
         """Formul bash'ta TEKRARLANMAMALI. Tekrar varsa iki taraf

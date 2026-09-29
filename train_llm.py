@@ -209,18 +209,36 @@ KB_TEXT_CHARS = 300 # kb parcasindan kullanilacak karakter sayisi (200 -> 300;
 #                    # inference'ta brain'in ilettigi ~500 karaktere yaklasir).
 SEED = 7
 
-# ---- VERI HAZIRLAMA OLÇÜMLERI (28.09, 4.000 ciftin GERÇEK encode'u) ----
-TOKEN_PER_PAIR = 108.8   # cift basina GERCEK token (kirpmali, RAG+kb-map acik,
+# ---- VERI HAZIRLAMA OLÇÜMLERI (29.09, 3.000 ciftin GERÇEK encode'u) ----
+TOKEN_PER_PAIR = 89.3    # cift basina GERCEK token (kirpmali, RAG+kb-map acik,
                          # max_seq 256). Olcum: encode_llm -> PAD kuyrugu
                          # budanmis gercek uzunluk. Maske (loss) 38,6 token.
+                         #
+                         # 29.09 OLCUMU: 3 tohum (11/23/37) x 1000 cift =
+                         # 89,27 +- 0,96 (SE). Yani %95 aralik 87,4-91,1.
+                         # Onceki sabit 108,8di ve %18 YANLISTI.
+                         #
+                         # NEDEN 28.09 KABUL EDILMEDI: kaggle_train.log'daki
+                         # "100,3M token" bir olcum DEGIL, sabitin kendisiyle
+                         # carpimi (bkz. asagida yazan print). 921.748 x 108,8
+                         # = 100,3M -> dongusel, hicbir sey dogrulamaz. Log'a
+                         # bakip sabiti "dogrulandim" sanmak iki hatayi ust
+                         # uste bindirirdi. Tek dogruluk kaynagi CANLI encode.
                          #
                          # ONCEDE '%.1fM' bicimiyle n * 0.16 yaziliyordu:
                          # 0,16 "binler" cinsinden ama M "milyon" demek ->
                          # 315.883 ciftte 50.541M yaziyordu, GERCEK 34,4M.
                          # 1.471 KAT HATA. Duzeltildi, olcum sabitlendi.
-ENC_CIFT_SN = 585.0     # encode hizi, cift/sn (4 cekirdek, Kaggle T4x2).
-                        # KAYNAK: kaggle_start.sh ust yorumundaki OLCUM
-                        # "encode 9 dk" @ 315.883 cift -> 585 cift/sn.
+ENC_CIFT_SN = 664.5     # encode hizi, cift/sn (4 cekirdek, Kaggle T4x2).
+                        # KAYNAK: 29.09 kosusu, UC BAGIMSIZ OLcum:
+                        #   train 921.748 cift -> 1385 sn = 665,6 cift/sn
+                        #   val   102.424 cift ->  156 sn = 656,6 cift/sn
+                        #   toplam 1.024.172   -> 1541 sn = 664,5 cift/sn
+                        # Onceki deger 585,0 DU (315.883 ciftten) ve %12
+                        # YAVASESTI: sure tahmini 1.575 sn yerine gercek
+                        # 1.541 sn (fazla kotu = guvenli yon, ama yine de
+                        # yanlis). 29.09 verisi 2,9 KAT buyuk oldugu icin
+                        # guncellenmediyse sure uyari metni yaniltirdi.
                         #
                         # ONCEDE n / 6000.0 vardi ve YORUMU "'dakika' birimi"
                         # diyordu: bolum sonucu SANIYE idi, dakika degil ->
@@ -404,6 +422,31 @@ def _mp_enc(item):
     return encode_llm(_mp_dummy, ctx, resp, context=_mp_ctx.get(ctx))
 
 
+def _toplam_token(enc_all, pad=None):
+    """enc_all -> GERCEK toplam token sayisi (PAD oncesi, kirpma sonrasi).
+
+    NEDEN: encode sureci log'da 'n * TOKEN_PER_PAIR' yaziyordu, yani sabitin
+    kendisiyle carpimi. Bu dongusel bir "olcum" idi: sabit yanlissa log da
+    yanlisi kanitlardi ve 29.09'da 108,8 olan sabit %18 fazla oldugu halde
+    "dogrulanmis" sanildi. Burada gercekten sayiyoruz; boylece TOKEN_PER_PAIR
+    her kosuda kendi kendini denetler.
+
+    encode_llm her sekansi max_seq'e PAD'ler; PAD kuyrugu budanmis gercek
+    uzunluk sayilir (testle ayni tanim).
+    """
+    pad = PAD if pad is None else pad
+    toplam = 0
+    for item in enc_all or ():
+        seq = item[0] if isinstance(item, (tuple, list)) else item
+        if hasattr(seq, 'tolist'):
+            seq = seq.tolist()
+        try:
+            toplam += seq.index(pad)
+        except ValueError:
+            toplam += len(seq)
+    return toplam
+
+
 def _pack_encoded(enc_all, B):
     """[(seq, mask)] -> uzunluk-kirpimli, sirali-kumeli batch listesi.
 
@@ -471,9 +514,19 @@ def make_batches(pairs_, B, dummy, ctx_map):
                     if done % 25000 == 0 or done == n:
                         print(f'  encode: {done}/{n} (%.0fs)' % (time.time() - t0e),
                               flush=True)
-            print('BPE-encode %d cift (%.1fM token) %d cekirdekle %.0fs' % (
-                n, n * TOKEN_PER_PAIR / 1e6, nw, time.time() - t0e),
-                flush=True)
+            canli = _toplam_token(enc_all)
+            print('BPE-encode %d cift (%.1fM token, CANLI OLcum) %d cekirdekle %.0fs'
+                  % (n, canli / 1e6, nw, time.time() - t0e), flush=True)
+            if canli:
+                # Sabit burada kendini dogrular: log artik n*TOKEN_PER_PAIR
+                # yazmiyor, GERCEK sayiyi yaziyor. Ikisi ayrilirsa encode
+                # yolu degismistir ve TOKEN_PER_PAIR bayatlamistir.
+                tpp = canli / float(n)
+                print('  -> canli token/cift = %.1f | TOKEN_PER_PAIR = %.1f '
+                      '| fark %+.1f%%'
+                      % (tpp, TOKEN_PER_PAIR,
+                         100.0 * (tpp - TOKEN_PER_PAIR) / TOKEN_PER_PAIR),
+                      flush=True)
         except Exception as e:
             enc_all = None
             print('paralel encode atlandi (sirali):', str(e)[:120], flush=True)
@@ -763,12 +816,20 @@ def load_chatgrow_pairs(path, ctx_len=CTX_CHARS, resp_len=None, max_pairs=20000)
     return pairs[:max_pairs]
 
 
-MS_PER_PAIR = 1.3884  # ms/cift. KAYNAK: kaggle_start.sh ust yorumundaki
-                      # OLCUM: "315883 cift, d=384/6 blok, T4x2, max_seq 256
-                      # -> ort 7,31 dk/epoch". 7,31 dk = 438,6 sn ->
-                      # 438.600 ms / 315.883 cift = 1,3884 ms/cift.
-                      # Epoch adimi veriyle dogrusal (dogrulama:
-                      # kaggle_start.sh bench). Iki taraf da SABIT.
+MS_PER_PAIR = 1.5139  # ms/cift. KAYNAK: 29.09 kaggle kosusu (OLCULDU).
+                      # 12 epoch suresi sn: 1437,4 1434,8 1337,3 1435,0
+                      # 1337,2 1433,8 1337,8 1437,5 1339,1 1437,5 1339,0
+                      # 1437,8 -> ORT 1395,35 sn/epoch (val olan epoch'lar
+                      # ~1435 sn, val atlananlar ~1338 sn; tek epoch secmek
+                      # %7 yaniltirdi). Egitim cifti 921.748 ->
+                      # 1.395.350 ms / 921.748 = 1,5139 ms/cift.
+                      #
+                      # ONCEKI DEGER 1,3884 DU 315.883 ciftlik eski kosudan
+                      # kaliyordu ve %11 EKSIK sayiyordu. Yanlisi yondu:
+                      # butce 12 epoch'u 396 dk'ya sigdirirken gercekte
+                      # 396 x 1,5139/1,3884 = 431 dk isterdi -> oturum
+                      # KESILIRDI. Veri butcesinin altinda kaldigi icin bu
+                      # kosuda ismadi; veri buyunce isteyecekti.
                       #
                       # DANGER: burada ilk yazimda 70.000 cift varsayildi ve
                       # 6,266 ms/cift cikti — 4,5 KAT YANLIStI ve zaman
@@ -776,12 +837,19 @@ MS_PER_PAIR = 1.3884  # ms/cift. KAYNAK: kaggle_start.sh ust yorumundaki
                       # 9 saatlik oturuma ~1,46 MILYON cift sigiyor).
                       # Olcum satiri okunmadan varsayim yapilmayacak:
                       # test_olculen_sabitler_birlikte_tutarli bunu kapatir.
-ENCODE_DK = 9.0       # ilk kez BPE encode, bir kez. OLCUM 315.883 ciftte
-                      # 9 dk; butce 119.961 ciftken gercek ~3,4 dk. 9 dk
-                      # KORUYUCU UST SINIR olarak birakildi: cift sayisi
-                      # veri hazirligindan sonra belli oluyor, tavan
-                      # hesaplanirken bilinmiyor. Yanlislik 5,6 dk (bütce
-                      # 405 dk), yani ihmal edilebilir.
+ENCODE_DK = 26.0      # ilk kez BPE encode, bir kez. 29.09 OLCUMU:
+                      # 1.024.172 cift -> 1385 + 156 = 1541 sn = 25,7 dk.
+                      # Onceki deger 9,0 DU ve 315.883 cift icindi; veri
+                      # 3,2 KAT buyuyunce 26 dk gercekken 9 dk varsayildi.
+                      # Yanlis YONDU: encode suresi egitim butcesinden
+                      # DUSULUYOR, demek ki kucuk saymak fazla cift
+                      # vaat etmek demek (17 dk = butcenin %4,3'u).
+                      #
+                      # BILINEN KISIT: bu SABIT ama encode suresi n ile
+                      # ORANTILI. sure_ve_hesapla cift sayisini URETIR,
+                      # encode suresi ise o sayiya BAKAR -> tam dongusel
+                      # degil, kaba bir ust sinir. Veri buyunce bu deger
+                      # tekrar olculmelidir.
 VARSAYILAN_BOSLUK = 0.75   # oturumun %75'i veriye, %25'i bosluk/erteleme
 
 

@@ -16,16 +16,27 @@
 #      (1 epoch suresi olcmek icin:  !bash kaggle_start.sh bench )
 #   5) Egitim sonrasi indirme hucresi (asagidaki INDIRME notuna bak).
 #
-#   SURE NOTU (OLCULDU: 315883 cift, d=384/6 blok, T4x2, max_seq 256):
-#   encode 9 dk (bir kez) + val olan epoch 7.5 dk + val atlanan epoch 7.1 dk
-#   -> ort 7.31 dk/epoch = 1,3884 ms/cift (train_llm.MS_PER_PAIR).
-#   DIKKAT: bu olcum 315.883 CIFTTE alindi. Onceki yorumlar epoch suresini
-#   70.000 cift uzerinden yanlis olceklendiriyordu (6,266 ms/cift, 4,5 KAT
-#   HATA) ve sure butcesini gereksiz yere dar gosteriyordu. Gercekte 9
-#   saatlik oturuma ~1,4 MILYON cift sigiyor: ZAMAN BUTCESI pratikte
-#   baglayici DEGIL, veri butcesi (MAX_PAIRS) asil kisittir.
+#   SURE NOTU (d=384/6 blok, T4x2, max_seq 256, 29.09 kosusu). IKI AYRI
+#   olcum var, karistirma: biri ENCODE hizi, digeri EPOCH hizi.
+#
+#   (1) ENCODE OLCUMU  -- OLCULDU: 1024172 cift, encode 1541 sn
+#       (921.748 train + 102.424 val)
+#       -> 664,5 cift/sn = train_llm.ENC_CIFT_SN
+#   (2) EPOCH OLCUMU   -- EPOCH OLCUMU: 921748 cift, ort 1395 sn/epoch
+#       (val olan epoch'lar ~1435 sn, val atlananlar ~1338 sn;
+#        tek epoch secmek %7 yaniltirdi, ORT alindi)
+#       -> 1,5139 ms/cift = train_llm.MS_PER_PAIR
+#       12 epoch = 16.744 sn = 279,1 dk. Gercekten 12. epoch'a kadar
+#       tamamlandi (en iyi val 0,3959 @ 8. epoch, acc 0,913).
+#
+#   DIKKAT: 28.09 olcumu 315.883 CIFTTE alinmisti (585 cift/sn, 1,3884
+#   ms/cift) ve veri 3,2 KAT buyuyunca iki sabit de bayatlaydi. Yanlisi
+#   yondu: MS_PER_PAIR kucuk saymak butceyi BUYUTUYORDU (12 epoch 396 dk
+#   yerine gercekte 431 dk ister -> oturum kesilirdi). Zaman butcesi
+#   pratikte baglayici DEGIL, veri butcesi (MAX_PAIRS) asil kisittir;
+#   yine de iki sabit de OLCULDUgunu yaziyoruz, tahmin degil.
 #   Erken durdurma (patience) val yukselmeye baslayinca keser; EPOCH
-#   vermezsen 70 kullanilir, yine olusturulabilir. Daha uzun egitim istersen
+#   vermezsen 12 kullanilir, yine olusturulabilir. Daha uzun egitim istersen
 #   LLM_EPOCHS=150 gibi ver ve Kaggle oturum suren yeterli olsun.
 #
 #   ONCEKILERE DOKUNMA: eski kosularda patience "kotu val OLCUMU" sayiyordu,

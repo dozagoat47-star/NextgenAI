@@ -2078,7 +2078,24 @@ class ChatBot:
                 ('.', '!', '?', '…', '"', ')')):
             return False
         letters = [c for c in gen.lower() if c.isalpha()]
-        if len(letters) < 6 or len(set(letters)) < int(len(letters) * 0.30):
+        # HARF CESITLILIGI - UZUNLUKTAN BAGIMSIZ OLMALI.
+        #
+        # OLCULEN HATA (25.09): kural `farkli_harf >= 0.30 * toplam_harf` idi.
+        # Turkce alfabe 29 harf; 0,30 katsayisiyla esik 29/0,30 = 96 karakterde
+        # tavanda yapiyor. Yani 97-260 karakter arasindaki HER uretim
+        # matematiksel olarak reddediliyordu - kapinin kendi izin verdigi
+        # uzunluk araliginin cogu.
+        #
+        # 29.09 URETIM OLCUMU: yeni model bu kapida 95 kez, eski model 58 kez
+        # reddedildi (ayni 147 deneme). Yani kapinin hatasi modelden cok
+        # uzun metni cezalandiriyor ve iki modeli yanlis yonde
+        # kiyasliyordu: eval'da yeni model alakada IYI, kapidan gecen
+        # metin sayisinda KOTU cikiyordu.
+        #
+        # Duzeltme: taban 12 farkli harf konur, oran yalnizca kISA
+        # metinlerde gecerli olur. Kuralin amaci tekrar dongusunu
+        # yakalamaktir; kendini tekrarlayan metin 2-3 farkli harfle yakalanir.
+        if len(letters) < 6 or len(set(letters)) < min(12, int(len(letters) * 0.30)):
             return False
         canned = set()
         for r in (self.intents.get(tag) or []):
@@ -2121,7 +2138,11 @@ class ChatBot:
         if not gen or len(gen) < 12 or len(gen) > 260:
             return False
         letters = [c for c in gen.lower() if c.isalpha()]
-        if len(letters) < 6 or len(set(letters)) < int(len(letters) * 0.30):
+        # HARF CESITLILIGI - UZUNLUKTAN BAGIMSIZ OLMALI. Gerekce ve olcum
+        # icin _accept_generated icindeki ayni yoruma bak. Ozet: eski kural
+        # 96 karakterden sonra matematiksel olarak imkansizdi (29 harf /
+        # 0,30), yani 97-260 karakter araliginin tamami reddediliyordu.
+        if len(letters) < 6 or len(set(letters)) < min(12, int(len(letters) * 0.30)):
             return False
         kb_set = set(self.tokenize(kb))
         if not kb_set:
