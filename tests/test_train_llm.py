@@ -1080,5 +1080,43 @@ class TestVeriHazirlamaOlcumleri(unittest.TestCase):
                 % (canli, train_llm.TOKEN_PER_PAIR))
 
 
+class TestRagContextStats(unittest.TestCase):
+    """29.09 duzeltmesi: RAG kapsami CIFT uzerinden olculmeli.
+
+    Eski sayici benzersiz ctx sayiyor, payda TOPLAM cift idi; dogal
+    varyantlar ayni ctx'i paylastigi icin oran ~14 kat kucuk cikiyordu
+    (log: 27.732/1.024.172 = %2,7; gercek: %52,8).
+    """
+
+    def test_sayim_cift_bazli(self):
+        import train_llm
+        # 'soru a' 5 kez geciyor (dogal varyantlar ctx'i degistirmez).
+        pairs = [('soru a', 'r%d' % i) for i in range(5)]
+        pairs += [('soru b', 'r5'), ('soru c', 'r6')]
+        cm = {'soru a': 'BILGI', 'soru b': 'BILGI'}
+        baglamli, tek_ctx, toplam = train_llm.rag_context_stats(pairs, cm)
+        self.assertEqual((baglamli, tek_ctx, toplam), (6, 2, 7))
+        # Eski (bozuk) sayim ayni girdide 2 donerdi.
+        self.assertNotEqual(baglamli, 2,
+                            'benzersiz ctx sayimi geri gelmis olabilir')
+
+    def test_baglamsiz_ctx_sayilmaz(self):
+        import train_llm
+        pairs = [('a', 'r1'), ('b', 'r2')]
+        cm = {'a': 'BILGI', 'b': None}      # cozulemeyen desen
+        baglamli, _tek, toplam = train_llm.rag_context_stats(pairs, cm)
+        self.assertEqual((baglamli, toplam), (1, 2))
+
+    def test_bos_girdi_bolme_hatasi_yok(self):
+        import train_llm
+        self.assertEqual(train_llm.rag_context_stats([], {}), (0, 0, 0))
+
+    def test_yuzde_hesabi_elle_dogrulanir(self):
+        import train_llm
+        pairs = [('a', 'r1'), ('a', 'r2'), ('b', 'r3')]
+        baglamli, _tek, toplam = train_llm.rag_context_stats(pairs, {'a': 'B'})
+        self.assertAlmostEqual(100.0 * baglamli / toplam, 200.0 / 3.0, places=6)
+
+
 if __name__ == '__main__':
     unittest.main()

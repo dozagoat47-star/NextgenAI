@@ -757,6 +757,24 @@ def build_kb_lut(path, ctx_chars=CTX_CHARS):
     return lut
 
 
+def rag_context_stats(pairs_, ctx_map):
+    """RAG kapsamini CIFT uzerinden olcer -> (baglamli_cift, tek_ctx, toplam).
+
+    29.09 DUZELTMESI. Sayici once benzersiz ctx sayiyordu, payda ise TOPLAM
+    cift idi; bu ikisi ayni sey olmadigi icin oran gercekten ~14 kat kucuk
+    cikiyordu. Dogal varyantlar (--natural K) ctx'i degistirmez, ayrica
+    load_pairs ayni desen icin birden cok cift uretiyor -> bir ctx ortalama
+    5-14 kez gecir. 29.09 logu "27.732/1.024.172 = %2,7" dedi ve bundan
+    "RAG neredeyse hic kullanilmiyor, kitap/bilgi katkisi yok" sonucu
+    cikarildi. Gercek olcum: %52,8 (dogrudan sayimla teyit edildi).
+
+    Doner: (n_cift_baglamli, n_benzersiz_ctx, n_cift_toplam)
+    """
+    toplam = len(pairs_)
+    baglamli = sum(1 for ctx, _ in pairs_ if ctx_map.get(ctx))
+    return baglamli, len(ctx_map), toplam
+
+
 def load_chatgrow_pairs(path, ctx_len=CTX_CHARS, resp_len=None, max_pairs=20000):
     """chatgrow.py/seed ciktisi -> (sorgu, yanit) ciftleri.
 
@@ -1059,14 +1077,31 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
             return None
 
     if RAG:
-        hits = 0
+        # ONCE: her benzersiz ctx icin baglam cozulur.
         for ctx, _ in tr_pairs + va_pairs:
             if ctx in ctx_map:
                 continue
             ctx_map[ctx] = kb_for(ctx)
-            if ctx_map[ctx]:
-                hits += 1
-        print(f'RAG contextli ornek: {hits}/{len(tr_pairs) + len(va_pairs)}', flush=True)
+        # SONRA: oran CIFT uzerinden hesaplanir.
+        #
+        # OLCULEN HATA (29.09): sayici benzersiz ctx sayiyordu, payda ise
+        # TOPLAM cift idi. Dogal varyantlar (--natural 5) ctx'i degistirmez,
+        # ayrica load_pairs ayni desen icin birden cok cift uretiyor -> bir
+        # ctx ortalama 13,8 kez gecir. "hits" bu yuzden cift sayisinin
+        # ~1/14'u idi ve oran gercek yerine 13,8 KAT KUCUK cikiyordu.
+        # 29.09 logu: 27.732/1.024.172 = %2,7 -> "RAG neredeyse hic
+        # kullanilmiyor" yanlis cikarimi. Gercek olcum: %52,8.
+        # Yanlisin bedeli: kitap/bilgi katkisi %2,7 sanildi ve "veri yok"
+        # denildi; oysa ciftlerin YARISI bilgi baglami tasiyor.
+        # Duzeltme yalnizca YAZDIRIR; ctx_map icerigi ve egitim girdisi
+        # bit bit aynidir (onbellek parmak izi de degismez).
+        _baglamli, _tek_ctx, _toplam = rag_context_stats(tr_pairs + va_pairs,
+                                                       ctx_map)
+        print('RAG baglamli cift : {}/{} = {:.1f}%  ({} benzersiz ctx, '
+              'ortalama {:.1f} cift/ctx)'.format(
+                  _baglamli, _toplam,
+                  100.0 * _baglamli / max(1, _toplam),
+                  _tek_ctx, _toplam / max(1, _tek_ctx)), flush=True)
 
     # ---- veri ondeklenti: ayni veri+tokenizerla tekrar cagrildiginda
     # (Colab resume / dry-run sonrasi egitim) 10dk'lik BPE-encode ATLANIR.

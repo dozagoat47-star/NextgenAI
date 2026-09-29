@@ -35,6 +35,30 @@ Kaggle akisi (kaggle_start.sh):
 Cogunlugunu bu glob zaten yakalar; --fresh ile bench/verify de egitimle ayni
 veriyi gorur.
 
+!! OLCULEN TAVAN (29.09) -- --max-pairs 8000 BU KAYNAKLA ULAŞILAMAZ !!
+    Gercek, tekrarlanabilir ust sinir 609 cift. Kanit:
+      * tam kapasite kosusu (--max-pairs 3000 --per-cat 500 --seed 7)
+        uretilen dosya, depodaki 609 ciftlik dosyayla BYTE-AYNI
+        (sha256 71251cb0ac3d6965...). Yani sonuc ayardan degil kaynaktan gelir.
+      * kategori sayfa toplami 128: masallar 8, destanlar 11, efsaneler 21,
+        bilmeceler 8, ninniler 56, agıtlar 20, + iki tanesi ayni kategoriye
+        dustugu icin 2 ("Turk halk edebiyati") -> gercek cift sayisi 609.
+      * Turk Wikisource'ta NESIR zengini baska kategori YOK: 16 aday tarandi
+        (roman, oyku, deneme, edebiyat, cumhuriyet donemi...), en zengini
+        3 sayfa. Olcu: 16 adayin toplam sayfa kapasitesi < 128.
+    Yanit uzunlugu da kaynak karmasindan gelir (olculmus, kategori basina ilk
+    4 sayfa):
+        destanlar (nesir)  medyan 29 kelime   <- akici
+        masallar  (si+nesir) medyan  5 kelime
+        ninniler  (si)      medyan  4 kelime
+        agıtlar   (si)      medyan  5 kelime
+        efsaneler, bilmeceler: 0 cift (hic metin uretilmiyor)
+    Sayfa basina denemede si ve nesir yolu AYRIKTI (si olan sayfada nesir bos
+    ve tersi) -> poem+prose birlestirmesi denendi ve 0 cift ekledi (byte-ayni
+    sonuc), bu yuzden kod "si varsa onu, yoksa nesri" yapisinde kaldi.
+    SONU: bu hat kitap akiciliginin kaynagi olamaz; sinir kaynakta, scriptte
+    degil. 609 cift, 29.09 tabaninin 223.815 ciftinin %0,27'si.
+
 Lisans notu: Wikisource tr`de kamu-mali (ya da tr:PD kategorili) eserler telif
 hakki tasimaz; turev/sozluk/aktif-metin elemeleri `--no-subsections` gibi.
 Bazi masal/destan metinleri modern anlatilarla karisiktir; `--min-year...`
