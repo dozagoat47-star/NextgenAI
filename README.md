@@ -3,6 +3,10 @@
 Sıfırdan yazılmış (NumPy-only, hazır ML kütüphanesi yok) Türkçe sohbet asistanı.
 Üç katmanlı mimari: intent sınıflandırma (transformer) + yerel bilgi retrieval (RAG-lite) + üretim katmanı.
 
+> **Bu projeyi bir yapay zekâya devam ettirmek istiyorsan:** `DEVAM_PROMPTU.md`
+> dosyasını okut. İçinde kurallar, ölçülmüş değerler, kısıtlar, Kagle eğitim akışı
+> ve sıradaki adım var. Kısa yönerge dosyanın başındaki "KISA PROMPT" bölümünde.
+
 ## Mimari
 
 | Katman | Dosya | Görev |
