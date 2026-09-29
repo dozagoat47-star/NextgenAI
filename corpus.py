@@ -371,6 +371,13 @@ class Corpus:
         Agirlikli index (df/idf/BM25/lex/vektor/trigram/kalip) ilk kurulumda
         '_index.pkl' onbellegine yazilir; corpus icerigi degismezse sonraki
         yuklemelerde yeniden derlenmez (dakikalar -> saniyeler).
+
+        OLCEILEN GERCEK MALIYET (29.09, 137.032 parca, yerel disk):
+            onbellekli yukleme   : 18,4 sn
+            onbelleksiz (sifirdan): 273,8 sn  (PPMI + 128 boyutlu SVD dahil)
+        Yani onbellek ~1 GB (index 789 MB + embedding 240 MB) yer ama her
+        acilista 4,3 dakika kazandirir. SILINMEZ; silinirse yeniden kurulur
+        (yesil: onbelleksiz yukleme sonrasi arama dogrulandi).
         """
         if self._load_index_cache():
             self._ensure_embeddings()
