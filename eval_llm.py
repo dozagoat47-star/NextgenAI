@@ -435,6 +435,29 @@ def compare_reports(path_a, path_b, key='qa_score'):
         print('  olcutu olcmez. Her iki modeli de YENIDEN degerlendirip --out')
         print('  ile yeni rapor uret, sonra karsilastir.')
         return 1
+
+    # DECODING AYARI DENETIMI (29.09 olcum hatasi)
+    #
+    # eval'in varsayilani knowledge_bias=0.0; URETIM 1.2 (brain.py:764).
+    # Ayari farkli iki raporu karsilastirmak "model farki" gibi gorunur, ama
+    # fark AYARDAN gelir. 29.09 sweep'inde olculdu: ayni model, ayni sorular,
+    # kb=0 -> kopya 0.226 / kb=1.2 -> 0.215. Bu model secimi degildir.
+    # Karsilastirmayi engellemiyoruz (ayar secimi de bu yolla yapiliyor) ama
+    # sonucu ANLAMINI bozmadan yaziyoruz.
+    AYAR_ANAHTARLARI = ('temperature', 'top_k', 'rep_penalty',
+                        'knowledge_bias', 'max_len', 'rag', 'natural', 'seed')
+    ca = A.get('config') or {}
+    cb = B.get('config') or {}
+    farkli = [k for k in AYAR_ANAHTARLARI if ca.get(k) != cb.get(k)]
+    ayar_farki = bool(farkli)
+    if ayar_farki:
+        print('!! UYARI: DECODING AYARLARI FARKLI. Bu karsilastirma model')
+        print('   farki degil AYAR farki olcer.')
+        for k in farkli:
+            print('     %-15s A=%-10s B=%s' % (k, ca.get(k), cb.get(k)))
+        print('   Yorum: fark modelden degil ayardan gelir; model secimi')
+        print('   icin kullanilamaz.')
+        print()
     print('A: %s\n   %s' % (path_a, A.get('model', '?')))
     print('B: %s\n   %s\n' % (path_b, B.get('model', '?')))
     for k in ('gen_index', 'qa_score', 'topic_mean', 'gold_recall',
@@ -471,6 +494,11 @@ def compare_reports(path_a, path_b, key='qa_score'):
     if abs(t) < 2.0:
         print('  -> FARK ANLAMLI DEGIL. Iki modeli "daha iyi" diye secmek')
         print('     bu olcumde gurultu secmektir.')
+    elif ayar_farki:
+        print('  -> ANLAMLI, ama fark DECODING AYARINDAN geliyor (yukaridaki')
+        print('     uyari). Bu bir model secimi degil, ayar secimidir;')
+        print('     uretim ayarindan farkli oldugu icin "A daha iyi"')
+        print('     denemez.')
     return 0
 
 

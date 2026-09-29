@@ -311,6 +311,80 @@ class TestRealModelEval(unittest.TestCase):
         self.assertLessEqual(agg['gen_index'], 1.0)
 
 
+class TestDecodingAyariDenetimi(unittest.TestCase):
+    """Farkli DECODING AYARI olan iki rapor "model farki" gibi okunamaz.
+
+    OLCULEN HATA (29.09): eval varsayilani knowledge_bias=0.0, URETIM 1.2
+    (brain.py:764). 29.09 kod ayari taramasinda ayni model, ayni sorular
+    icin kb=0 -> kopya 0.226, kb=1.2 -> 0.215 cikti; bu bir model
+    degisikligi degil ayar etkisidir, ama compare_reports "A daha iyi"
+    diye okunabilirdi.
+
+    Karsilastirma ENGELLENMEZ (ayar secimi de bu yolla yapiliyor) ama
+    farkin AYARDAN geldigi yazilir.
+    """
+
+    def _rapor(self, tmp, ad, cfg, deger=0.5):
+        yol = os.path.join(tmp, ad)
+        with io.open(yol, 'w', encoding='utf-8') as f:
+            json.dump({
+                'model': 'd=384 blok=6',
+                'config': cfg,
+                'report': {'metric_version': METRIC_VERSION, 'copy_bleu': deger,
+                           'copy_bleu_std': 0.1, 'qa_score': deger,
+                           'qa_score_std': 0.1},
+                'items': [{'q': 's1', 'copy_bleu': deger, 'qa_score': deger},
+                          {'q': 's2', 'copy_bleu': deger, 'qa_score': deger}],
+            }, f, ensure_ascii=False)
+        return yol
+
+    def setUp(self):
+        import tempfile
+        self.tmp = tempfile.mkdtemp(prefix='ayarlı_')
+        self.cfg = {'temperature': 0.7, 'top_k': 10, 'rep_penalty': 0.4,
+                    'knowledge_bias': 1.2, 'max_len': None, 'rag': True,
+                    'natural': 5, 'seed': 7}
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _karsilastir_ve_yakala(self, a, b):
+        import io as _io
+        import contextlib
+        buf = _io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            compare_reports(a, b, 'copy_bleu')
+        return buf.getvalue()
+
+    def test_ayni_ayarda_uyari_yok(self):
+        a = self._rapor(self.tmp, 'a.json', dict(self.cfg))
+        b = self._rapor(self.tmp, 'b.json', dict(self.cfg), 0.4)
+        cikti = self._karsilastir_ve_yakala(a, b)
+        self.assertNotIn('DECODING AYARLARI FARKLI', cikti)
+
+    def test_farkli_ayarda_uyari_var(self):
+        a = self._rapor(self.tmp, 'a.json', dict(self.cfg))
+        bozuk = dict(self.cfg, knowledge_bias=0.0)
+        b = self._rapor(self.tmp, 'b.json', bozuk, 0.6)
+        cikti = self._karsilastir_ve_yakala(a, b)
+        self.assertIn('DECODING AYARLARI FARKLI', cikti)
+        self.assertIn('knowledge_bias', cikti)
+
+    def test_anlamli_fark_ayar_kaynakli_diyi_soyleniyor(self):
+        """Anlamli fark ciktiginda sonuc 'model secimi' diye sunulmamali."""
+        a = self._rapor(self.tmp, 'a.json', dict(self.cfg), 0.5)
+        b = self._rapor(self.tmp, 'b.json', dict(self.cfg), 0.9)
+        # ayni ayar, ama sorularin degerleri farkli -> anlamli fark uretilmez.
+        # Bu yuzden ayari da degistirip degeri de degistiriyoruz.
+        bozuk = dict(self.cfg, top_k=40)
+        b = self._rapor(self.tmp, 'b2.json', bozuk, 0.9)
+        cikti = self._karsilastir_ve_yakala(a, b)
+        self.assertIn('DECODING AYARLARI FARKLI', cikti)
+        if 'AYARDAN' in cikti or 'AYARINDAN' in cikti:
+            self.assertIn('model secimi degil', cikti)
+
+
 class TestButceBoslukHatasi(unittest.TestCase):
     """29.09: eval_llm degerlendirme kumesini BOS birakti, metrikler 0.000.
 
