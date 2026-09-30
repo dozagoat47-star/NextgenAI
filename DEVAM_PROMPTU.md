@@ -33,7 +33,7 @@ Türkçe sohbet asistanı. Web arayüzü Flask (`app.py`, port 5000).
 | Bağımlılıklar | `requirements.txt`: numpy>=1.24, flask>=2.3, requests>=2.31, openpyxl>=3.1 |
 | Disk | 2,1 gigabayt → **1,47 gigabayt** (temizlik sonrası); `model/` 329 megabayt |
 | Veri büyüyor (CI) | 29.09: 11.149 intent · 29.09 sonrası: **12.730 intent**, kb-map **39.983** desen, eğitim çifti ~1,09 milyon |
-| **Sana kural** | Kodu elle düzelt, tahminle atlama; iddiasının sayısı olsun. Karar vermeden önce ölç, ölçtüğünü payla. Belirsizlikte sor. |
+| **Çalışma tarzı** | Kodu elle düzelt, tahminle atlama; iddiasının sayısı olsun. Karar vermeden önce ölç, ölçtüğünü payla. Belirsizlikte sor. |
 
 ## Mimari (README'den)
 
@@ -84,28 +84,41 @@ Bu kullanıcı için kural numara 1. Her iddianın arkasında **sayı** olmalı.
 
 ## Karar kuralı (sonuçlara bakmadan ÖNCE sabit — 29.09'da belirlendi)
 
-Akıcılık **düşmez** + altın kapsama en fazla **0,015** düşer + fark paired t-testinde
-anlamlı (**|t| ≥ 2**). Aksi halde değişiklik atılır.
+Varsayılan eşik: akıcılık **düşmez** + altın kapsama en fazla **0,015** düşer +
+fark paired t-testinde anlamlı (**|t| ≥ 2**). Bu, karşılaştırmaları tutarlı
+tutmak için — tek başına yasak değil, ölçülen şeyi nasıl değerlendireceğimiz.
+
+**Ama ölçüm sana başka bir şey gösteriyorsa kuralı değiştirebilirsin** — yeter
+ki değişikliği gerekçelendir, güncelle ve dosyaya yaz. 29.09'daki `%2,7`
+ölçüm hatası, sabit bir eşiğin bile yanlış sayıyla uygulanabileceğini
+gösterdi.
 
 ---
 
-# 3. KESİN KISITLAR
+# 3. ÇALIŞMA KURALLARI
 
-- **Veri dosyalarına elle dokunma**: `intents.json`, `knowledge_map.jsonl`,
-  `corpus.jsonl`, `corpus_ids.jsonl`, `chatgrow_*.jsonl`.
-  Sadece **üreten scriptler** (`build_book_pairs.py`, `autogrow.py`, `chatgrow.py`),
-  sync betiği (`scripts/sync_chatgrow.ps1`) ve CI değiştirilebilir. Veri dosyası
-  üreticiyi **çalıştırarak** yeniden üretilir, elle düzenlenmez.
-- `d_model` / blok sayısı küçültülemez.
-- Testler veri dosyalarına dokunmamalı.
-- `model/` git'e girmez → üzerine yazmadan/taşımadan önce **tarihli yedek** zorunlu.
-  Yeni model ölçülmeden `model/llm_model.*` üzerine yazılmaz. `model_kur.py` güvenli
-  yol (`--check`, küçültme yasağı, rollback, `model/yedek/<ts>/`).
-- **Force push yasak.** Reddedilirse: `git fetch` → `git rebase origin/main` → normal push.
-  (`data/chatgrow` sync'i + CI günde 3-4 kez commit+push yapıyor, çakışma normal.)
+**Tek zorunlu kural: git geçmişi.** Force push kullanma. CI günde 3-4 kez
+`main`'e push yapıyor, force push o commitleri siler. Reddedilirse:
+`git fetch` → `git rebase origin/main` → normal push.
+
+Geri kalanı — serbest, gerekçesi varsa sebeplendir:
+
+- **Veri dosyaları** (`intents.json`, `knowledge_map.jsonl`, `corpus.jsonl`,
+  `corpus_ids.jsonl`, `chatgrow_*.jsonl`): normalde üreten scriptler
+  (`build_book_pairs.py`, `autogrow.py`, `chatgrow.py`) ve CI günceller —
+  çünkü elle düzeltilen veri bir sonraki CI koşusunda ezilir. Ama elle
+  düzenlemek de yasak **değil**: geçici olarak düzeltip test etmek, kötü bir
+  kaydı temizlemek, küçük bir düzeltmeyi hızlıca denemek için yapılabilir.
+  Yaparsan neyi neden yaptığını yaz ve üretici scriptten de geçir.
+- **Model mimarisi**: `d_model`/blok küçültülebilir, ama ölçümle gerekçelendirilir
+  (bkz. §2 karar kuralı). `--untie-embeddings` tam da böyle bir ölçülmüş seçenek.
+- **`model/` klasörü** git'e girmez. Üzerine yazmadan önce yedek al
+  (`model_kur.py` `--check` yapar, küçültmeyi engeller, `model/yedek/<ts>/`
+  altına rollback noktası yazar). Zorunluluk değil güvenlik yolu.
+- **Testler** veri dosyalarını okuyabilir; yazmamalı. Yazarsa CI'da üretici
+  koşusunun üstüne biner.
 - Kullanıcı **kısa cevap istiyor.** Belirsizlikte tahmin etme, sor.
-  "Her adımı bitirdiğinde dur ve sonraki adımı ne yapacağını söyle."
-- İki iş isteniyorsa **bir kafayla** ikisini birden yap (kullanıcı açıkça böyle istedi).
+- İki iş isteniyorsa ikisini birden yap (kullanıcı açıkça böyle istedi).
 
 ---
 
@@ -357,8 +370,8 @@ sabittir; büyüyen kısım yalnızca bilgi intent'leridir (tam 6 desenli şablo
 | Decoding tükendi mi? | **EVET, 4 eksende** | aşağıdaki tablo |
 
 **Decoding taramaları** (hepsi n=250, aynı sorular, paired t-testi; karar kuralı
-geçmedi — **hiçbiri uygulanmadı**, `brain.py:2035` ve `brain.py:764`
-**DOKUNULMADI**):
+geçmediği için hiçbiri uygulanmadı — `brain.py:2035` ve `brain.py:764` aynen
+duruyor, ayar kendisi değil ölçüm sonucu değiştirebilir):
 
 | eksen | değerler | `gold_recall` | t |
 |---|---|---|---|
@@ -373,7 +386,8 @@ altın yanıtlar 204 karakterde kesilmiş, ASCII'ye bozulmuş, tekrar eden
 Wikipedia parçaları; decoder'ın 6-gram tekrar kesmesi bunları yarım kesiyor.
 **Bağlam biçimi dağılım dışı olunca model sohbet kalıbına düşüyor** (6 token,
 "devam edelim mi?"). `enrich_intents.py:132`'deki `"<Başlık>. <metin>"` biçimi
-modelin bağımlı olduğu bir kısıt — dokunulmamalı.
+modelin bağımlı olduğu bir kısıt — ölçümü bozacak, `brain.py:1047` ve
+`enrich_intents.py:132` birlikte çalışmalı.
 
 ## 7.1 Refüt edilenler (tekrar etme, hepsi ölçüldü)
 
@@ -386,7 +400,7 @@ modelin bağımlı olduğu bir kısıt — dokunulmamalı.
 
 ## 7.2 Ölçülmüş kusurlar
 
-- **`naturalize.py` metin bozulması (DÜZELTİLMEDİ):** varyantların **%1,06**'sı
+- **`naturalize.py` metin bozulması (ölçüldü, henüz düzeltilmedi):** varyantların **%1,06**'sı
   hatalı (bitişik `x.y` %0,64, yapıştırılmış işaret %0,42, çift enjeksiyon
   %0,00). Ham veride zaten %0,42 `x.y` var → büyük kısmı kaynaktan. Kaynak:
   `_maybe_insert_mid` virgülsüz yolunda kesme konumu
@@ -450,7 +464,7 @@ bütçesi (`MAX_PAIRS`) daha önce bağlayıcıydı, o bozulmadı.
 | `train_llm.py` | 920, 1021-1023 | `load_chatgrow_pairs`, RAG eşiği (`use_corpus`) |
 | `brain.py` | 1047 | 40 sınıf kuralı (`>6` desen → sohbet) |
 | `brain.py` | 764 | `knowledge_bias=1.2` |
-| `brain.py` | 2035 | decoding — **DOKUNMA** |
+| `brain.py` | 2035 | decoding — 4 eksende ölçüldü, hiçbiri kazandırmadı (§7) |
 | `brain.py` | 2098, 2145 | kapı distinct-letter düzeltmesi |
 | `eval_llm.py` | 400+ | `compare_reports` decoding denetimi |
 | `corpus.py` | 188, 303, 368, 486, 921 | `Corpus`, `_load_index_cache`, `load`, `_ensure_embeddings`, `search(query, k=2)` |
@@ -489,10 +503,10 @@ bütçesi (`MAX_PAIRS`) daha önce bağlayıcıydı, o bozulmadı.
   `unittest.loader._FailedTest` modülü düşürüp tüm suite'i kırmızı eder).
   `requires_torch` 5 test dosyasında kullanılıyor.
 - Test taramasında docstring ve diziler kod sayılmamalı
-- **Kod tarama nöbetçileri** (`kaggle_start.sh`/`train_llm.py` sayılarına bağlı
-  kalibrasyondur — dokunma/bozma): `n / 6000.0`, `n * 0.16`,
+- **Kod tarama nöbetçileri** (sayı sabitlerine bağlı kalibrasyon; sabitleri
+  değiştirirsen testleri de güncelle): `n / 6000.0`, `n * 0.16`,
   `n * TOKEN_PER_PAIR` (boşluklu **ve** boşluksuz), `MS_PER_PAIR=`
-  (kaggle_start.sh'da yasak)
+  (kaggle_start.sh'da olmamalı — bash mantığı Python'da test edilemez)
 
 ---
 
