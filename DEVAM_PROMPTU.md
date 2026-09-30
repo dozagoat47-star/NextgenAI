@@ -31,8 +31,8 @@ Türkçe sohbet asistanı. Web arayüzü Flask (`app.py`, port 5000).
 | HEAD = origin/main | `11bac35` (çalışma ağacı temiz) |
 | Son 5 commit | `11bac35`, `af0bd23`, `4cf4d12`, `7f2d110`, `bd63543` |
 | Bağımlılıklar | `requirements.txt`: numpy>=1.24, flask>=2.3, requests>=2.31, openpyxl>=3.1 |
-| Disk | 2,1 GB → **1,47 GB** (temizlik sonrası); `model/` 329 MB |
-| Veri büyüyor (CI) | 29.09: 11.149 intent · 29.09 sonrası: **12.730 intent**, kb-map **39.983** desen, eğitim çifti ~1,09M |
+| Disk | 2,1 gigabayt → **1,47 gigabayt** (temizlik sonrası); `model/` 329 megabayt |
+| Veri büyüyor (CI) | 29.09: 11.149 intent · 29.09 sonrası: **12.730 intent**, kb-map **39.983** desen, eğitim çifti ~1,09 milyon |
 | **Sana kural** | Kodu elle düzelt, tahminle atlama; iddiasının sayısı olsun. Karar vermeden önce ölç, ölçtüğünü payla. Belirsizlikte sor. |
 
 ## Mimari (README'den)
@@ -117,7 +117,7 @@ Eğitim **Kaggle'da** yapılır, GPU ile. Yerel NumPy eğitimi saatler sürer.
 - **Accelerator: GPU P100** (veya **T4x2**).
 - Kaggle haftada **30 saat** ücretsiz GPU.
 - Oturum süresi pratikte **9 saat**; `kaggle_start.sh` bunu `OTURUM_DK=540` olarak varsayar.
-- 29.09 ölçümü (d=384/6 blok, T4x2, max_seq 256): 12 epoch ≈ 279 dk ≈ 4,7 saat.
+- 29.09 ölçümü (d=384/6 blok, T4x2, max_seq 256): 12 epoch ≈ 279 dakika ≈ 4,7 saat.
 
 ## Adımlar (Kaggle.com → New Notebook)
 
@@ -143,8 +143,8 @@ Eğitim **Kaggle'da** yapılır, GPU ile. Yerel NumPy eğitimi saatler sürer.
 
 | komut | ne yapar | süre |
 |---|---|---|
-| `!bash kaggle_start.sh verify` | dry-run doğrulama, GPU gerekmez, **TAM encode yapılmaz** | ~1-2 dk |
-| `!bash kaggle_start.sh bench` | 1 epoch zamanlama (cache/encode + 1 epoch birlikte ölçülür) | ~10 dk + 1 epoch |
+| `!bash kaggle_start.sh verify` | dry-run doğrulama, GPU gerekmez, **TAM encode yapılmaz** | ~1-2 dakika |
+| `!bash kaggle_start.sh bench` | 1 epoch zamanlama (cache/encode + 1 epoch birlikte ölçülür) | ~10 dakika + 1 epoch |
 | `!bash kaggle_start.sh train` | asıl eğitim | ~4,7 saat |
 
 ## Gerçek komut (train modu)
@@ -166,9 +166,9 @@ python train_llm.py --rag --kb-map knowledge_map.jsonl --natural 5 $CGARG \
 | `LLM_EPOCHS` | 12 | üst sınır **ve** `lr_horizon = min(EPOCHS, patience+20)` |
 | `LLM_PATIENCE` | 4 | **epoch cinsinden** (eski sürümde "kötü val ölçümü" sayıyordu, düzeltildi) |
 | `LLM_OTURUM_DK` | 540 | oturum süresi → `MAX_PAIRS` tavanını hesaplar |
-| `LLM_CAP` / `LLM_BLOCKS` | 384 / 6 | ~22,9M parametre |
+| `LLM_CAP` / `LLM_BLOCKS` | 384 / 6 | ~22,9 milyon parametre |
 | `LLM_SEQ` | 256 | `MAX_SEQ_LEN` ile **AYNI olmalı** (tek kaynak) |
-| `LLM_TIE` | 1 | 0 → `--untie-embeddings` (23,0M → 16,8M, dosya 87,6 → 64,1 MB) |
+| `LLM_TIE` | 1 | 0 → `--untie-embeddings` (23,0 milyon → 16,8 milyon, dosya 87,6 → 64,1 megabayt) |
 | `LLM_WD` | 0.01 | AdamW, yalnız ağırlık matrisleri |
 | `LLM_DROPOUT` | 0.10 | |
 | `LLM_NATURAL` | 5 | doğal çoğaltma çarpanı |
@@ -178,13 +178,13 @@ python train_llm.py --rag --kb-map knowledge_map.jsonl --natural 5 $CGARG \
 
 | sabit | değer | nasıl ölçüldü |
 |---|---|---|
-| `ENC_CIFT_SN` | 664,5 çift/sn | 1.024.172 çift, encode 1541 sn (921.748 train + 102.424 val) |
-| `MS_PER_PAIR` | 1,5139 ms/çift | 921.748 çift, ortalama 1395 sn/epoch (val olan epoch'lar ~1435, val atlananlar ~1338 → **tek epoch seçmek %7 yanıltırdı**, ortalama alındı) |
+| `ENC_CIFT_SN` | 664,5 çift/saniye | 1.024.172 çift, encode 1541 saniye (921.748 train + 102.424 val) |
+| `MS_PER_PAIR` | 1,5139 milisaniye/çift | 921.748 çift, ortalama 1395 saniye/epoch (val olan epoch'lar ~1435, val atlananlar ~1338 → **tek epoch seçmek %7 yanıltırdı**, ortalama alındı) |
 | `TOKEN_PER_PAIR` | **100,0** token | 5.000 çift, canlı `encode_llm` → PAD budanmış gerçek uzunluk (eğitim popülasyonu; ham popülasyon 95,97 ± 0,97). 29.09'daki 89,3 veri büyüdüğü için %12 bayatlamıştı |
 | `TOKEN_PER_PAIR` (29.09) | 89,3 | 3 tohum × 1.000 ham çift, o dönemin 11.149 intent'lik verisi |
 
 **Dikkat (28.09 hatası):** MS_PER_PAIR küçük saymak bütçeyi **BÜYÜTÜYOR** (12 epoch
-396 dk yerine gerçekte 431 dk ister → oturum kesilirdi). Zaman bütçesi pratikte bağlayıcı
+396 dakika yerine gerçekte 431 dakika ister → oturum kesilirdi). Zaman bütçesi pratikte bağlayıcı
 değil; **veri bütçesi (`MAX_PAIRS`) asıl kısıt**. Tavan formülü
 `train_llm.sure_ve_hesapla()`'da — bash'ta değil, test edilebilir olsun diye.
 
@@ -208,8 +208,8 @@ Artan işlem yalnız %30; uzunluk-kırpımlı batch'ler (`_pack_encoded`) RAG's�
 veri bütçesi        : 210.159 çift (intents %93,9) + chatgrow 13.656 (%6,1)
   ↳ kitap hattı          609  (%0,27)
 doğallaştırma ×5    : 1.024.172 çift
-RAG bağlamlı çift   : %52,9   (log "%2,7" demişti — HATALI, bkz. §6.2)
-BPE vocab 16.000 · 100,3M token · 8 epoch (patience ile erken kesildi)
+RAG bağlamlı çift   : %52,9   (log "%2,7" demişti — HATALI, bakınız §6.2)
+BPE vocab 16.000 · 100,3 milyon token · 8 epoch (patience ile erken kesildi)
 en iyi val 0,3959 @ 8. epoch · acc 0,913
 ```
 
@@ -303,15 +303,15 @@ Düzeltme `rag_context_stats()` fonksiyonunda, **yalnızca yazdırır** — `ctx
 `build_book_pairs.py` **öğretmiyor ki öğretmez**: "devam cümlesi" (continuation)
 üretiyor, bilgi değil. Yanıt 6,2 kelime → niyet yanıtlarıyla aynı uzunlukta.
 
-## 6.4 Disk temizliği — 676 MB, kanıtlayarak silindi
+## 6.4 Disk temizliği — 676 megabayt, kanıtlayarak silindi
 2 Kaggle zip'i (içerik diskte doğrulandı), byte-aynı yedek kopyalar, 0 referanslı model
 dosyaları, 4 `llm_data_*.npz` (gitignore'lu, Kaggle klonunda var olamaz).
-`model/` 941 → 329 MB. Tek rollback noktası: `model/yedek/20260929_031340`.
+`model/` 941 → 329 megabayt. Tek rollback noktası: `model/yedek/20260929_031340`.
 İki `kaggle_train.log` korundu.
 
-## 6.5 Korpus önbellekleri (1.038 MB) SİLİNMEDİ — ölçüldü
-Önbellekli yükleme **18,4 sn** vs önbelleksiz **273,8 sn**. Çöp değil, her açılışta
-4,3 dk kazandıran hız önbelleği. Karar `corpus.py` `load()` docstring'ine yazıldı.
+## 6.5 Korpus önbellekleri (1.038 megabayt) SİLİNMEDİ — ölçüldü
+Önbellekli yükleme **18,4 saniye** / önbelleksiz **273,8 saniye**. Çöp değil, her açılışta
+4,3 dakika kazandıran hız önbelleği. Karar `corpus.py` `load()` docstring'ine yazıldı.
 
 ## 6.6 40 sohbet sınıfı kasıtlı
 `brain.py:1047` kuralı: `len(patterns) > 6` → sohbet, `≤6` → bilgi. AutoGrow bilgi
@@ -350,7 +350,7 @@ sabittir; büyüyen kısım yalnızca bilgi intent'leridir (tam 6 desenli şablo
 | soru | cevap | kanıt |
 |---|---|---|
 | `KB_TEXT_CHARS=300` bağlamı kırpıyor mu? | **HAYIR, %0,0** | kb metni maks 192 token < 200 bütçe; 0/39.983 desen 300 karakteri aşıyor (zaten üretimde 300'de kesiliyor) |
-| Kopyalama bilgi-bağlamlı çiftlerde yoğunlaşıyor mu? | **HAYIR** | gruplar arası: bilgili 0,185 vs bilgisiz 0,217 (t=−1,04, anlamsız). Karıştırıcısız paired (aynı 250 soru, bağlam açık/kapalı): kopya +0,095 (t=3,42) ama **altın içerik +0,150 (t=4,54)** → kopyalama artışı faydalı |
+| Kopyalama bilgi-bağlamlı çiftlerde yoğunlaşıyor mu? | **HAYIR** | gruplar arası: bilgili 0,185 / bilgisiz 0,217 (t=−1,04, anlamsız). Karıştırıcısız paired (aynı 250 soru, bağlam açık/kapalı): kopya +0,095 (t=3,42) ama **altın içerik +0,150 (t=4,54)** → kopyalama artışı faydalı |
 | Model bağlamı kullanıyor mu? | **EVET, güçlü** | öğretmen koşullu argmax %68,2 → **%86,7** (NLL 2,717 → 1,329; t=+8,06) |
 | Üretimdeki bağlam cevabı taşıyor mu? | **EVET** | 250 bilgi sorusunun **%60,0**'ında altının tüm içerik kelimeleri `Corpus.search` metninde (eşit 300 karakter bütçede eğitim bağlamından +0,029, t=−2,72) |
 | Kaybedilen içerik neden kaybediliyor? | **Üretim biçimi** | altın kelimelerinin %30,8'i geçiyor; kalanın **%59,4'ü bağlamda VAR**, %40,6'sı hiç yok |
@@ -405,7 +405,7 @@ modelin bağımlı olduğu bir kısıt — dokunulmamalı.
 
 ## 7.4 Bilinmeyen (ölçülmedi, tahmin de edilmedi)
 
-`MS_PER_PAIR = 1,5139` ms/çift, 29.09'da **89,3 token/çift** verisiyle ölçüldü.
+`MS_PER_PAIR = 1,5139` milisaniye/çift, 29.09'da **89,3 token/çift** verisiyle ölçüldü.
 Çift başına token %12 arttı (100,0), yani epoch süresi de artmış olmalı; GPU
 olmadan ölçülemez. Yerel olarak `kaggle_start.sh bench` ile ölçülmeli. Veri
 bütçesi (`MAX_PAIRS`) daha önce bağlayıcıydı, o bozulmadı.
@@ -430,7 +430,7 @@ bütçesi (`MAX_PAIRS`) daha önce bağlayıcıydı, o bozulmadı.
 - ~~Çalışan VS Code debug sunucusu (PID 7064, port 5000)~~ → **ÇÖZÜLDÜ**
   (29.09 sonrası ölçüldü: PID 7064 yok, port 5000'de dinleyen yok). Artık
   `corpus.jsonl` bozma riski yok.
-- 587 test ~270 sn sürüyor; ölçüm aracı çalıştırırken `train_llm.py`'ye dokunma.
+- 587 test ~270 saniye sürüyor; ölçüm aracı çalıştırırken `train_llm.py`'ye dokunma.
 
 ---
 
@@ -483,7 +483,7 @@ bütçesi (`MAX_PAIRS`) daha önce bağlayıcıydı, o bozulmadı.
 # 11. TEST / CI
 
 - `pytest` **yok** → `python -m unittest discover -s tests -p "test_*.py"`
-- ~270 sn, **587 test OK (1 skip)**
+- ~270 saniye, **587 test OK (1 skip)**
 - CI (`ci.yml`, Python 3.12) yalnız **`pip install numpy requests flask`** yapar →
   `torch` bağımlı testler `@requires_torch` ile **skip** edilir (aksi halde
   `unittest.loader._FailedTest` modülü düşürüp tüm suite'i kırmızı eder).
@@ -505,7 +505,7 @@ bütçesi (`MAX_PAIRS`) daha önce bağlayıcıydı, o bozulmadı.
 - `Corpus.search(query, k=2)` — **`top_k` parametresi yok**
 - PowerShell'de `'%s' % (x, y)` içinde `%%.1f` yazarsan **"not all arguments
   converted"** hatası verir: `%%` kaçış olduğu için o alan dönüşüm saymaz.
-  Bu tuzak 29.09'da 3 kez ölçüm betiğini düşürdü (biri 10 dk'lık 3 kolü
+  Bu tuzak 29.09'da 3 kez ölçüm betiğini düşürdü (biri 10 dakikalık 3 kolü
   kaybettirdi). Gerçek yüzde için `%.1f%%` + değeri ayrı argüman olarak ver.
 - Ölçüm betiğinde **kol biter bitmez diske yaz**, sonra raporla: raporlama
   satırındaki hata tüm üretimleri yok ediyor.
@@ -528,16 +528,16 @@ bütçesi (`MAX_PAIRS`) daha önce bağlayıcıydı, o bozulmadı.
 |---|---|---|
 | `olc_baglam.py` | RAG kapsamı, bağlam/yanıt kırpma oranı, token/çift | `olc_baglam_cikti.txt` |
 | `olc_kopya_sinyali.py` | altın yanıtın bağlamdan kopyalanması (ASCII katlamalı) | `olc_kopya_cikti.txt`, `olc_ornek_ciftler.jsonl` |
-| `olc_token_dogrula.py` | `TOKEN_PER_PAIR`: elle formül vs canlı `encode_llm` | `olc_token_cikti.txt` |
+| `olc_token_dogrula.py` | `TOKEN_PER_PAIR`: elle formül / canlı `encode_llm` | `olc_token_cikti.txt` |
 | `olc_model_tarafi.py` | paired bağlam açık/kapalı + gruplar arası | `olc_model_tarafi.json`, `olc_model_cikti.txt` |
 | `olc_sadakat_neden.py` | kaybedilen altın kelimeleri: bağlamda var mı? | (başka betikten) |
 | `olc_sweep3.py` | `knowledge_bias` 0/1,2/3,0 + **GEÇERSİZ** oracle | `olc_sweep3.json` |
 | `olc_sweep4.py` | başlıklı oracle (geçersiz) + birleşik | `olc_sweep4.json` |
 | `olc_nll.py` | öğretmen koşullu NLL + argmax doğruluğu | `olc_nll.json` |
-| `olc_kaynak_karsilastir.py`, `olc_kaynak_esit_butce.py` | eğitim vs üretim bağlamı (eşit bütçe) | `olc_kaynak_karsilastir.json` |
+| `olc_kaynak_karsilastir.py`, `olc_kaynak_esit_butce.py` | eğitim / üretim bağlamı (eşit bütçe) | `olc_kaynak_karsilastir.json` |
 | `olc_sweep7.py` | sıcaklık 0,7/0,3/0,05 | `olc_sweep7.json` |
 | `olc_sweep10.py` | `rep_penalty` 0,4/0,2/0,0 | `olc_sweep10.json` |
-| `olc_altin_kalite.py` | altın yanıt kalitesi (sohbet vs bilgi) | (stdout) |
+| `olc_altin_kalite.py` | altın yanıt kalitesi (sohbet / bilgi) | (stdout) |
 | `olc_dogal_kapsam.py` | doğallaştırma içerik koruması | `olc_dogal_kapsam.json` |
 | `olc_diskursor.py` | diskursör işareti: hedeflerde ve çıktılarda | (stdout) |
 | `olc_naturalize_hata.py` | `naturalize.py` hata sınıfları (%1,06) | (stdout) |
