@@ -313,10 +313,13 @@ dosyaları, 4 `llm_data_*.npz` (gitignore'lu, Kaggle klonunda var olamaz).
 ## 6.6 40 sohbet sınıfı kasıtlı
 `brain.py:1047` kuralı: `len(patterns) > 6` → sohbet, `≤6` → bilgi. AutoGrow bilgi
 intent'lerini tam 6 desenli Wikipedia şablonundan üretiyor → `num_intents: 40` sabit
-(`autogrow.py:57` yorumu bunu doğruluyor). `intents.json` = 11.557 intent
-(40 sohbet + 11.517 bilgi). Büyüme retrieval katmanına gidiyor.
+(`autogrow.py:57` yorumu bunu doğruluyor). Büyüme retrieval katmanına gidiyor.
 
-Ölçüm: 11.557 intent, 40'ı desen>6, 11.517'si desen≤6 (tam 6 desenli şablon).
+**DİKKAT — bu sayı SABİT DEĞİLDİR.** AutoGrow CI'da her koşuda `intents.json`'u
+büyütür, yani aşağıdaki değer **29.09 ölçümüdür ve sonrasında değişmiştir.**
+29.09: 11.557 intent (40 sohbet + 11.517 bilgi). Sonraki ölçüm: bilgi intent
+**11.888**, toplam 11.928. Numarayı kullanmadan önce **yeniden ölç**. 40 sohbet sınıfı
+sabittir; büyüyen kısım yalnızca bilgi intent'leridir (tam 6 desenli şablon).
 `corpus.jsonl`: 137.032 parça, örneklemde %12,3 uzun metin / %87,7 kısa tanım.
 
 ## 6.7 Ölçüm araçları repoya taşındı

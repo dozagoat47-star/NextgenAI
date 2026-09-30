@@ -1,26 +1,27 @@
 # Nextgen AI
 
 Sıfırdan yazılmış (NumPy-only, hazır ML kütüphanesi yok) Türkçe sohbet asistanı.
-Üç katmanlı mimari: intent sınıflandırma (transformer) + yerel bilgi retrieval (RAG-lite) + üretim katmanı.
 
-> **Bu projeyi bir yapay zekâya devam ettirmek istiyorsan:** `DEVAM_PROMPTU.md`
-> dosyasını okut. İçinde kurallar, ölçülmüş değerler, kısıtlar, Kagle eğitim akışı
-> ve sıradaki adım var. Kısa yönerge dosyanın başındaki "KISA PROMPT" bölümünde.
+> **Bir yapay zekâya devam ettirmek istiyorsan:** `DEVAM_PROMPTU.md` dosyasını
+> okut. Kısa yönerge dosyanın başındaki "KISA PROMPT" bölümünde.
 
 ## Mimari
 
 | Katman | Dosya | Görev |
 |---|---|---|
-| Sınıflandırıcı | `transformer.py`, `brain.py` | Transformer encoder (NumPy) — sohbet niyetlerini sınıflandırır |
+| Sınıflandırıcı | `transformer.py`, `brain.py` | Transformer encoder (NumPy) — sohbet niyetlerini sınıflandırır (40 sınıf) |
 | Bilgi arama | `corpus.py`, `knowledge.py` | RAG-lite: LSA/SVD + PPMI + BM25; bilinmeyen soru Wikipedia'dan |
-| Üretim | `generator.py`, `seqgen.py`, `seq2seq.py` | Anchor-sabit parafraz (bigram) + koşullu LSTM üreteç + Seq2Seq transformer encoder-decoder |
+| Üretim | `llm.py`, `seq2seq.py`, `seqgen.py`, `generator.py` | Üretim hattı sırayla dener: **LLM → Seq2Seq → LSTM**; hepsi aynı kalite kapısından geçer |
 | Öğrenme | `finetune.py` | LoRA adaptörüyle anlık intent ekleme/çıkarma (`/learn`, `/forget`) |
 | Sunucu | `app.py` | Flask web arayüzü, yönlendirme kuralları |
 
-İki katmanlı çalışma prensibi:
-- **Sohbet niyetleri** (deseni >6 olan intentler) transformer ile sınıflandırılır.
-- **Bilgi niyetleri** (Wikipedia şablonlu 750+) IDF anahtar-kelime retrieval ile cevaplanır.
-- Model güven veremezse `corpus` -> internet (Wikipedia) fallback'ine düşer; internetten gelen bilgi `corpus.jsonl`'a kaydedilir.
+Çalışma prensibi:
+- **Sohbet niyetleri** (deseni >6 olan intent'ler) sınıflandırıcıyla çözülür.
+- **Bilgi niyetleri** (Wikipedia şablonlu, otomatik büyüyen küme) IDF anahtar-kelime
+  retrieval ile.
+- Üretim katmanı ana üreticidir; yanıt kalite kapısından geçemezse bir sonrakine düşer.
+- Hiçbiri yetmezse `corpus` → internet (Wikipedia) fallback'i; internetten gelen bilgi
+  `corpus.jsonl`'a kaydedilir.
 
 ## Kurulum
 
@@ -30,13 +31,53 @@ pip install -r requirements.txt
 
 ## Eğitim
 
-> Eğitim Google Colab'da GPU ile yapılır; yerel NumPy eğitimi saatler sürer.
+> **Eğitim Kaggle'da GPU ile yapılır** (`kaggle_start.sh`). Yerel NumPy eğitimi
+> saatler sürer, pratikte değildir.
 
-1. Eğitilmiş model `model/` dizininde hazır gelir: `model/model.json` + `model/model_weights.npz` + `model/bot_data.json` (+ opsiyonel `model/lora.json`, `model/seq_model.json`, `model/seq2seq_model.json`).
-2. Yeniden eğitmek için `colab/nextgen_transformer_colab.ipynb` (GPU) kullanın, çıktıyı `model/`'e kopyalayın.
-3. Yerel NumPy eğitimi (yavaş, önerilmez): `python train.py --epochs 500 --lr 0.001`
-4. Karakter üreteci (Seq2Seq encoder-decoder): `colab/nextgen_seq2seq_colab.ipynb` (önerilen)  
-5. Karakter üreteci (LSTM fallback): `colab/nextgen_seqgen_colab.ipynb` veya `python seqgen.py`
+Kaggle.com → New Notebook. **Ayarlar:** Internet **ON**, Accelerator **GPU P100** (veya T4x2).
+
+```python
+# 1. hücre
+!git clone https://github.com/dozagoat47-star/NextgenAI.git
+%cd NextgenAI
+!python -m pip install --quiet numpy
+```
+```python
+# 2. hücre
+!bash kaggle_start.sh train
+```
+
+Sonra **Save (Version)** → **Output** sekmesi → **Download All**. İndirilen zip'teki
+`llm_model.json` + `llm_model_weights.npz` dosyalarını birlikte `model/` klasörüne kopyala.
+
+Betik üç modda çalışır:
+
+| komut | ne yapar | süre |
+|---|---|---|
+| `!bash kaggle_start.sh verify` | dry-run doğrulama, GPU gerekmez, tam encode yapılmaz | ~1-2 dk |
+| `!bash kaggle_start.sh bench` | 1 epoch zamanlama | ~10 dk + 1 epoch |
+| `!bash kaggle_start.sh train` | asıl eğitim | ~4,7 saat (12 epoch) |
+
+Ayar için ortam değişkenleri: `LLM_EPOCHS` (12), `LLM_PATIENCE` (4), `LLM_CAP` (384),
+`LLM_BLOCKS` (6), `LLM_SEQ` (256), `LLM_DROPOUT` (0.10), `LLM_NATURAL` (5),
+`LLM_OTURUM_DK` (540). Ayrıntı ve ölçülmüş süre sabitleri `DEVAM_PROMPTU.md` §4'te.
+
+Ayrıntılar ve alternatif yollar için `DEVAM_PROMPTU.md` §4'e bak.
+
+## Model dosyaları
+
+| dosya | boyut | ne |
+|---|---|---|
+| `model/llm_model.json` + `llm_model_weights.npz` | 0,19 MB + 67,6 MB | **ana üretici** (Kaggle'da eğitilir) |
+| `model/seq2seq_model.json` | 34,6 MB | Seq2Seq encoder-decoder üreteç |
+| `model/seq_model.json` | 8,4 MB | LSTM karakter üreteci |
+| `model/model.json` + `model_weights.npz` | 0,3 MB + 4,8 MB | niyet sınıflandırıcı (40 sınıf) |
+| `model/bot_data.json` | 1,4 MB | bot verisi |
+
+> `model/` git'e girmez. Üzerine yazmadan önce `model_kur.py --check` ile kontrol et;
+> betik küçültmeyi engeller ve `model/yedek/<tarih>/` altına yedek alır.
+
+`colab/` altındaki notebook'lar ikincil yoldur; güncel akış Kaggle'dır.
 
 ## Çalıştırma
 
@@ -44,11 +85,13 @@ pip install -r requirements.txt
 python app.py        # http://localhost:5000
 ```
 
-API uçları:
-- `POST /chat` — `{"message": "..."}` -> `{"response": "..."}`
-- `POST /learn` — `{"entries": [{"tag", "patterns", "responses"}]}` (LoRA ile öğretir)
-- `POST /forget` — `{"tag": "..."}` (LoRA intentini geri alır)
-- `GET /status` — model/corpus durumu
+| uç | gövde | sonuç |
+|---|---|---|
+| `POST /chat` | `{"message": "..."}` | `{"response": "..."}` |
+| `POST /predict` | `{"text": "..."}` | `{"suggestions": [...]}` (en fazla 6 öneri) |
+| `POST /learn` | `{"entries": [{"tag", "patterns", "responses"}]}` | LoRA ile öğretir |
+| `POST /forget` | `{"tag": "..."}` | LoRA intentini geri alır |
+| `GET /status` | — | model/corpus durumu |
 
 ## Test
 
@@ -58,10 +101,16 @@ python -m unittest discover -s tests -v
 
 ## Veri hattı
 
-- `autogrow.py` — Wikipedia'dan otomatik bilgi toplar, `intents.json` + `corpus.jsonl`'ı büyütür.
-- `clean_intents.py` — toplanan ham veriyi temizler (Latin dışı yazım, kesik biyografi, zararlı tag).
+- `autogrow.py` — Wikipedia'dan otomatik bilgi toplar, `intents.json` + `corpus.jsonl`'ı büyütür
+- `clean_intents.py` — toplanan ham veriyi temizler
+- `build_book_pairs.py` — Wikisource'tan continuation çiftleri (`chatgrow_kitap_*.jsonl`)
+- `chatgrow.py` — sohbet çiftleri
+- `tools/` — ölçüm araçları (`tools/README.md`'e bak)
 
-## Bilinen sınırlar / yön
+Veri hattı CI'da da otomatik çalışır (`.github/workflows/`) ve `main`'e kendisi push eder.
 
-- Çekirdek bir dil modeli değil, sınıflandırıcı + retrieval'dır; akıl yürütme, kurgu, çok adımlı mantık sınırlıdır.
-- Yanıt üretimi parafraz esaslıdır; Seq2Seq üreteç kopyalanan yanıtları koşullu yeniden üretir (tam semantik üretim değil).
+## Bilinen sınırlar
+
+- ~%40 oranında "bilgim yok" cevabı veriyor — veri eksiği, kodla çözülemez
+- Üretimde sadakat (fidelity) %22–31; kopyalama eğilimi ölçülmüş sorun
+- Kitap/Wikisource hattı kaynak tükenmiş: 609 çift (bkz. `build_book_pairs.py` docstring)
