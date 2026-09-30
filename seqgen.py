@@ -335,30 +335,80 @@ def load_pairs(intents_path, max_pairs=20000, max_per_intent=40,
     oysa MAX_SEQ_LEN yanita tam 204 karakter ayiriyor. 70, verinin %42'sini
     atiyor ve kirpilanlarin %81'ini kelime ortasindan kesiyordu; ayrinti ve
     olcumler icin RESP_CHARS_MAX yorumuna bakin.
+
+    CIZGISI (29.09): Farkli intent'lerin pattern'leri clean_chars sonrasi
+    ayni context'e donuse bilir (orn. 'fizik nedir' -> 'fizik' ve 'bilim' intentleri).
+    Bu fonksiyon artik context basina TEK intent'in yanitlarini kullanir;
+    diger intent'ler o context icin ATLANIR -> yanit karisikligi onlenir.
+
+    CIZGISI (30.09): Sohbet intent'leri (>6 pattern) icerisinde de
+    alt-konu pattern'leri tum yanitlarla cross-product yapiyordu
+    (orn. 'yemek' intentinde 'cay mi kahve mi' pattern'i pizza/makarna/corba
+    yanitlari aliyordu). Artik sohbet intent'lerinde pattern basina TEK
+    yanit (round-robin) kullanilir; bilgi intent'lerinde (6 pattern) eskisi
+    gibi tum yanitlar kullanilir (cunku 6 pattern ayni konunun varyantidir).
     """
+    if not (intents_path and os.path.exists(intents_path)):
+        return []
+
+    data = json.load(io.open(intents_path, 'r', encoding='utf-8'))
+
+    # 1. Adim: Her intent icin (temizlenmis_pattern, tag, responses, is_knowledge) topla
+    intent_data = []
+    for it in data.get('intents', []):
+        tag = clean_chars(it.get('tag', ''), 32)
+        resps = [clean_chars(r, RESP_CHARS_MAX)
+                 for r in it.get('responses', [])]
+        resps = [r for r in resps if len(r) >= 6]
+        if not tag or not resps:
+            continue
+        n_patterns = len(it.get('patterns', []))
+        is_knowledge = (n_patterns == 6)  # 6 pattern = bilgi intenti
+        if use_query:
+            pats = [clean_chars(p, ctx_len) for p in it.get('patterns', [])]
+            pats = [p for p in pats if len(p) >= 6] or [tag]
+            # Her pattern icin (ctx, tag, resps, is_knowledge) kaydet
+            for p in pats[:max_per_intent]:
+                intent_data.append((p, tag, resps[:max_per_intent], is_knowledge))
+        else:
+            # use_query=False: tag'i context olarak kullan
+            intent_data.append((tag, tag, resps[:max_per_intent], False))
+
+    # 2. Adim: Context'e gore grupla, cakisma varsa TEK intent sec
+    ctx_to_entries = {}
+    for ctx, tag, resps, is_knowledge in intent_data:
+        if ctx not in ctx_to_entries:
+            ctx_to_entries[ctx] = (tag, resps, is_knowledge)
+        else:
+            # Cakisma var: ilk bulani koru (bilgi intenti oncelikli olabilir)
+            existing_tag, existing_resps, existing_knowledge = ctx_to_entries[ctx]
+            if existing_tag != tag:
+                # Bilgi intenti (is_knowledge=True) varsa onu onceliklendir
+                if is_knowledge and not existing_knowledge:
+                    ctx_to_entries[ctx] = (tag, resps, is_knowledge)
+                # Aksi halde mevcut koru (sessizce atla)
+
+    # 3. Adim: Secili entry'lerden pair uret
     pairs = []
-    if intents_path and os.path.exists(intents_path):
-        data = json.load(io.open(intents_path, 'r', encoding='utf-8'))
-        for it in data.get('intents', []):
-            tag = clean_chars(it.get('tag', ''), 32)
-            resps = [clean_chars(r, RESP_CHARS_MAX)
-                     for r in it.get('responses', [])]
-            resps = [r for r in resps if len(r) >= 6]
-            if not tag or not resps:
-                continue
-            if use_query:
-                pats = [clean_chars(p, ctx_len) for p in it.get('patterns', [])]
-                pats = [p for p in pats if len(p) >= 6] or [tag]
-                for p in pats[:max_per_intent]:
-                    for r in resps[:max_per_intent]:
-                        pairs.append((p, r))
+    for ctx, (tag, resps, is_knowledge) in ctx_to_entries.items():
+        if is_knowledge:
+            # Bilgi intenti: her pattern tum yanitlari gorsun (cross-product)
+            for r in resps:
+                pairs.append((ctx, r))
+        else:
+            # Sohbet intenti: pattern basina TEK yanit (round-robin)
+            # Bu, 'yemek' intentinde 'cay mi kahve mi' pattern'inin
+            # pizza/makarna/corba yanitlarini gormesini engeller
+            if len(resps) == 1:
+                pairs.append((ctx, resps[0]))
             else:
-                cnt = 0
-                for r in resps:
-                    pairs.append((tag, r))
-                    cnt += 1
-                    if cnt >= max_per_intent:
-                        break
+                # Deterministik: context hash'ine gore bir yanit sec
+                h = 5381
+                for ch in ctx:
+                    h = ((h * 33) + ord(ch)) & 0x7FFFFFFF
+                chosen = resps[h % len(resps)]
+                pairs.append((ctx, chosen))
+
     rng = random.Random(3)
     rng.shuffle(pairs)
     return pairs[:max_pairs]

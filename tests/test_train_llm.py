@@ -814,6 +814,10 @@ class TestResponseBudget(unittest.TestCase):
         SONRA max_pairs ile kirpiyor, yani gercek intents.json (8.003
         yanit) test paketine ~7 dk ekliyordu. Buradaki onemli olan
         tavinin UYGULANMASI, veri hacmi degil.
+
+        Guncelleme (30.09): sohbet intent'leri (pattern > 6) icin pattern
+        basina TEK yanit secilir (round-robin). Bu test 1 pattern'li
+        sentetik intent kullanir, bu yuzden sadece 1 yanit doner.
         """
         import io
         import json
@@ -836,13 +840,17 @@ class TestResponseBudget(unittest.TestCase):
             os.unlink(yol)
         self.assertTrue(pairs, 'cift uretilmedi')
         L = [len(r) for _c, r in pairs]
+        # Sohbet intent (1 pattern) -> 1 yanit donmeli
+        self.assertEqual(len(pairs), 1, 'sohbet intent: pattern basina 1 yanit')
+        # Secilen yanit tavanı asmamali
         self.assertLessEqual(max(L), RESP_CHARS_MAX,
                              'tavan asilmis: %d > %d' % (max(L), RESP_CHARS_MAX))
-        # 70'lik tavan geri gelmis olsaydi burasi 70 olurdu
+        # Tavan tam uygulanmali (uzun yanit kirpilip 204 olmali)
         self.assertEqual(max(L), RESP_CHARS_MAX,
                          'tavan tam uygulanmali: %d != %d'
                          % (max(L), RESP_CHARS_MAX))
-        self.assertIn(len(kisa), L, 'kisa yanit oldugu gibi kalmali')
+        # Kisa yanit secilirse (deterministik hash), eski gibi kisa kalmali;
+        # uzun secilirse 204'e kirpilip gelmeli. Her iki durum da dogru.
 
 
 class TestVeriHazirlamaOlcumleri(unittest.TestCase):

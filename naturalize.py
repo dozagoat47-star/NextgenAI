@@ -177,6 +177,10 @@ def _maybe_insert_mid(sentence, rng, prob=0.35):
     iceriden degistirerek gercek bir varyant yaratir; ekleme noktasi dogal
     bir virgul/hizlandirici siniridir ve cumlenin %30-85'i arasina dusturulur
     (cumle basina takilmis '; ustelik' gibi garip okumalar engellenir).
+
+    Pozisyon hesaplamasi orijinal metinde kelime sinirini BULUR (string
+    uzunlugundan tahmin etmez) -> onceki enjeksiyonlar/ckift bosluklar
+    konumu kaydirmaz.
     """
     if len(sentence) < 60 or rng.random() > prob:
         return sentence
@@ -186,7 +190,7 @@ def _maybe_insert_mid(sentence, rng, prob=0.35):
     hi = int(len(sentence) * 0.85)
     candidates = [p for p in candidates if lo <= p <= hi]
     if not candidates:
-        # virgul yoksa: kelime bazli orta bolgeyi sinirla (SLICE index'i ile)
+        # virgul yoksa: kelime bazli orta bolgeyi GERCEK KARAKTER KONUMU ile sinirla
         words = sentence.split()
         if len(words) < 8:
             return sentence
@@ -194,15 +198,39 @@ def _maybe_insert_mid(sentence, rng, prob=0.35):
         cut_to = max(3, len(words) // 2)
         if cut_from >= cut_to or cut_from >= len(words):
             return sentence
-        b4 = ' '.join(words[:cut_from])   # slice konumu, kelime icerigi degil
-        pos = len(b4)                     # burada bir bosluk karakteri var
+        # Gercek karakter konumunu bul: cumleyi tarayip cut_from kelimesin sonunu isaretle
+        count = 0
+        pos = 0
+        in_word = False
+        for i, ch in enumerate(sentence):
+            if ch.isspace():
+                if in_word:
+                    count += 1
+                    if count == cut_from:
+                        pos = i  # kelimenin sonundaki bosluk konumu
+                        break
+                    in_word = False
+            else:
+                in_word = True
+        if count < cut_from:
+            return sentence
     else:
         pos = rng.choice(candidates)
     if not (0 < pos < len(sentence) - 1):
         return sentence
     f = rng.choice(_MID_FILLERS)
-    # Komadan sonra / kelime sinirinda dogal sekilde birakir; karakter yemez.
-    return sentence[:pos] + f.rstrip() + ' ' + sentence[pos + 1:]
+    # Virgul varsa pos virgul isaret eder -> virgulden sonraki boslugu atla
+    # Virgul yoksa pos kelime-sonundaki boslugu isaret eder -> boslugu koru, filler ekle
+    after = sentence[pos:]
+    if after and after[0] in ',;':
+        # virgul/noktali virgul durumu: virgulden sonraki boslugu atla
+        skip = 1
+        if len(after) > 1 and after[1] == ' ':
+            skip = 2
+        return sentence[:pos] + f.rstrip() + ' ' + after[skip:]
+    else:
+        # kelime siniri: boslugu koru, filler'i onune ekle (filler zaten virgulle baslar)
+        return sentence[:pos] + f.rstrip() + ' ' + after
 
 
 def _maybe_open(sentence, rng, prob):

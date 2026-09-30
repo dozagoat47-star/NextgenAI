@@ -41,7 +41,8 @@ SPECIALS = ['<pad>', '<bos>', '<sep>', '<eos>']
 PAD, BOS, SEP, EOS = 0, 1, 2, 3
 
 # Turkce kucuk harf kumesi (dogal imla). Buyuk harfler asagiya cekilir.
-TURKISH_LETTERS = 'abcçdefgğhıijklmnoöprsştuüvyz'
+# q, w, x Turkce alfabede yok ama yabanci isim/terimlerde gecer (alexis, max, quantum vb.)
+TURKISH_LETTERS = 'abcçdefgğhıijklmnoöprsştuüvyzqwx'
 ASCII_DIGITS = '0123456789'
 PUNCT = ".,;:!?…()'\"%*-/&+=#@"
 # ' ' tekrar edenleri teklesir; kasitli bosluk korunur.
