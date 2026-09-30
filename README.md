@@ -77,7 +77,10 @@ Ayrıntılar ve alternatif yollar için `DEVAM_PROMPTU.md` §4'e bak.
 > `model/` git'e girmez. Üzerine yazmadan önce `model_kur.py --check` ile kontrol et;
 > betik küçültmeyi engeller ve `model/yedek/<tarih>/` altına yedek alır.
 
-`colab/` altındaki notebook'lar ikincil yoldur; güncel akış Kaggle'dır.
+`colab/` altındaki notebook'lar **ikincil yoldur**; güncel akış Kaggle'dır
+(`kaggle_start.sh`). Colab klasörü yalnızca yan modellerin (`transformer.py`,
+`seqgen.py`, `seq2seq.py`) notebook'larını ve LLM için yedek yolu tutar.
+Ayrıntı: `colab/README.md`.
 
 ## Çalıştırma
 
@@ -114,3 +117,8 @@ Veri hattı CI'da da otomatik çalışır (`.github/workflows/`) ve `main`'e ken
 - ~%40 oranında "bilgim yok" cevabı veriyor — veri eksiği, kodla çözülemez
 - Üretimde sadakat (fidelity) %22–31; kopyalama eğilimi ölçülmüş sorun
 - Kitap/Wikisource hattı kaynak tükenmiş: 609 çift (bkz. `build_book_pairs.py` docstring)
+- **Decoding tükendi (ölçüldü, n=250 paired t-testi):** `knowledge_bias` (0/1,2/3,0),
+  sıcaklık (0,7/0,3/0,05) ve `rep_penalty` (0,4/0,2/0,0) hiçbiri `gold_recall`'ı
+  anlamlı değiştirmiyor. Model bağlamı kullanıyor (öğretmen koşullu argmax
+  %68,2 → %86,7) ve bağlam cevabın %60,0'ını taşıyor, ama örneklemeli üretim
+  altının %30,8'ini veriyor → darboğaz üretim biçimi. Ayrıntı: `DEVAM_PROMPTU.md` §7

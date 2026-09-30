@@ -33,6 +33,7 @@ Türkçe sohbet asistanı. Web arayüzü Flask (`app.py`, port 5000).
 | Bağımlılıklar | `requirements.txt`: numpy>=1.24, flask>=2.3, requests>=2.31, openpyxl>=3.1 |
 | Disk | 2,1 GB → **1,47 GB** (temizlik sonrası); `model/` 329 MB |
 | Veri büyüyor (CI) | 29.09: 11.149 intent · 29.09 sonrası: **12.730 intent**, kb-map **39.983** desen, eğitim çifti ~1,09M |
+| **Sana kural** | Kodu elle düzelt, tahminle atlama; iddiasının sayısı olsun. Karar vermeden önce ölç, ölçtüğünü payla. Belirsizlikte sor. |
 
 ## Mimari (README'den)
 

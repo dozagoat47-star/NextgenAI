@@ -1,30 +1,46 @@
-# Nextgen AI - Colab ile GPU Eğitimi (PyTorch -> NumPy export)
+# Nextgen AI - Colab ile GPU Eğitimi (PyTorch -> NumPy export) — İKİNCİL YOL
 
-Yerel NumPy eğitimi yavaş olduğundan aynı transformer mimarisi Google
-Colab'da **PyTorch + GPU** ile eğitilir; ağırlıklar yerelin anladığı
-`model.json` (NumPy, float32) formatına aktarılır. `app.py`, `brain.py`
-hiç değişmeden çalışmaya devam eder.
+> **Güncel akış Kaggle'dır, bu klasör ikincil yoldur.** Asıl dil modeli
+> (`train_llm.py` + `llm.py`, BPE + encoder-decoder) **`kaggle_start.sh`** ile
+> Kaggle'da eğitilir — haftada 30 saat ücretsiz P100/T4x2, oturum ~9 saat.
+> Ayrıntı ve güncel komut: ana `README.md` (§ Kaggle eğitimi).
+>
+> Buradaki notebook'lar **Kaggle'da eğitilmeyen** yan modeller içindir
+> (`transformer.py` sohbet sınıflandırıcı, `seqgen.py` LSTM, `seq2seq.py`
+> encoder-decoder) ve `nextgen_llm_colab.ipynb` LLM için yedek yoldur.
+>
+> Yerel NumPy eğitimi saatler sürdüğü için eğitim GPU'da yapılır; ağırlıklar
+> yerelin anladığı `model.json` (NumPy, float32) formatına aktarılır.
+> `app.py`, `brain.py` hiç değişmeden çalışmaya devam eder.
 
 ## Dosyalar
 
 | Dosya | Açıklama |
 |---|---|
-| `nextgen_transformer_colab.ipynb` | Eğitim notebook'u (self-contained) |
+| `nextgen_llm_colab.ipynb` | LLM eğitimi — **yedek yol**, Kaggle yerine |
+| `nextgen_transformer_colab.ipynb` | Sohbet sınıflandırıcı eğitimi (self-contained) |
+| `nextgen_seqgen_colab.ipynb` | SeqGen LSTM eğitimi |
+| `nextgen_seq2seq_colab.ipynb` | Seq2Seq encoder-decoder eğitimi |
 | `../tests/test_core.py::test_transformer_export_map` | Export şeması round-trip regresyon testi |
 
 ## Kullanım
 
+> **Önce Kaggle'ı deneyin.** Yan modeller bile mümkünse Kaggle'da
+> (`kaggle_start.sh train`) eğitilir; aşağıdaki adımlar yalnızca Kaggle
+> kotanız bittiğinde veya başka bir model denemek istediğinizde gerekir.
+
 1. `intents.json`, `brain.py`, `transformer.py` dosyalarını Colab'ın
    sol Files panelinden `/content` klasörüne yükle.
 2. Notebook'u aç (`File > Upload notebook`) ve `Runtime > Run all`.
+   (`Runtime > Change runtime type` → **GPU** seçilmeli.)
 3. Eğitim bitince son hücredeki talimatla indir:
    - `model.json`
    - `model_weights.npz`
    - `bot_data.json`
 4. Yerelde bu üçünü `model/` klasöründeki dosyaların üstüne kopyala.
-   (Eski bozuk `model.json` ezilir; `model/_backup_feedforward/` yedeği
-   dokunulmaz.)
-5. Test: `python excel_predict.py` veya `python app.py`.
+   **`model/` git'e girmez ve üzerine yazmadan önce tarihli yedek zorunludur**
+   (`model_kur.py --check` güvenli yolu; yedekler `model/yedek/<ts>/`).
+5. Test: `python -m unittest discover -s tests` ve `python app.py`.
 
 ## Checkpoint / Resume (oturum kesilmesine dayanıklı)
 
@@ -58,21 +74,23 @@ Bu değerler, yerelde NumPy ile doğrulanmış stabil kombinasyondur
 
 ## İki katmanlı mimari: sohbet + bilgi ayrımı
 
-Eski 791 intent'lik model %1.75'e takılıyordu (753 bilgi intent'i aynı
-"X nedir" şablonuyla oluşturulmuş; 6.7 örnek/sınıf). Notebook artık:
+Sayılar **29.09 ölçümüyle günceldir** (`intents.json`: 12.730 intent, bunların
+40'ı desen >6 → sohbet, 12.690'ı bilgi). AutoGrow bilgi intent'lerini tam 6
+desenli Wikipedia şablonundan üretir; `autogrow.py:57` bunu doğrular
+(`num_intents` 40'da sabit kalır).
 
-1. **Sohbet sınıflandırması:** Deseni >6 olan intent'ler (gerçek veride
-   38 adet) siniflandırıcıya öğretilir. `num_intents` 38'e iner, doğruluk
-   hızla yükselir.
-2. **Bilgi retrieval'i:** Kalan 753 bilgi intent'i `intents`/`intent_kws`
+1. **Sohbet sınıflandırması:** Deseni >6 olan intent'ler (`brain.py:1047`)
+   sınıflandırıcıya öğretilir → 40 sınıf. Bilgi intent'leri bu katmana girmez.
+2. **Bilgi retrieval'i:** Kalan bilgi intent'leri `intents`/`intent_kws`
    içinde kalır; `bot_data.json` bunları içerir. Yerelde
    `ChatBot._select_knowledge` bilgi sorularını ters dizin (inverted index)
-   ile yanıtlar — siniflandırıcıya hiç dokunmaz.
+   ile yanıtlar — sınıflandırıcıya hiç dokunmaz.
 3. `get_response` akışı: bilgi sorusunda güven düşükse bilgi retrieval'e
    sorulur; bulunursa canned bilgi yanıtı, yoksa netleştirme.
 
-Bu yüzden notebook'taki `bot.conversational_data(data)` filtresi
-`intent_tags`'i 38'e indirir ama `intents`/`intent_kws`'i 791'de bırakır;
+Büyüme **retrieval** katmanına gider, sınıflandırıcıya değil. Bu yüzden
+notebook/script'teki `bot.conversational_data(data)` filtresi
+`intent_tags`'i 40'a indirir ama `intents`/`intent_kws`'i tam bırakır;
 export sonrası yereldeki `brain.py` aynı bot_data ile iki katmanlı çalışır.
 
 ---
@@ -187,12 +205,16 @@ MAX_ENC_LEN=40, MAX_DEC_LEN=48, TARGET_MAX_LEN=42
 
 ## Alternatif: Lightning AI ile eğitim (`train_seq2seq.py`)
 
-Notebook'a gerek yok; bağımsız script `train_seq2seq.py` (kök dizinde) aynı
-eğitimi terminalde koşar. Avantajları:
+Kaggle kadar önerilmez ama notebook'a gerek yok; bağımsız script
+`train_seq2seq.py` (kök dizinde) aynı eğitimi terminalde koşar. Avantajları:
 - **Kalıcı disk**: checkpoint restarta/copmaya rağmen durur; script otomatik
   kaldığı yerden devam eder (Colab `/content`'e benzeri yok).
 - Arka plan çalıştırma; tarayıcı kapanınca eğitim sürer.
 - Ücretsiz kredi (ayda 15, ~1 dolar = 1 kredi); T4 ~0.2-1.2 kredi/saat.
+
+**Kaggle'dan farkı:** oturum süresi kısıtı yok (Kaggle/Colab ~9 saat), ama
+haftalık GPU kotası farklıdır ve `MAX_PAIRS` hesabı `kaggle_start.sh`'dakinden
+ayrıdır.
 
 Çalıştırma: Studio'ya 5 dosyayı yükle (`intents.json`, `seqgen.py`,
 `seq2seq.py`, `normalize.py`, `train_seq2seq.py`), GPU (T4) seç, sonra:
@@ -202,4 +224,5 @@ python train_seq2seq.py --epochs 250   # veya 400
 SMOKE=1 python train_seq2seq.py        # 2 adım hız testi (CPU/GPU)
 ```
 
-Çıktı: `seq2seq_model.json` -> yerel `model/` klasörüne kopyala.
+Çıktı: `seq2seq_model.json` -> yerel `model/` klasörüne kopyala
+(`model/` git'e girmez; üzerine yazmadan önce tarihli yedek al).
