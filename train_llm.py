@@ -210,13 +210,31 @@ KB_TEXT_CHARS = 300 # kb parcasindan kullanilacak karakter sayisi (200 -> 300;
 SEED = 7
 
 # ---- VERI HAZIRLAMA OLÇÜMLERI (29.09, 3.000 ciftin GERÇEK encode'u) ----
-TOKEN_PER_PAIR = 89.3    # cift basina GERCEK token (kirpmali, RAG+kb-map acik,
+TOKEN_PER_PAIR = 100.0   # cift basina GERCEK token (kirpmali, RAG+kb-map acik,
                          # max_seq 256). Olcum: encode_llm -> PAD kuyrugu
-                         # budanmis gercek uzunluk. Maske (loss) 38,6 token.
+                         # budanmis gercek uzunluk.
                          #
-                         # 29.09 OLCUMU: 3 tohum (11/23/37) x 1000 cift =
-                         # 89,27 +- 0,96 (SE). Yani %95 aralik 87,4-91,1.
-                         # Onceki sabit 108,8di ve %18 YANLISTI.
+                         # 29.09 OLCUMU: 3 tohum x 1000 HAM cift = 89,27 (SE
+                         # 0,96). O deger 11.149 intent'lik veri icindi.
+                         #
+                         # 29.09 SONRASI VERI BUYUDU (CI autogrow intents uretiyor):
+                         # intents 11.149 -> 12.730, kb-map 29.970 -> 39.983
+                         # desen, cift 1.024.172 -> ~1.09 milyon. CANLI encode
+                         # ile TEKRAR OLCULDU (ayni yontem, PAD budanmis):
+                         #   HAM ciftler        (n=3.000, 3 tohum): 95,97 +- 0,97
+                         #   EGRITIM populasyonu (n=5.000, stabilize + dogal
+                         #     varyant x5 + chatgrow, gercek egitim cifti):
+                         #     100,02  -> eski sabit %12,0 EKSIKTI (14,4 SE)
+                         # Deger EGITIM populasyonunun olcumudur cunku
+                         # make_batches'in canli dogrulama satiri (asagida) tam
+                         # bu kumeyi sayar; ham olcum yalnizca nöbetçi testin
+                         # kullandigi alt kumedir.
+                         #
+                         # DOGRULAMA: elle kurulan uzunluk formulu canli
+                         # encode_llm ile baglamli 2.435/2.435 ciftte BIREBIR
+                         # ayni (baglamsiz ciftte 1 token fark: encode_llm bilgi
+                         # yokken ek <SEP> koymuyor). Yani sapma KODDAN degil
+                         # veri buyumesinden.
                          #
                          # NEDEN 28.09 KABUL EDILMEDI: kaggle_train.log'daki
                          # "100,3M token" bir olcum DEGIL, sabitin kendisiyle
@@ -229,6 +247,9 @@ TOKEN_PER_PAIR = 89.3    # cift basina GERCEK token (kirpmali, RAG+kb-map acik,
                          # 0,16 "binler" cinsinden ama M "milyon" demek ->
                          # 315.883 ciftte 50.541M yaziyordu, GERCEK 34,4M.
                          # 1.471 KAT HATA. Duzeltildi, olcum sabitlendi.
+                         #
+                         # BUTCE ETKISI YOK: sure_ve_hesapla() bu sabiti
+                         # KULLANMAZ (ENCODE_DK + MS_PER_PAIR kullanir).
 ENC_CIFT_SN = 664.5     # encode hizi, cift/sn (4 cekirdek, Kaggle T4x2).
                         # KAYNAK: 29.09 kosusu, UC BAGIMSIZ OLcum:
                         #   train 921.748 cift -> 1385 sn = 665,6 cift/sn

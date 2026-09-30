@@ -32,6 +32,7 @@ Türkçe sohbet asistanı. Web arayüzü Flask (`app.py`, port 5000).
 | Son 5 commit | `11bac35`, `af0bd23`, `4cf4d12`, `7f2d110`, `bd63543` |
 | Bağımlılıklar | `requirements.txt`: numpy>=1.24, flask>=2.3, requests>=2.31, openpyxl>=3.1 |
 | Disk | 2,1 GB → **1,47 GB** (temizlik sonrası); `model/` 329 MB |
+| Veri büyüyor (CI) | 29.09: 11.149 intent · 29.09 sonrası: **12.730 intent**, kb-map **39.983** desen, eğitim çifti ~1,09M |
 
 ## Mimari (README'den)
 
@@ -178,7 +179,8 @@ python train_llm.py --rag --kb-map knowledge_map.jsonl --natural 5 $CGARG \
 |---|---|---|
 | `ENC_CIFT_SN` | 664,5 çift/sn | 1.024.172 çift, encode 1541 sn (921.748 train + 102.424 val) |
 | `MS_PER_PAIR` | 1,5139 ms/çift | 921.748 çift, ortalama 1395 sn/epoch (val olan epoch'lar ~1435, val atlananlar ~1338 → **tek epoch seçmek %7 yanıltırdı**, ortalama alındı) |
-| `TOKEN_PER_PAIR` | 89,3 token | kirpmalı, RAG + kb-map açık |
+| `TOKEN_PER_PAIR` | **100,0** token | 5.000 çift, canlı `encode_llm` → PAD budanmış gerçek uzunluk (eğitim popülasyonu; ham popülasyon 95,97 ± 0,97). 29.09'daki 89,3 veri büyüdüğü için %12 bayatlamıştı |
+| `TOKEN_PER_PAIR` (29.09) | 89,3 | 3 tohum × 1.000 ham çift, o dönemin 11.149 intent'lik verisi |
 
 **Dikkat (28.09 hatası):** MS_PER_PAIR küçük saymak bütçeyi **BÜYÜTÜYOR** (12 epoch
 396 dk yerine gerçekte 431 dk ister → oturum kesilirdi). Zaman bütçesi pratikte bağlayıcı
@@ -337,20 +339,86 @@ sabittir; büyüyen kısım yalnızca bilgi intent'leridir (tam 6 desenli şablo
 
 ---
 
-# 7. ANA ÇIKARIM (sıradaki adımı belirleyen)
+# 7. ANA ÇIKARIM VE 29.09 ÖLÇÜM SONUÇLARI
 
-**"Bilgi verisi yok" tezi ölçümle çürüdüldü.** Eğitim çiftlerinin **yarısı (%52,9)
-zaten bilgi bağlamı taşıyor.** Kopyalama sorunu ve düşük sadakat (%22–31), bu çiftlerin
-yarısında modele **"kopyala" sinyali** verilmesinden kaynaklanıyor olabilir.
-Kitap verisini büyütmek bu yüzreğe dokunmuyor.
+**29.09'daki "bilgi verisi yok" tezi ölçümle çürütülmüştü.** Eğitim çiftlerinin
+**yarısı (%52,9 → güncel veride %48,4) zaten bilgi bağlamı taşıyor.**
 
-**Sıradaki adım (onay bekliyor — henüz ölçülmedi):**
-`KB_TEXT_CHARS=300` ile bağlamın kırpılma oranını, ve bilgi-bağlamlı çiftlerdeki
-`copy_bleu`'yu bilgi'siz çiftlerle karşılaştırmak. Kopyalamanın gerçekten bu grupta
-yoğunlaştığını doğrularsa hedef decoding'den veri tarafına (paragraf yeniden ifade)
-kayacak.
+**29.09 sonrası yapılan ölçüm:**
 
-Yeni sohbette **ilk adım bu ölçümü kurmak ve taban değerleri almak.**
+| soru | cevap | kanıt |
+|---|---|---|
+| `KB_TEXT_CHARS=300` bağlamı kırpıyor mu? | **HAYIR, %0,0** | kb metni maks 192 token < 200 bütçe; 0/39.983 desen 300 karakteri aşıyor (zaten üretimde 300'de kesiliyor) |
+| Kopyalama bilgi-bağlamlı çiftlerde yoğunlaşıyor mu? | **HAYIR** | gruplar arası: bilgili 0,185 vs bilgisiz 0,217 (t=−1,04, anlamsız). Karıştırıcısız paired (aynı 250 soru, bağlam açık/kapalı): kopya +0,095 (t=3,42) ama **altın içerik +0,150 (t=4,54)** → kopyalama artışı faydalı |
+| Model bağlamı kullanıyor mu? | **EVET, güçlü** | öğretmen koşullu argmax %68,2 → **%86,7** (NLL 2,717 → 1,329; t=+8,06) |
+| Üretimdeki bağlam cevabı taşıyor mu? | **EVET** | 250 bilgi sorusunun **%60,0**'ında altının tüm içerik kelimeleri `Corpus.search` metninde (eşit 300 karakter bütçede eğitim bağlamından +0,029, t=−2,72) |
+| Kaybedilen içerik neden kaybediliyor? | **Üretim biçimi** | altın kelimelerinin %30,8'i geçiyor; kalanın **%59,4'ü bağlamda VAR**, %40,6'sı hiç yok |
+| Decoding tükendi mi? | **EVET, 4 eksende** | aşağıdaki tablo |
+
+**Decoding taramaları** (hepsi n=250, aynı sorular, paired t-testi; karar kuralı
+geçmedi — **hiçbiri uygulanmadı**, `brain.py:2035` ve `brain.py:764`
+**DOKUNULMADI**):
+
+| eksen | değerler | `gold_recall` | t |
+|---|---|---|---|
+| `knowledge_bias` | 0,0 / 1,2 / 3,0 | 0,277 / 0,301 / 0,302 | −0,96 / +0,04 |
+| sıcaklık | 0,7 / 0,3 / 0,05 | 0,293 / 0,266 / 0,280 | −1,24 / −0,60 |
+| `rep_penalty` | 0,4 / 0,2 / 0,0 | 0,295 / 0,303 / 0,301 | +0,36 / +0,28 |
+| top-k / rep / sıcaklık | §6.1'deki 6 ayar | — | hiçbiri geçmedi |
+
+**Oracle (tavan) probu KULLANILAMAZ — 3 denemede de tutarsız:** çıplak altın
+0,033 · başlık+altın 0,140 · NLL'de 2,577 (üretim 1,329'**DAN KÖTÜ**). Nedeni:
+altın yanıtlar 204 karakterde kesilmiş, ASCII'ye bozulmuş, tekrar eden
+Wikipedia parçaları; decoder'ın 6-gram tekrar kesmesi bunları yarım kesiyor.
+**Bağlam biçimi dağılım dışı olunca model sohbet kalıbına düşüyor** (6 token,
+"devam edelim mi?"). `enrich_intents.py:132`'deki `"<Başlık>. <metin>"` biçimi
+modelin bağımlı olduğu bir kısıt — dokunulmamalı.
+
+## 7.1 Refüt edilenler (tekrar etme, hepsi ölçüldü)
+
+| iddia | sonuç |
+|---|---|
+| "greedy altını üretir" (öğretmen koşullu %86,7'den) | **YANLIŞ** — t=0,05: `gold_recall` −0,013 (t=−0,60). Öğretmen koşullu ölçüm altın *ön eki* verir; exposure bias |
+| "altın yanıtlar bozuk" | **YANLIŞ** — rep2 0,004 / distinct1 0,965 (sohbet 0,001 / 0,978) |
+| "doğallaştırma içeriği kısaltıyor" | **YANLIŞ** — varyantlar %97,6 içerik koruyor, %12,6 **uzatıyor** |
+| "bağlaç enjeksiyonu sadakati düşürüyor" | **ÖLÇÜLEMEDİ** — işaretli/isaretsiz `gold_recall` farkı üç kümede de \|t\|<1,4 ve **işaret yönü değişiyor** |
+
+## 7.2 Ölçülmüş kusurlar
+
+- **`naturalize.py` metin bozulması (DÜZELTİLMEDİ):** varyantların **%1,06**'sı
+  hatalı (bitişik `x.y` %0,64, yapıştırılmış işaret %0,42, çift enjeksiyon
+  %0,00). Ham veride zaten %0,42 `x.y` var → büyük kısmı kaynaktan. Kaynak:
+  `_maybe_insert_mid` virgülsüz yolunda kesme konumu
+  `len(' '.join(words[:k]))` ile **string uzunluğundan** hesaplanıyor
+  (`naturalize.py:186-205`); metin tek boşlukla kurulmamışsa konum kayıyor
+  (`"kasalidir.sismik"`, `"bir; üstelik bakima"`). Değiştirilmedi: kalite etkisi
+  kanıtlanmadı (§2 kuralı), doğrulaması 4,7 saatlik Kaggle koşusu ister.
+- **`TOKEN_PER_PAIR` bayatlamıştı (DÜZELTİLDİ):** 89,3 → **100,0** (eğitim
+  popülasyonunda canlı encode 100,02; ham popülasyonda 95,97 ± 0,97). Sapma
+  koddan değil veriden: intents 11.149 → 12.730, kb-map 29.970 → 39.983. Bütçe
+  etkisi yok (`sure_ve_hesapla` bu sabiti kullanmaz).
+- **Eğitim/üretim bağlam uyuşmazlığı:** aynı 250 sorunun **0/250**'sinde
+  eğitimdeki `knowledge_map` metni ile üretimdeki `Corpus.search` metni aynı.
+- **Çalışan VS Code debug sunucusu** (PID 7064, port 5000): **ÇÖZÜLDÜ** —
+  29.09 sonrası ölçüldü, PID yok ve port 5000 boş.
+
+## 7.4 Bilinmeyen (ölçülmedi, tahmin de edilmedi)
+
+`MS_PER_PAIR = 1,5139` ms/çift, 29.09'da **89,3 token/çift** verisiyle ölçüldü.
+Çift başına token %12 arttı (100,0), yani epoch süresi de artmış olmalı; GPU
+olmadan ölçülemez. Yerel olarak `kaggle_start.sh bench` ile ölçülmeli. Veri
+bütçesi (`MAX_PAIRS`) daha önce bağlayıcıydı, o bozulmadı.
+
+## 7.3 Sıradaki adım
+
+Ölçülebilir kalan yer **veri üretimi**: `autogrow.py` / `enrich_intents.py`
+ürettikleri hedefler. Ölçülmüş adaylar:
+1. Doğallaştırma varlık adı bozuyor (`alyson hannigan` → *"aleis denisof"*);
+   %1,6 varyantta içerik kapsamı <%50.
+2. Aynı ctx için farklı yanıtlar karışıyor (bir konu/bölümün cevabı başkasının
+   yerine geçiyor).
+3. §8'deki 4 cevaplanamayan "X nedir" sorusu (`corpus.jsonl`'de tam adıyla
+   kayıt yok).
 
 ---
 
@@ -358,9 +426,9 @@ Yeni sohbette **ilk adım bu ölçümü kurmak ve taban değerleri almak.**
 
 - **4 "X nedir" sorusu cevaplanamıyor**: `kadin`, `siber guvenlik`, `kuantum
   bilgisayarlar`, `fotografik` → `corpus.jsonl`'de tam adıyla kayıt yok.
-- Kullanıcının **çalışan VS Code debug sunucusu** (PID 7064, port 5000) hâlâ eski kodu
-  çalıştırıyor. Yeniden başlatılana kadar bir bilgi sorusu `corpus.jsonl`'i bozabilir.
-  (2 kez bildirildi, yapılmadı.)
+- ~~Çalışan VS Code debug sunucusu (PID 7064, port 5000)~~ → **ÇÖZÜLDÜ**
+  (29.09 sonrası ölçüldü: PID 7064 yok, port 5000'de dinleyen yok). Artık
+  `corpus.jsonl` bozma riski yok.
 - 587 test ~270 sn sürüyor; ölçüm aracı çalıştırırken `train_llm.py`'ye dokunma.
 
 ---
@@ -434,6 +502,12 @@ Yeni sohbette **ilk adım bu ölçümü kurmak ve taban değerleri almak.**
 - `app.load_bot()` `global bot` kullanıyor, **döndürmüyor** → `app.bot` kullan
   (yanlış testte `NoneType` hatası verdi)
 - `Corpus.search(query, k=2)` — **`top_k` parametresi yok**
+- PowerShell'de `'%s' % (x, y)` içinde `%%.1f` yazarsan **"not all arguments
+  converted"** hatası verir: `%%` kaçış olduğu için o alan dönüşüm saymaz.
+  Bu tuzak 29.09'da 3 kez ölçüm betiğini düşürdü (biri 10 dk'lık 3 kolü
+  kaybettirdi). Gerçek yüzde için `%.1f%%` + değeri ayrı argüman olarak ver.
+- Ölçüm betiğinde **kol biter bitmez diske yaz**, sonra raporla: raporlama
+  satırındaki hata tüm üretimleri yok ediyor.
 
 ---
 
@@ -446,3 +520,23 @@ Yeni sohbette **ilk adım bu ölçümü kurmak ve taban değerleri almak.**
 - `t_shadow.py` — 29.09 shadow ölçümü (ESKİ %9,3 / YENI %52,9)
 - `kitap_tam.jsonl` + `kitap_tam.txt` — 609 byte-aynı kanıtı
 - `devam_promtu.md` — bu dosyanın ilk sürümü (artık güncel değil, **bu dosya kanonik**)
+
+### 29.09 sonrası ölçüm betikleri ve çıktıları (hepsi canlı ölçüm)
+
+| betik | ne ölçtü | çıktı |
+|---|---|---|
+| `olc_baglam.py` | RAG kapsamı, bağlam/yanıt kırpma oranı, token/çift | `olc_baglam_cikti.txt` |
+| `olc_kopya_sinyali.py` | altın yanıtın bağlamdan kopyalanması (ASCII katlamalı) | `olc_kopya_cikti.txt`, `olc_ornek_ciftler.jsonl` |
+| `olc_token_dogrula.py` | `TOKEN_PER_PAIR`: elle formül vs canlı `encode_llm` | `olc_token_cikti.txt` |
+| `olc_model_tarafi.py` | paired bağlam açık/kapalı + gruplar arası | `olc_model_tarafi.json`, `olc_model_cikti.txt` |
+| `olc_sadakat_neden.py` | kaybedilen altın kelimeleri: bağlamda var mı? | (başka betikten) |
+| `olc_sweep3.py` | `knowledge_bias` 0/1,2/3,0 + **GEÇERSİZ** oracle | `olc_sweep3.json` |
+| `olc_sweep4.py` | başlıklı oracle (geçersiz) + birleşik | `olc_sweep4.json` |
+| `olc_nll.py` | öğretmen koşullu NLL + argmax doğruluğu | `olc_nll.json` |
+| `olc_kaynak_karsilastir.py`, `olc_kaynak_esit_butce.py` | eğitim vs üretim bağlamı (eşit bütçe) | `olc_kaynak_karsilastir.json` |
+| `olc_sweep7.py` | sıcaklık 0,7/0,3/0,05 | `olc_sweep7.json` |
+| `olc_sweep10.py` | `rep_penalty` 0,4/0,2/0,0 | `olc_sweep10.json` |
+| `olc_altin_kalite.py` | altın yanıt kalitesi (sohbet vs bilgi) | (stdout) |
+| `olc_dogal_kapsam.py` | doğallaştırma içerik koruması | `olc_dogal_kapsam.json` |
+| `olc_diskursor.py` | diskursör işareti: hedeflerde ve çıktılarda | (stdout) |
+| `olc_naturalize_hata.py` | `naturalize.py` hata sınıfları (%1,06) | (stdout) |
