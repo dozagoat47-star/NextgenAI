@@ -91,6 +91,44 @@ WORD_ALT = {
 }
 
 
+# Yaygin yazim hatalari / kisaltmalar (typo augmentation icin)
+# Model bu varyantlari egitimde gorup yazim hatalarini ogrenir
+_TYPO_MAP = {
+    "merhaba": ["merhba", "meraba", "mrhba", "mrba"],
+    "nasılsın": ["nslsn", "naslsn", "naber", "nbr"],
+    "teşekkürler": ["tskler", "tesekkur", "saol", "sağol", "ty"],
+    "nasıl": ["nsl", "nasl", "nl"],
+    "tamam": ["tmm", "tm", "ok"],
+    "olur": ["olr", "olrr"],
+    "değil": ["dgl", "degil", "deil"],
+    "evet": ["evt", "ev", "e"],
+    "hayır": ["hyr", "hr", "yok"],
+    "iyi": ["iy", "iw"],
+    "kötü": ["ktu", "kotu"],
+    "güzel": ["gzl", "guzel"],
+    "bak": ["bk"],
+    "şey": ["sy"],
+    "bişey": ["bsy", "bsey"],
+    "ne": ["n"],
+    "neden": ["ndn", "neden"],
+    "nerede": ["nrd", "nerde"],
+    "ne zaman": ["nzaman", "n zaman"],
+    "nasıl yapılır": ["nsl ypr", "nasıl ypr"],
+    "anlamadım": ["anlamdm", "anlamadm"],
+    "anlamıyorum": ["anlamyr", "anlamıyr"],
+    "bilmiyorum": ["bilmiyr", "bilmior"],
+    "nereden": ["nrdn", "nerdn"],
+    "kim": ["km"],
+    "hangi": ["hng", "hngi"],
+    "kaç": ["kc", "kac"],
+    "neresi": ["nrs", "nersi"],
+    "nedir": ["ndr", "ndir"],
+    "hakkında": ["hknda", "hknda", "hakknda"],
+    "anlat": ["anlt", "anlat"],
+    "bilgi ver": ["blgi vr", "bilgi vr"],
+}
+
+
 def _stable_hash(text):
     """Pythondaki rastgelelesirilmis hash() yerine deterministik hash."""
     h = 5381
@@ -157,6 +195,30 @@ def _maybe_swap(sentence, rng, prob):
             words[i] = rng.choice(WORD_ALT[base]) + suf
             return ' '.join(words)
     return sentence
+
+
+def _maybe_typo(sentence, rng, prob=0.08):
+    """Yaygin yazim hatalari / kisaltmalar ekle (typo augmentation).
+    
+    Model egitimde bu varyantlari gorup yaygin yazim hatalarini ve
+    kisaltmalari ogrenir. Sadece kelime bazinda uygulanir, noktalama korunur.
+    """
+    if not sentence or rng.random() > prob:
+        return sentence
+    words = sentence.split()
+    if not words:
+        return sentence
+    # Rastgele 1-2 kelime sec ve typo uygula
+    n_typo = 1 if len(words) < 6 else rng.randint(1, 2)
+    typo_indices = rng.sample(range(len(words)), min(n_typo, len(words)))
+    for i in typo_indices:
+        w = words[i]
+        base = w.rstrip('.,!?;:')
+        suf = w[len(base):]
+        base_lower = base.lower()
+        if base_lower in _TYPO_MAP:
+            words[i] = rng.choice(_TYPO_MAP[base_lower]) + suf
+    return ' '.join(words)
 
 
 _MID_FILLERS = [
@@ -309,6 +371,7 @@ def natural_variants(response, k=3, seed=42):
             wp = 0.40 if len(sents) <= 2 else 0.20
             sents = [_maybe_swap(s, rng, wp) for s in sents]
             sents = [_maybe_insert_mid(s, rng, 0.40) for s in sents]
+            sents = [_maybe_typo(s, rng, 0.08) for s in sents]
 
             body = _join_sentences(sents)
             body = _maybe_close(body, is_question, rng, 0.30)

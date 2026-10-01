@@ -40,6 +40,41 @@ DEFAULT_UNKNOWN = ("Bu konuda henüz yeterli bilgiye sahip değilim, "
                    "farklı bir şekilde sormak ister misin?")
 
 # ===========================================================================
+# ILK TOKEN DUZELTME (Post-processing)
+# Model "ben ..." diye baslayip konu kaciriyorsa duzelt
+FIRST_TOKEN_FIX = {
+    'durum': ('iyiyim', 'iyiyim', 'sagol', 'iyiyim teşekkürler'),
+    'karsilama': ('merhaba', 'selam', 'hoş geldin', 'merhaba!'),
+    'tesekkur': ('rica ederim', 'ne demek', 'rica ederim!'),
+    'veda': ('güle güle', 'hoşça kal', 'bay bay', 'görüşürüz'),
+    'ozur': ('özür dilerim', 'özür dilerim', 'kusura bakma'),
+    'yardim': ('tabii', 'elbette', 'tabii ki', 'nasıl yardımcı olabilirim'),
+    'ozel': ('evet', 'tabii', 'elbette', 'kesinlikle'),
+    'default': ('evet', 'tabii', 'anladım', 'anlaşıldı'),
+}
+
+def fix_first_token(response, intent_tag):
+    """Yanitin ilk kelimesi 'ben/benim' gibi kisisel zamirse, intent'e gore duzelt."""
+    if not response or not response.strip():
+        return response
+    words = response.strip().split()
+    if not words:
+        return response
+    first = words[0].lower().strip('.,!?;:')
+    # Kisisel zamirler / soylemsiz baslangiclar
+    if first in {'ben', 'benim', 'biz', 'bizim', 'sen', 'senin', 'siz', 'sizin', 'o', 'onun'}:
+        choices = FIRST_TOKEN_FIX.get(intent_tag, FIRST_TOKEN_FIX['default'])
+        import random
+        new_first = random.choice(choices)
+        # Buyuk harf koru
+        if words[0][0].isupper():
+            new_first = new_first[0].upper() + new_first[1:]
+        words[0] = new_first
+        return ' '.join(words)
+    return response
+
+
+# ===========================================================================
 # DEGISTIRICI UCBIRLIK KORUMASI (/learn, /forget)
 # ---------------------------------------------------------------------------
 # Bu iki uç nokta CALISAN dosyalara yazar (intents.json, bot_data.json,
@@ -709,6 +744,9 @@ def chat():
             response = fallback_answer(user_message)
             _last_tag = None
 
+        # Ilk token duzeltmesi (intent'e gore)
+        if _last_tag:
+            response = fix_first_token(response, _last_tag)
         print(f"[CHAT] Response: {response}")
         return jsonify({'response': response})
     except Exception as e:
