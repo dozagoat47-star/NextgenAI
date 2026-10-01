@@ -232523,6 +232523,70 @@
         "Yulia Anatoliivna Sviridenko (Ukraynaca: ; 25 Aralık 1985), Ukraynalı bir politikacıdır ve 17 Temmuz 2025 - 16 Temmuz 2026 tarihleri arasında Ukrayna'nın 19.",
         "başbakanı olarak görev yapmıştır."
       ]
+    },
+    {
+      "tag": "siber_guvenlik",
+      "patterns": [
+        "siber guvenlik nedir",
+        "siber guvenlik hakkinda bilgi ver",
+        "siber guvenlik ne demek",
+        "siber guvenlik anlat",
+        "bana siber guvenlik hakkinda bilgi ver",
+        "siber guvenlik hakkinda konus"
+      ],
+      "responses": [
+        "Bilgi corpus'tan alinacak."
+      ],
+      "source": "manual",
+      "added_at": "2026-09-30T23:40:11.788029"
+    },
+    {
+      "tag": "kuantum_bilgisayarlar",
+      "patterns": [
+        "kuantum bilgisayarlar nedir",
+        "kuantum bilgisayarlar hakkinda bilgi ver",
+        "kuantum bilgisayarlar ne demek",
+        "kuantum bilgisayarlar anlat",
+        "bana kuantum bilgisayarlar hakkinda bilgi ver",
+        "kuantum bilgisayarlar hakkinda konus"
+      ],
+      "responses": [
+        "Bilgi corpus'tan alinacak."
+      ],
+      "source": "manual",
+      "added_at": "2026-09-30T23:40:11.788029"
+    },
+    {
+      "tag": "fotografik",
+      "patterns": [
+        "fotografik nedir",
+        "fotografik hakkinda bilgi ver",
+        "fotografik ne demek",
+        "fotografik anlat",
+        "bana fotografik hakkinda bilgi ver",
+        "fotografik hakkinda konus"
+      ],
+      "responses": [
+        "Bilgi corpus'tan alinacak."
+      ],
+      "source": "manual",
+      "added_at": "2026-09-30T23:40:11.788029"
+    },
+    {
+      "tag": "kadin_tanim",
+      "patterns": [
+        "kadin nedir",
+        "kadin hakkinda bilgi ver",
+        "kadin ne demek",
+        "kadin anlat",
+        "bana kadin hakkinda bilgi ver",
+        "kadin hakkinda konus"
+      ],
+      "responses": [
+        "Bilgi corpus'tan alinacak."
+      ],
+      "source": "manual",
+      "added_at": "2026-09-30T23:40:11.788029"
     }
   ],
   "_meta": {
