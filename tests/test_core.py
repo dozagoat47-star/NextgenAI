@@ -26,8 +26,9 @@ class TestNLP(unittest.TestCase):
         self.bot = ChatBot()
 
     def test_ascii_normalize(self):
+        # Buyuk/kucuk harf korunur (02.10.2026 duzeltmesi)
         self.assertEqual(self.bot.ascii_normalize('Şükran öğle ılık'),
-                         'sukran ogle ilik')
+                         'Sukran ogle ilik')
 
     def test_stopwords_present(self):
         self.assertTrue('ve' in STOPWORDS)
@@ -1145,6 +1146,87 @@ class TestTwoLayerArchitecture(unittest.TestCase):
         self.assertEqual(len(bot.intent_tags), 2)
         self.assertEqual(len(result['intents']), 2)
 
+    # --- sohbet/bilgi ayrimi: acik isaret (brain._sohbet_mi) -------------
+    # 02.10.2026: ayrim desen sayisiyla (len(patterns) > 6) yapiliyordu.
+    # Olcum: 16.185 bilgi intent'in 16.182'si TAM 6 desenli, sohbet
+    # intent'lerinin en azi 8 desenli, 7 desenli intent YOK. Yani esik
+    # dusurulurse (>5) sohbet sayisi artmaz, 16.185 bilgi intent
+    # siniflandiriciya girer. Sayiyi dusurmek yanlis yon.
+    # Diger yandan 6 desenli olup SOHBET olan 3 sinif vardi
+    # (kavram_tanimi, tavsiye_isteme, gelecek_planlari) ve eleniyordu.
+    # Duzeltme: `tur` alani acik isaret olarak oncelikli, sayma yedek.
+
+    def test_sohbet_mi_patterns_sayisi_eski_kural_ayni(self):
+        """'tur' yokken desen sayisi kurali AYNEN gecerli olmali."""
+        for n, beklenen in ((1, False), (2, False), (5, False), (6, False),
+                            (7, True), (8, True), (41, True)):
+            it = {'tag': 'x', 'patterns': ['p%d' % i for i in range(n)],
+                  'responses': ['r']}
+            self.assertEqual(ChatBot._sohbet_mi(it), beklenen,
+                             '%d desenli intent icin yanlis' % n)
+
+    def test_sohbet_mi_acik_isaret_sohbete_ekler(self):
+        """6 desenli + tur='sohbet' -> sohbet (sayma kurali elerdi)."""
+        it = {'tag': 'tavsiye_isteme', 'tur': 'sohbet',
+              'patterns': ['a', 'b', 'c', 'd', 'e', 'f'], 'responses': ['r']}
+        self.assertTrue(ChatBot._sohbet_mi(it))
+
+    def test_sohbet_mi_acik_isaret_bilgiye_duser(self):
+        """8 desenli + tur='bilgi' -> bilgi (sayma kurali kabul ederdi)."""
+        it = {'tag': 'yardim', 'tur': 'bilgi',
+              'patterns': ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'],
+              'responses': ['r']}
+        self.assertFalse(ChatBot._sohbet_mi(it))
+
+    def test_sohbet_mi_gercek_veride_sonuc_degismedi(self):
+        """REGRESYON: yeni kural (acik isaret) ESKI kurala (desen sayisi) EKLER, cikarmaz.
+
+        02.10.2026: 3 sizinti intent'e (kavram_tanimi, tavsiye_isteme,
+        gelecek_planlari) "tur": "sohbet" eklendi. Eski kural 40 sohbet
+        veriyordu; yeni kural 40 + 3 = 43 veriyor. Cikarma YOK.
+        """
+        with open(os.path.join(BASE, 'intents.json'), encoding='utf-8') as f:
+            its = json.load(f)['intents']
+        eski = {it['tag'] for it in its if len(it['patterns']) > 6}
+        yeni = {it['tag'] for it in its if ChatBot._sohbet_mi(it)}
+        # Yeni kural eski kuralin ust kumesi olmali (cikarma yok)
+        self.assertTrue(eski.issubset(yeni),
+                        'yeni kural eskiyi kapsamiyor: eksik %s' % (eski - yeni))
+        # Eski kural 40, yeni kural 43 (3 sizinti eklendi)
+        self.assertEqual(len(yeni), len(eski) + 3,
+                         'beklenen 3 ek sohbet sinifi, gercek %d' % (len(yeni) - len(eski)))
+        self.assertTrue(eski, 'sohbet sinifi bulunamadi - veri degismis olabilir')
+
+    def test_sohbet_mi_sizinti_siniflar_gercekten_sohbet_di(self):
+        """3 sizinti sinifi artık 'tur': 'sohbet' ile isaretli -> sohbete giriyor.
+
+        Bu test once (02.10 oncesi) sizinti oldugunu TESPIT ediyordu:
+        6 desenli olduglari icin siniflandiriciya GIRMIYORLARDI.
+        Simdi acik isaretle sohbet sinifina giriyorlar; test bunu DOGRULAR.
+        """
+        with open(os.path.join(BASE, 'intents.json'), encoding='utf-8') as f:
+            its = {it['tag']: it for it in json.load(f)['intents']}
+        for tag in ('kavram_tanimi', 'tavsiye_isteme', 'gelecek_planlari'):
+            self.assertIn(tag, its, 'sinif kayboldu: %s' % tag)
+            self.assertEqual(len(its[tag]['patterns']), 6,
+                             '%s 6 desenli degil - sizinti tespiti gecersiz'
+                             % tag)
+            # ACİK ISARET VAR -> sohbete giriyor (sizinti KAPATILDI)
+            self.assertTrue(ChatBot._sohbet_mi(its[tag]),
+                            '%s sohbete girmiyor - tur alani eksik' % tag)
+            self.assertEqual(its[tag].get('tur', '').strip().lower(), 'sohbet',
+                             '%s tur alani "sohbet" degil' % tag)
+
+    def test_sohbet_mi_patterns_anahtari_yoksa_cokmez(self):
+        """Bozuk/eksik intent cökertmemeli (eski kod KeyError verirdi)."""
+        for it in ({'tag': 'x'}, {'tag': 'x', 'patterns': None},
+                   {'tag': 'x', 'tur': None, 'patterns': []},
+                   {'tag': 'x', 'tur': '  SOHBET  ', 'patterns': []}):
+            ChatBot._sohbet_mi(it)          # cokmemeli
+        self.assertTrue(ChatBot._sohbet_mi({'tur': '  SOHBET  '}))
+        self.assertFalse(ChatBot._sohbet_mi({'tur': 'bilgi',
+                                             'patterns': ['a'] * 9}))
+
     def test_knowledge_intents_property(self):
         """knowledge_intents: intents.keys() - intent_tags."""
         bot = ChatBot()
@@ -1674,3 +1756,90 @@ class TestRetrievalTrustGate(unittest.TestCase):
         self.assertFalse(self.bot.chunk_anchored('galaksi nedir', {}))
         self.assertFalse(self.bot.chunk_anchored('galaksi nedir',
                                                  {'title': '', 'score': 1.0}))
+
+
+class TestSohbetOlcumSeti(unittest.TestCase):
+    """tools/soru_listesi_sohbet.json butunlugu.
+
+    NEDEN: bu liste bir OLUM tanimidir. Bozuk olursa (yanlis etiket adi,
+    eksik sinif, Turkce harf) sohbet olcumu sessizce GECERSIZ olur ve
+    kimse fark etmez - cunku arac yine bir sayi uretir. AutoGrow her
+    kosuda intents.json'u buyuttugu icin liste elle tutulmuyor, kendi
+    kendini dogrulamasi gerekiyor.
+    """
+
+    LISTE = os.path.join(BASE, 'tools', 'soru_listesi_sohbet.json')
+
+    def setUp(self):
+        with open(self.LISTE, encoding='utf-8') as f:
+            self.liste = json.load(f)
+        self.sorular = self.liste['sorular']
+        with open(os.path.join(BASE, 'intents.json'), encoding='utf-8') as f:
+            self.intents = json.load(f)['intents']
+
+    def test_soru_sayisi_beyani_dogru(self):
+        """Beyan edilen sayi dosyadakiyle ayni olmali (arac dogrular da)."""
+        self.assertEqual(self.liste['soru_sayisi'], len(self.sorular))
+
+    def test_beklenen_etiketler_gecerli(self):
+        """Her 'beklenen' intents.json'da GERCEK bir etiket olmali.
+
+        Yazim hatasi bir etiketi kalici olarak yakalanamaz yapar; arac
+        bunu 'model yanlis yapti' diye raporlardi.
+        """
+        taglar = {it['tag'] for it in self.intents}
+        yanlis = {s['beklenen'] for s in self.sorular
+                  if s['beklenen'] != 'Anlayamadim'
+                  and s['beklenen'] not in taglar}
+        self.assertFalse(yanlis, 'intents.json\'da olmayan etiket: %s'
+                         % sorted(yanlis))
+
+    def test_her_sohbet_sinifi_bir_soruya_sahip(self):
+        """SINIFLANDIRICIYA giren HER sohbet sinifi listede olmali.
+
+        Sohbet sinifi tanimi brain._sohbet_mi ile ayni olmali; boylece
+        3 sizinti intent'ine 'tur' eklendiginde liste de ilgili sorulari
+        icerir (yeni sinif olcum disi kalmaz).
+        """
+        siniflar = {it['tag'] for it in self.intents
+                    if ChatBot._sohbet_mi(it)}
+        kapsanan = {s['beklenen'] for s in self.sorular}
+        eksik = siniflar - kapsanan
+        self.assertFalse(eksik, 'olcum setinde sorusu olmayan sohbet sinifi: '
+                                '%s' % sorted(eksik))
+
+    def test_ascii_only(self):
+        """Turkce harf iceren soru olmamali.
+
+        normalize.ascii_normalize etkisi (DEVAM_PROMPTU 6.13) AYRI bir
+        konudur; ayni olcumde iki degiskeni karistirmamak icin liste
+        tools/soru_listesi.json ile ayni sozlesmeyi tutar: ASCII.
+        """
+        harfler = sorted({c for s in self.sorular
+                          for c in s['soru'] if ord(c) > 127})
+        self.assertFalse(harfler, 'ASCII disi karakter: %s' % harfler)
+
+    def test_soru_tekrar_edilmiyor(self):
+        """Ayni soru iki kez varsa olcum iki kez sayar."""
+        sorular = [s['soru'] for s in self.sorular]
+        tekr = {q for q in sorular if sorular.count(q) > 1}
+        self.assertFalse(tekr, 'tekrar eden soru: %s' % sorted(tekr))
+
+    def test_kabul_kurali_yalnizca_gecerli_degerler(self):
+        """"kabul" yalnizca iki degerden biri olabilir."""
+        for s in self.sorular:
+            self.assertIn(s.get('kabul', 'tam_dogruluk'),
+                          ('tam_dogruluk', 'sohbet_sinifi_DEGIL'),
+                          'gecersiz kabul degeri: %s' % s.get('kabul'))
+
+    def test_kapsam_disi_sorulari_sohbet_sinifi_istemiyor(self):
+        """kapsam_disi grubunda 'sohbet_sinifi_DEGIL' kurali tanimli olmali.
+
+        Bu kural modelin ciktisina gore ayarlanamaz; sohbet sinifina
+        girmemek nesnel bir ozelliktir.
+        """
+        kd = [s for s in self.sorular if s.get('grup') == 'kapsam_disi']
+        self.assertTrue(kd, 'kapsam_disi grubu bos')
+        for s in kd:
+            self.assertEqual(s.get('kabul'), 'sohbet_sinifi_DEGIL',
+                             'kapsam_disi sorusu %s' % s['soru'])

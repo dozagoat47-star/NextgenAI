@@ -18793,6 +18793,7 @@
     },
     {
       "tag": "kavram_tanimi",
+      "tur": "sohbet",
       "patterns": [
         "mizah nedir",
         "mizah ne demek",
@@ -19283,6 +19284,7 @@
     },
     {
       "tag": "tavsiye_isteme",
+      "tur": "sohbet",
       "patterns": [
         "bana ne onerirsin",
         "bu konuda ne yapmaliyim",
@@ -19302,6 +19304,7 @@
     },
     {
       "tag": "gelecek_planlari",
+      "tur": "sohbet",
       "patterns": [
         "gelecegim beni endiselendiriyor",
         "5 yil sonra nerede olmak istiyorum",

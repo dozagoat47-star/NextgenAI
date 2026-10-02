@@ -340,6 +340,86 @@ def pairs_from_chat(rec, drop_english=True):
             yield ctx, resp
 
 
+def pairs_from_daily_dialogues(rec):
+    """3nesdeniz/turkish-daily-dialogues-5k semasi -> (ctx,resp) gencratoru.
+    
+    Girdi: {"conversation_id": "...", "messages": [{"role": "user", "content": ...},
+                                                  {"role": "assistant", "content": ...}],
+            "topic": "...", "setting": "...", "relationship": "..."}
+    
+    Her user->assistant donusumu bir cift uretir. Gercek gunluk sohbetler.
+    """
+    msgs = rec.get('messages')
+    if not isinstance(msgs, list):
+        return
+    bekleyen = None
+    for t in msgs:
+        if not isinstance(t, dict):
+            continue
+        role = (t.get('role') or '').lower()
+        content = (t.get('content') or '').strip()
+        if not content:
+            continue
+        if role in ('user', 'human', 'soru', 'query'):
+            bekleyen = content
+        elif role in ('assistant', 'gpt', 'ai', 'cevap') and bekleyen:
+            ctx, resp = bekleyen, content
+            bekleyen = None
+            if yabanci_dil_mi(ctx) or yabanci_dil_mi(resp):
+                continue
+            if sinav_kalinti_mi(ctx) or sinav_kalinti_mi(resp):
+                continue
+            yield ctx, resp
+
+
+def pairs_from_everyday_conversations(rec):
+    """SoAp9035/everyday-conversations-tur semasi -> (ctx,resp) gencratoru.
+    
+    Girdi: {"conversations": [{"content": "...", "role": "user"}, ...]}
+    
+    Her user->assistant donusumu bir cift uretir. Gunluk sohbetler.
+    """
+    convs = rec.get('conversations')
+    if not isinstance(convs, list):
+        return
+    bekleyen = None
+    for t in convs:
+        if not isinstance(t, dict):
+            continue
+        role = (t.get('role') or '').lower()
+        content = (t.get('content') or '').strip()
+        if not content:
+            continue
+        if role in ('user', 'human', 'soru', 'query'):
+            bekleyen = content
+        elif role in ('assistant', 'gpt', 'ai', 'cevap') and bekleyen:
+            ctx, resp = bekleyen, content
+            bekleyen = None
+            if yabanci_dil_mi(ctx) or yabanci_dil_mi(resp):
+                continue
+            if sinav_kalinti_mi(ctx) or sinav_kalinti_mi(resp):
+                continue
+            yield ctx, resp
+
+
+def pairs_from_law_chatbot(rec):
+    """Renicames/turkish-law-chatbot semasi -> (ctx,resp) gencratoru.
+    
+    Girdi: {"Soru": "...", "Cevap": "..."} - Tek donusumlu QA
+    
+    Hukuk alaninda uzmanlasmis soru-cevap. Sohbet degil ama bilgi kalitesi yuksek.
+    """
+    soru = (rec.get('Soru') or '').strip()
+    cevap = (rec.get('Cevap') or '').strip()
+    if not soru or not cevap:
+        return
+    if yabanci_dil_mi(soru) or yabanci_dil_mi(cevap):
+        return
+    if sinav_kalinti_mi(soru) or sinav_kalinti_mi(cevap):
+        return
+    yield soru, cevap
+
+
 # --- dedup + yakın-kopya ----------------------------------------------------
 
 def _tokenize_norm(s):
@@ -467,12 +547,77 @@ def dedupe_pairs(pairs, seed=SEED, dup_thr=0.90, keep_log=True):
     return kept
 
 
+def dedupe_pairs_with_source(pairs, seed=SEED, dup_thr=0.90, keep_log=True):
+    """dedupe_pairs ile ayni mantik, ama (ctx, resp, source) ucluleri isler.
+    kaynak alanı korunarak döndürülür.
+    """
+    seen_sets = []
+    kept = []
+    dead_ctx = dead_resp = dead_toks = 0
+    resp_map = {}
+    posting = {}
+    lo_pad = dup_thr * (1 - SIZE_PAD)
+    hi_pad = 1.0 / (dup_thr * (1 - SIZE_PAD))
+
+    for ctx, resp, src in pairs:
+        if resp in resp_map:
+            dead_resp += 1
+            continue
+
+        toks = _tokenize_norm(ctx)
+        if not toks:
+            dead_toks += 1
+            continue
+
+        n = len(toks)
+        lo, hi = n * lo_pad, n * hi_pad
+
+        cand = set()
+        for t in toks:
+            lst = posting.get(t)
+            if lst:
+                cand.update(lst)
+        cand = [i for i in cand if lo <= len(seen_sets[i]) <= hi]
+
+        dup = False
+        for i in cand:
+            if jaccard_sets(toks, seen_sets[i]) >= dup_thr:
+                dup = True
+                dead_ctx += 1
+                break
+        if dup:
+            continue
+
+        idx = len(seen_sets)
+        seen_sets.append(toks)
+        resp_map[resp] = True
+        kept.append((ctx, resp, src))
+        for t in toks:
+            lst = posting.get(t)
+            if lst is None:
+                posting[t] = [idx]
+            else:
+                lst.append(idx)
+                if len(lst) > MAX_POST:
+                    del lst[0]
+
+    if keep_log:
+        print(f'[dedup] girdi {len(pairs)} -> cikti {len(kept)} '
+              f'(kopya-ctx {dead_ctx}, ayni-resp {dead_resp}, '
+              f'bos-ctx {dead_toks})', flush=True)
+    return kept
+
+
 # --- ana akis ---------------------------------------------------------------
 
 SOURCES = {
     'tascib/turkish-instruction': pairs_from_instruction,
     'erythropygia/ThinkingData-200K-Turkish': pairs_from_thinking,
     'kilicai/turkish-sft-multi-turn-dialogue-10k': pairs_from_chat,
+    # Gerçek sohbet/görüşme kaynağı denemeleri (02.10.2026 eklendi):
+    '3nesdeniz/turkish-daily-dialogues-5k': pairs_from_daily_dialogues,
+    'SoAp9035/everyday-conversations-tur': pairs_from_everyday_conversations,
+    'Renicames/turkish-law-chatbot': pairs_from_law_chatbot,
 }
 
 
@@ -533,7 +678,7 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     sources = [s for s in args.source if s] or list(SOURCES)
-    pairs = []
+    pairs = []  # (ctx, resp, source)
     for s in sources:
         if s not in SOURCES:
             print(f'!! bilinmeyen kaynak: {s}; {list(SOURCES)} kullanılıyor', flush=True)
@@ -575,23 +720,26 @@ def main(argv=None):
         kept = dedupe_pairs(kept, seed=args.seed)
         print(f'[{s}] {len(kept)} cift, {time.time() - t0:.0f} sn '
               f'(budama+kopya sonrasi)', flush=True)
-        pairs.extend(kept)
+        # kaynak bilgisini sakla
+        pairs.extend((ctx, resp, s) for ctx, resp in kept)
 
     # uluslararası tekrar-dedupe + karıştır + max-pairs kırp
-    out = dedupe_pairs(pairs, seed=args.seed)
+    # dedupe_pairs kaynak alanını korumalı
+    out = dedupe_pairs_with_source(pairs, seed=args.seed)
     rng = random.Random(args.seed)
     rng.shuffle(out)
     if args.max_pairs:
         out = out[:args.max_pairs]
     with io.open(args.out, 'w', encoding='utf-8') as f:
-        for ctx, resp in out:
-            f.write(json.dumps({'query': ctx, 'answer': [resp]},
+        for ctx, resp, src in out:
+            f.write(json.dumps({'query': ctx, 'answer': [resp], 'source': src},
                                ensure_ascii=False) + '\n')
     print(f'[yaz] {len(out)} cift -> {args.out}', flush=True)
     if out:
-        for ctx, resp in out[:4]:
+        for ctx, resp, src in out[:4]:
             print(f'   ornek ctx: {ctx!r}', flush=True)
             print(f'         resp: {resp!r}', flush=True)
+            print(f'         source: {src}', flush=True)
 
 
 if __name__ == '__main__':

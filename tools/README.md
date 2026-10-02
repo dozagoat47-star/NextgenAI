@@ -84,6 +84,59 @@ Fark **A - B** yazilir (eval_llm.py ile ayni yon). Dort eksen: ekrana
 uretim gecen soru (ikili + McNemar), sadakat (paired t), deneme basi
 kabul, ret nedenleri farki.
 
+## sohbet_olc.py - SOHBET yolunu olcer (taban olcumu, 02.10.2026)
+
+```
+python tools/sohbet_olc.py <etiket> [cikti.json]
+```
+
+`uretim_olc.py` **bilgi** yolunu olcer (`brain._try_kb_rephrase`, sadakat).
+Sohbet tamamen farkli bir yoldur (`_classify` -> chat sinifi ->
+`_try_seq_rephrase`), metrikleri de farklidir. **Sohbet hic olculmemisti**:
+sabit 50 sorunun 50'si de bilgi sorusuydu, tek sohbet sorusu yoktu — yani
+"sohbet kalitesi %72" denilen her sayi aslinda bilgi-only idi.
+
+Sorular `soru_listesi_sohbet.json`'dan (sabit, **40/40 sohbet sinifinin
+tamami** + 5 kenar soru). Olctukleri:
+
+- **KULLANILABILIR ISABET** (ana olcu) - dogru tahmin **ve** o sinif
+  gercekten var. Sadece tahmin dogruluğu degil: `brain.py:1746`
+  `chosen_tag in self.intent_tags` kapisi acilmazsa sohbet yolu hic
+  calismaz, dogru tahmin yine de ise yaramaz.
+- **SINIF TASI** - beklenen etiket var ama siniflandirici sinifinda **degil**.
+  Bu sorular yapisal olarak kazanilamaz; olcmek icin varlar.
+- **ETIKET OLMAYAN TAHMIN** - `predict()` intents.json'da **olmayan** bir
+  metin dondurdu (`ari hjelm`, `an giang` gibi). brain.py tarafindan uretilmis,
+  olcum aracindan degil.
+- canned orani (donen metin intents.json'daki hazir bir yanitin birebir kopyasi mi),
+- tekrarli yanit, bos yanit, LLM yolunun acilma/donme orani.
+
+> **Aracin kendi hatasi (02.10, duzeltildi):** "sinif tasi" filtresi once
+> *tahmin edilen* etikete bakiyordu; 6 yanlis tahmini sinif tasi saydi.
+> Dogru kriter **beklenen** etiketin sinifta olmasi.
+>
+> **Daha onemli: olcum kendini kirletiyordu.** Tek geciste her soru icin once
+> `predict()` sonra `get_response()` cagriliyordu; bir onceki sorunun
+> `get_response`'i sonraki sorunun `predict`'ini degistiriyordu. Dogrulama:
+> `predict()` iki kez arka arkaya 45/45 ayni (deterministik), yani kirlilik
+> yalnizca `get_response -> predict` yonunde. Cozum: **iki ayri gecis** -
+> (1) siniflandirma, hicbir `get_response` cagrisi yapmadan; (2) uretim.
+> Bu duzeltmeden sonra "etiket olmayan bozuk tahmin" iddiasi TAMAMEN DUSTU
+> (45 sorunun 44'u gecerli etiket, tek istisna `Anlayamadim` sentinel'i).
+> 01.10 tarihli ilk sohbet raporlarindaki sinif-tasi ve bozuk-etiket
+> sayilari **gecersizdir**.
+
+### `soru_listesi_sohbet.json` - ASCII-only, bilgi listesiyle ayni sozlesme
+
+Turkce harf iceren soru **yok**: `normalize.py:16-19` etkisi ayri konudur,
+ikisini ayni olcumde karistirmamak icin. Sorular desenlerin kopyasi degil
+(kullanici bunu boyle soyleyebilir), isabet orani ezber degil genelleme olcer.
+
+`kapsam_disi` grubundaki sorularda `kabul: "sohbet_sinifi_DEGIL"` vardir:
+olcutulen sey etiket degil, **sohbet sinifina girmemesi**. Bilgi yoluna
+yonlendirmek kabul sayilir - modelin ciktisina gore ayarlanmis bir esik
+degil.
+
 ## kapi_ab.py - OZGUNLUK ESIGI taramasi (esik 0.15 -> 0.00)
 
 Kapinin `ozgunluk >= %15` kuralini 8 esikte **paired** olarak tarar ve her
@@ -162,10 +215,20 @@ sezgi **yanlış çıktı** — ham kb modelin metninden **daha temiz**:
 
 Kaldıraç **kapı değil `tries`**: `tries 3→6` ekran oranını %72→%86 çıkarıyor
 (+7 soru) kapı kuralına dokunmadan; sıcaklık 0,7→0,9 tek başına sadece +2.
-Bedeli: aday 150→300 (**×2 süre — ölçülmedi**) ve sadakat −2,4 puan.
 
-**Bilinen eksik:** araç **süre damgası yazmıyor**, yani "ne kadar yavaşlar"
-bilinmiyor. `tries` kararından önce eklenmeli (`DEVAM_PROMPTU.md` §6.17).
+**Süre bedeli 01.10–02.10'da ÖLÇÜLDÜ** (`yedek_olc 0110b`, damgalı
+`olcum_raporlari/yedek_olc_0110b.json`) — önceki kayıt "süre ölçülmedi" diyordu:
+
+| varyant | ekran oranı | soru/sn | süre | sadakat |
+|---|---|---|---|---|
+| bugun t3_t07 (taban) | %72 | 3,28 | ×1,00 | taban |
+| **t6_t07** | **%86 (+16 puan)** | 7,17 | **×2,18** | **−0,4 puan** |
+| t3_t09 | %76 (+0) | 3,12 | ×0,95 | −1,2 puan |
+| t6_t09 | %86 (+12 puan) | 7,73 | ×2,36 | −3,4 puan |
+
+Sıcaklık 0,9 **elendi**: `tries`'i 6'ya çıkarmadan ekran oranını artırmıyor
+(+0 puan) ve zaten sadakati düşürüyor. `tries 3→6` gerçek bir kaldıraç:
+**+16 puan karşılığında ×2,18 süre ve −0,4 puan sadakat.** Karar kullanıcıya.
 
 
 ## sure_olc.py - zaman tavanini kaggle_train.txt'ten OLÇER

@@ -824,11 +824,18 @@ class ChatBot:
                     key = self.ascii_normalize(w).lower()
                     if not key:
                         continue
-                    if len(w) >= 2 and w.isupper():
+                    # Kısaltma tespiti: SADECE ASCII büyük harf (A-Z) içeren
+                    # kelimeler kısaltma sayılır. Türkçe özel harfli (İ,Ğ,Ü,Ş,Ö,Ç)
+                    # tam büyük harfli kelimeler (İSTANBUL, ANKARA) KISALTMA DEĞİLDİR.
+                    if len(w) >= 2 and w.isupper() and w.isascii():
                         acronym.add(key)    # kisaltma (AI, NATO) -> imla degismez
                         continue
                     low = _tr_lower(w)
-                    if key != low and key not in lex:
+                    # Türkçe özel karakterli kelimeler (key != low OLMAYABILIR ama
+                    # orijinalde non-ASCII varsa) deasciify icin sozluge eklenmeli.
+                    # Orjinal kelimenin non-ASCII icerip icermedigi kontrolu:
+                    has_non_ascii = any(ord(c) > 127 for c in w)
+                    if (key != low or has_non_ascii) and key not in lex:
                         if len(key) < 2:
                             continue        # tek harf eslemeleri guvenilmez
                         lex[key] = low
@@ -1033,18 +1040,45 @@ class ChatBot:
         self._build_keyword_weights()
         return data
 
+    @staticmethod
+    def _sohbet_mi(intent):
+        """Bu intent sohbet sinifi mi?
+
+        ACIK ISARET ONCE, desen sayisi SONRA. 02.10.2026 olcumu:
+        intents.json'daki 16.185 bilgi intent'in 16.182'si (%99,98) 6 desenli
+        Wikipedia sablonu; sohbet intent'lerinin EN AZI 8 deseni var ve
+        7 desenli intent YOK. Yani esik 6'ya dusurulurse (>=7) sohbet
+        sayisi degismez ama 16.185 bilgi intent siniflandiriciya girer.
+        Sayiyi dusurmek YANIS yon.
+
+        Buna karsi olculebilir bir sizinti vardi: 6 desenli olup SOHBET
+        intent'i olan 3 sinif (kavram_tanimi "mizah nedir", tavsiye_isteme
+        "bana ne onerirsin", gelecek_planlari "gelecegim beni endiselen")
+        filtrelenip siniflandiriciya hic girmiyordu. Duzeltme sayiyi
+        degil KURALI degistirmek: `tur` alani acik isaret olarak oncelikli,
+        yoksa eski sayma kurali (geriye uyumlu, soyleyen AYNI sonucu verir).
+
+        Esik DUZURULMEZ; sadece acik isareti olan intent'ler eklenir.
+        """
+        tur = (intent.get('tur') or '').strip().lower()
+        if tur == 'sohbet':
+            return True
+        if tur == 'bilgi':
+            return False
+        return len(intent.get('patterns') or []) > 6
+
     def conversational_data(self, data):
         """Veriden sohbet intent'lerini ayirir ve intent_tags'i bunlara indirir.
 
         Bilgi intent'leri Wikipedia sablonundan uretilmis 6 desenli
         ("{konu} nedir", "{konu} hakkinda bilgi" gibi); sohbet intent'leri ise
-        daha zengin (8-34 desen). Bu yuzden desen sayisi >6 olanlar sohbet
-        intentidir, geri kalanlar bilgi intenti olarak taranmaya devam eder.
+        daha zengin (8-41 desen). Varsayilan ayrim desen sayisidir; acik
+        `tur` alani olan intent'ler bunu gecersiz kilar (bkz. _sohbet_mi).
 
         Kucuk veri kumeleri (test/itibari dosyalar) filtreden tamamen
         elenirse orijinal veri aynen dondurulur (bozulma yok).
         """
-        conv = [it for it in data['intents'] if len(it['patterns']) > 6]
+        conv = [it for it in data['intents'] if self._sohbet_mi(it)]
         if not conv:
             return data
         self.intent_tags = sorted(it['tag'] for it in conv)

@@ -1,0 +1,72 @@
+{
+ "aciklama": "Sabit SOHBET olcum sorulari. Bilgi sorulari tools/soru_listesi.json'da (50 soru, 50'si de bilgi). Bu dosya o boslugu kapatir: sohbet hic olculmemisti.",
+ "olcusun_amaci": [
+  "1) siniflandirma isabeti: bot.predict() -> beklenen tag",
+  "2) LLM yolunun acilma orani (_try_seq_rephrase cagrildi mi)",
+  "3) tekrarli/siskin yanit orani",
+  "4) yanit konu uyumu (VEKIL olcum - bkz. notlar)"
+ ],
+ "nasil_yazildi": "Her soru mevcut desenlerin KOPYASI degil; kullanici bunu dogal soyleyebilir. Bu yuzden isabet orani 'ezber' degil 'genelleme' olcer. Yine de bazi sorular desene yakin kalabilir - 'not' alaninda isaretlendi.",
+ "olcu_sinirlari": [
+  "konu_uyumu bir VEKIL olcudur: soru ve yanit icerik kelimelerinin kesisim orani. Turkce sohbet icin tek basina guvenilir DEGIL; sadece 'yanit sorudan tamamen koptu mu' sorusuna cevap verir.",
+  "LLM yolu acilmasa da canned yanit 'dogru' sayilir; isabet ve uretim orani AYRI raporlanir.",
+  "beklenen='Anlayamadim' olanlar icin uretilen yanit SAYILMAZ, isabet sayilir.",
+  "kabul='sohbet_sinifi_DEGIL' olanlarda (kapsam_disi grup) olcutulen sey ETIKET degil: sohbet sinifina GIRMEMESI. Bilgi intent'ine yonlendirmek kabul sayilir; modelin ciktisina gore ayarlanmis esik degildir.",
+  "Turkce harf iceren soru YOK; liste tools/soru_listesi.json ile ayni sekilde ASCII-only. Boylece siniflandirma olculur, ascii_normalize (normalize.py:16-19) olculmez. Turkce harf etkisi ayri konudur."
+ ],
+ "sinif_tasi_sorulari": "kavram_tanimi / tavsiye_isteme / gelecek_planlari sohbet intent'i olmalilar (desenleri sohbet dili, yanitlari da) ama 6 desen olduklari icin siniflandiriciya GIRMIYORLAR. Bu sorular o sizinti olcmek icin; beklenen tag yazili olsa da su an HIC YAKALANAMAZ.",
+ "soru_sayisi": 45,
+ "sorular": [
+  {"soru": "merhaba, su an burada misin?", "beklenen": "karsilama", "grup": "selamlasma", "not": "desene yakin: 'merhaba'"},
+  {"soru": "ben gidiyorum, sonra gorusecegiz", "beklenen": "veda", "grup": "selamlasma", "not": ""},
+  {"soru": "sana cok minnettarim, isimi hallettin", "beklenen": "tesekkur", "grup": "selamlasma", "not": ""},
+  {"soru": "gunun nasil geciyor, keyfin nasil?", "beklenen": "durum", "grup": "selamlasma", "not": ""},
+  {"soru": "sen tam olarak kimsin, ne is yapiyorsun?", "beklenen": "kendini_tanit", "grup": "selamlasma", "not": ""},
+  {"soru": "seni cok zekisin ya, tebrikler", "beklenen": "takdir_iltifat", "grup": "selamlasma", "not": ""},
+
+  {"soru": "bugun harika bir sey oldu, cok mutluyum!", "beklenen": "mutluluk", "grup": "duygu", "not": "desene yakin: 'cok mutluyum'"},
+  {"soru": "icim sikildi, moralim dusuk", "beklenen": "uzuntu", "grup": "duygu", "not": ""},
+  {"soru": "yine uyuyamadim gece, cok gerginim", "beklenen": "stres", "grup": "duygu", "not": ""},
+  {"soru": "kimseyle konusacak kimsem yok", "beklenen": "yalnizlik", "grup": "duygu", "not": "desene yakin: 'konusacak kimsem yok'"},
+  {"soru": "bana cok kizdilar, sinirliyim su an", "beklenen": "ofke", "grup": "duygu", "not": ""},
+  {"soru": "seni gercekten cok seviyorum", "beklenen": "sevgi", "grup": "duygu", "not": ""},
+  {"soru": "hic motivasyonum kalmadi, bana moral ver", "beklenen": "motivasyon", "grup": "duygu", "not": ""},
+
+  {"soru": "bugun aksam ne pisirsem, elimde et var", "beklenen": "yemek", "grup": "oner", "not": ""},
+  {"soru": "izleyecek bir sey ariyorum, ne onerirsin?", "beklenen": "film", "grup": "oner", "not": ""},
+  {"soru": "aksam icin bir sarki oner", "beklenen": "sarki", "grup": "oner", "not": "desene yakin: 'sarki oner'"},
+  {"soru": "yakin izin alacagim, nereye gitmeliyim?", "beklenen": "seyahat_tatil", "grup": "oner", "not": ""},
+  {"soru": "bilgisayar oyunu oynuyor musun, hangisi senin favorin?", "beklenen": "oyun", "grup": "oner", "not": ""},
+  {"soru": "aksam bosita ne yapmak iyi olur?", "beklenen": "hobiler", "grup": "oner", "not": ""},
+  {"soru": "sana bir fikra anlatabilir miyim?", "beklenen": "espri", "grup": "oner", "not": ""},
+
+  {"soru": "disarida yagmur var mi, semsiye almali miyim?", "beklenen": "hava_durumu", "grup": "bilgi_sohbet", "not": ""},
+  {"soru": "meslegin ne, gunun hangi saatinde calisiyorsun?", "beklenen": "meslek", "grup": "bilgi_sohbet", "not": ""},
+  {"soru": "en sevdigin renk hangisi, neden onu?", "beklenen": "renk", "grup": "bilgi_sohbet", "not": ""},
+  {"soru": "python ile bir listeyi nasil siralarim?", "beklenen": "programlama", "grup": "bilgi_sohbet", "not": ""},
+  {"soru": "kediler neden bu kadar tatli?", "beklenen": "hayvanlar", "grup": "bilgi_sohbet", "not": ""},
+  {"soru": "yapay zeka hayatimizi nasil degistiriyor?", "beklenen": "teknoloji", "grup": "bilgi_sohbet", "not": ""},
+  {"soru": "uykusuzluk neden basimi agritiyor?", "beklenen": "saglik", "grup": "bilgi_sohbet", "not": ""},
+  {"soru": "matematikten neden bu kadar korkuyorum?", "beklenen": "matematik", "grup": "bilgi_sohbet", "not": ""},
+  {"soru": "uzayda yasamak nasil bir sey olur?", "beklenen": "uzay", "grup": "bilgi_sohbet", "not": ""},
+  {"soru": "klasik muzik seven var mi, tavsiye ver", "beklenen": "musiki", "grup": "bilgi_sohbet", "not": ""},
+  {"soru": "futbol oynamayi birakmali miyim?", "beklenen": "spor", "grup": "bilgi_sohbet", "not": ""},
+  {"soru": "felsefe bana hep garip geldi", "beklenen": "felsefe", "grup": "bilgi_sohbet", "not": ""},
+  {"soru": "bilim alaninda neler oluyor, yeni kesif var mi?", "beklenen": "bilim", "grup": "bilgi_sohbet", "not": ""},
+  {"soru": "tarih hakkinda sohbet edelim mi?", "beklenen": "tarih", "grup": "bilgi_sohbet", "not": ""},
+
+  {"soru": "gunun hangi saatinde en verimli calisiyorsun?", "beklenen": "gunluk_rutin", "grup": "bilgi_sohbet", "not": ""},
+  {"soru": "sinav var, hic calismak istemiyorum", "beklenen": "okul_is", "grup": "bilgi_sohbet", "not": ""},
+  {"soru": "kardesin var mi, aileniz birlikte yasiyor mu?", "beklenen": "aile_arkadas", "grup": "bilgi_sohbet", "not": ""},
+  {"soru": "bana dogruyu soyle, saklama benden", "beklenen": "feedback_tepki", "grup": "bilgi_sohbet", "not": ""},
+  {"soru": "iki secenek arasinda kaldim, ne yapsam bilmiyorum", "beklenen": "kararsiz", "grup": "bilgi_sohbet", "not": ""},
+  {"soru": "elimde bir isim kaldi, bana yardimci olur musun?", "beklenen": "yardim", "grup": "bilgi_sohbet", "not": ""},
+
+  {"soru": "mizah tam olarak ne demek?", "beklenen": "kavram_tanimi", "grup": "sinif_tasi", "not": "BU SINIF YOK: 6 desenli, siniflandiriciya girmiyor"},
+  {"soru": "bana ne onerirsin, ne yapmaliyim?", "beklenen": "tavsiye_isteme", "grup": "sinif_tasi", "not": "BU SINIF YOK: 6 desenli, siniflandiriciya girmiyor"},
+  {"soru": "gelecegim icin plan yapmam lazim, ne dusunuyorsun?", "beklenen": "gelecek_planlari", "grup": "sinif_tasi", "not": "BU SINIF YOK: 6 desenli, siniflandiriciya girmiyor"},
+
+  {"soru": "asdfghjkl qwerty zxcvbn", "beklenen": "Anlayamadim", "kabul": "sohbet_sinifi_DEGIL", "grup": "kapsam_disi", "not": "anlamsiz girdi: sohbet sinifina GIRMEMELI (bilgi yolu ya da Anlayamadim kabul)"},
+  {"soru": "havadaki ucak su an neredeyse", "beklenen": "Anlayamadim", "kabul": "sohbet_sinifi_DEGIL", "grup": "kapsam_disi", "not": "sohbet sinifinda olmayan konu; sohbet sinifina GIRMEMELI. Bilgi yolu kabul edilir"}
+ ]
+}

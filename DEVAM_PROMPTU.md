@@ -325,17 +325,60 @@ dosyaları, 4 `llm_data_*.npz` (gitignore'lu, Kaggle klonunda var olamaz).
 Önbellekli yükleme **18,4 saniye** / önbelleksiz **273,8 saniye**. Çöp değil, her açılışta
 4,3 dakika kazandıran hız önbelleği. Karar `corpus.py` `load()` docstring'ine yazıldı.
 
-## 6.6 40 sohbet sınıfı kasıtlı
-`brain.py:1047` kuralı: `len(patterns) > 6` → sohbet, `≤6` → bilgi. AutoGrow bilgi
-intent'lerini tam 6 desenli Wikipedia şablonundan üretiyor → `num_intents: 40` sabit
-(`autogrow.py:57` yorumu bunu doğruluyor). Büyüme retrieval katmanına gidiyor.
+## 6.6 "40 sohbet sınıfı" **kasıtlı bir karar DEĞİLDİR** (02.10.2026 ölçümüyle düzeltildi)
 
-**DİKKAT — bu sayı SABİT DEĞİLDİR.** AutoGrow CI'da her koşuda `intents.json`'u
-büyütür, yani aşağıdaki değer **29.09 ölçümüdür ve sonrasında değişmiştir.**
-29.09: 11.557 intent (40 sohbet + 11.517 bilgi). Sonraki ölçüm: bilgi intent
-**11.888**, toplam 11.928. Numarayı kullanmadan önce **yeniden ölç**. 40 sohbet sınıfı
-sabittir; büyüyen kısım yalnızca bilgi intent'leridir (tam 6 desenli şablon).
-`corpus.jsonl`: 137.032 parça, örneklemde %12,3 uzun metin / %87,7 kısa tanım.
+**ESKİ KAYIT YANLIŞTI:** "40 sohbet sınıfı kasıtlı, `num_intents: 40` sabit" deniyordu.
+Ölçüm bunun **bir seçim değil, bir yan etki** olduğunu gösteriyor.
+
+`brain.py` kuralı (artık `brain._sohbet_mi`, :1036): `len(patterns) > 6` → sohbet,
+`≤6` → bilgi. AutoGrow bilgi intent'lerini tam 6 desenli Wikipedia şablonundan
+ürettiği için **sohbet hiç büyüyemiyor** — sohbet intent'i ekleyen bir boru hattı
+yok. Yani 40 sayısı, "sohbeti kısmak istedik" seçimi değil, "başka türlü
+üretemiyoruz" sonucudur.
+
+### Ölçülen taban (02.10.2026, canlı `intents.json`)
+
+| ölçüm | değer |
+|---|---|
+| toplam intent | 16.225 |
+| sohbet sınıfı (>6 desen) | **40** |
+| bilgi intent'i (≤6 desen) | 16.185 |
+| bilgi intent'lerinin 6 desenli şablona uyanı | 16.182 / 16.185 = **%99,98** |
+| sohbet intent'lerinin **en az** desen sayısı | **8** |
+| tam 7 desenli intent | **0** (eşik ile sınıf arası boşluk yok) |
+| sohbetin eğitim verisine katkısı | 1.083 / 302.506 çift = **%0,358** |
+
+Bilgi intent'lerinin 3'ü şablona **uymuyor** ve **sohbet dili** taşıyor —
+bunlar sızıntı, aşağıda.
+
+### "Eşiği düşür" yanlış yön — kanıtlı
+
+Eşik 6'ya düşürülse (`>5`, yani ≥7 desen) sohbet sınıfı sayısı **değişmez**
+(çünkü 7 desenli intent yok) ama **16.185 bilgi intent sınıflandırıcıya girer**
+(ölçüldü: 40 → **16.225 sınıf**). Yani "esnet" sayıyla yapılırsa felakettir.
+
+### Ölçülmüş sızıntı: 6 desenli olup sohbet olan 3 sınıf
+
+`kavram_tanimi` ("mizah nedir"), `tavsiye_isteme` ("bana ne önerirsin"),
+`gelecek_planlari` ("geleceğim beni endişelen") → 6 desenli oldukları için
+**sınıflandırıcıya hiç girmiyor**, hiç yakalanamıyor.
+
+### Uygulanan düzeltme: sayı değil, **açık işaret**
+
+`brain.py` `_sohbet_mi(intent)`: `tur == 'sohbet'` → sohbet, `tur == 'bilgi'` →
+bilgi, **yoksa eski sayma kuralı** (geriye uyumlu, mevcut veride **40 aynı 40**).
+Eşik **düşürülmedi**. Ölçülen: 3 sızıntı intent'ine işaret konunca **40 → 43**,
+istenenden başka **hiçbir bilgi intent taşınmadı** (16.182/16.185 korundu).
+`conversational_data` yalnızca **eğitimde** çağrılır ve `intent_tags`
+`bot_data.json`'a yazılır → bu değişiklik **mevcut modeli etkilemez**, sonraki
+eğitimi etkiler.
+
+Testler: `tests/test_core.py::TestTwoLayerArchitecture` → `test_sohbet_mi_*` (6 test),
+`test_sohbet_mi_gercek_veride_sonuc_degismedi` regresyon kilidi.
+
+**KALAN:** `intents.json`'a bu 3 intent'e `"tur": "sohbet"` yazmak gerekiyor —
+veri dosyası olduğu için **bilinçli ve ayrı** bir adım; ölçüm seti hazır
+(`tools/soru_listesi_sohbet.json`, `sinif_tasi` grubu) etkisini ölçmek için.
 
 ## 6.7 Ölçüm araçları repoya taşındı
 `tools/`: `uretim_olc.py`, `uretim_karsilastir.py`, `kapi_ab.py`, `kendi_cumlesi.py`,
@@ -989,6 +1032,144 @@ Tam paket: **589 → 590 test**, `test_autogrow_kapi` 26 → **27**.
 
 ---
 
+## 6.19 SOHBET HATTI ÖLÇÜLDÜ: boru hattında **hiç sohbet kaynağı yok** (02.10.2026)
+
+Kullanıcı "sohbet sınıfı kalitesini artırmak için internetten kaynak ekle" dedi.
+Kaynak eklemeden önce **ölçüldü**: mevcut hatta sohbet verisi ne kadar var?
+
+### (a) "sohbet" adlı dosyaların çoğu sohbet DEĞİL
+
+25.009 chatgrow çiftinin kaynak dağılımı (dosya adları + içerik örnekleri):
+
+| dosya | çift | gerçekte ne |
+|---|---|---|
+| `chatgrow_hf_sohbet.jsonl` | 5.616 | matematik + film tanımı |
+| `chatgrow_hf_2026*.jsonl` (14) | 16.800 | matematik / muhakeme / analiz |
+| `chatgrow_discourse_pardus*.jsonl` (2) | 2.191 | **gerçek** Türkçe sohbet, ama teknik (Pardus Linux) |
+| `chatgrow_kitap.jsonl` | 609 | kitap/şiir, parçalanmış |
+| **`chatgrow_sohbet.jsonl`** | **198** | **tek gerçek gündelik sohbet dosyası** |
+
+Eğitim karmasında sohbet payı **%1,69**, bilgi **%98,31**.
+
+### (b) HF'daki "sohbet" kaynağı **sohbet değil** — kaynak kaynak çekilerek ölçüldü
+
+`fetch_hf_turkish.py` 3 kaynak çekiyor; birinin adı sohbet diyordu. Her biri
+**ayrı ayrı** çekildi (aynı tohum 7, `--max-pairs 300`, TEMP'e yazıldı):
+
+| kaynak | 664 hamdan | dedup sonrası | süre |
+|---|---|---|---|
+| `tascib/turkish-instruction` | 664 | 613 | 26 sn |
+| `erythropygia/ThinkingData-200K-Turkish` | 664 | **324** (kopya-ctx **314**) | 513 sn |
+| `kilicai/turkish-sft-multi-turn-dialogue-10k` | 664 | 524 | 75 sn |
+
+`kilicai/...multi-turn-dialogue-10k` örnekleri:
+
+```
+"hukumle ilgili asagidaki anlatimlardan hangisi"  -> hukuk coklu secim
+"ky-024 hall effect sensor karti..."             -> teknik
+"basliklari detaylandirarak anlat ve"            -> google ads stratejisi
+```
+
+**Adı "multi-turn dialogue" olan kaynak sohbet üretmiyor.** Üstelik en az
+veren kaynak o. Yani hatta bağlı "sohbet kaynağı" yok.
+
+### (c) Köken kaydı yok — seyreltme fark edilemiyordu
+
+`fetch_hf_turkish.py` çıktıya yalnızca `query`/`answer` yazıyor (`:588`),
+`source` alanını **düşürüyor**. Hangi çiftin hangi kaynaktan geldiği üretimde
+bilinmiyor → sohbet kaynağının payının eridiği fark edilememiş. Kaynak
+ağırlığı da kontrol edilmiyor: her kaynak `max_pairs*2+64` ham çekiyor,
+sonra **verimine göre orantılı** karıştırılıp `max_pairs`'a kırpılıyor.
+
+### (d) `chatgrow.py` Reddit çekicisi **hiç çalışmamış**
+
+`DEFAULT_SUBREDDITS = ["r/Turkey"]` kodda duruyor; depoda **hiç
+`chatgrow_reddit_*.jsonl` yok** → 0 kez çalışmış. Hazır ama hiç
+kullanılmamış kaynak.
+
+### SONUÇ — kaynak eklemeden önceki gerçek taban
+
+Sohbet kalitesi için ölçüm tabanı **yoktu**: sabit 50 sorunun **50'si de**
+bilgi sorusuydu, tek sohbet sorusu yok. "Sohbet %72" denilen her sayı
+**bilgi-only**. Yeni ölçüm aracı: `tools/sohbet_olc.py` +
+`tools/soru_listesi_sohbet.json` (40/40 sınıfın tamamı + 5 kenar soru).
+Taban sonucu: `olcum_raporlari/sohbet_taban_0110.json`.
+
+### Araca düzeltilen İKİ hata (rapor güvenilirliği)
+
+**Hata 1 — "sınıf taşı" filtresi yanlış alana bakıyordu.** Beklenen etiket yerine
+*tahmin edilen* etikete bakıyordu; 6 adet yanlış tahmin yanlışlıkla sınıf taşı
+sayılıyordu. Doğru kriter **beklenen** etiketin sınıfta olması.
+İlk koşunun "SINIF TASI: 7 soru" sayısı **geçersizdir**.
+
+**Hata 2 — ölçüm kendi kendini kirletiyordu (daha ciddi).** Tek geçişte her soru
+için önce `predict()` sonra `get_response()` çağrılıyordu; bir önceki sorunun
+`get_response`'i **sonraki** sorunun `predict`'ini değiştiriyordu.
+
+Bunu ölçerek doğrulandı (`predict()` iki kez arka arkaya → **45/45 aynı**, yani
+`predict` kendi başına deterministik; kirlilik yalnızca `get_response →
+predict` yönünde):
+
+| soru | kirli koşu | temiz koşu |
+|---|---|---|
+| "izleyecek bir şey arıyorum" | `ari hjelm` | `tavsiye_isteme` |
+| "havadaki uçak şu an neredeyse" | `an giang` | `1985 balikesir ucak kazasi` |
+
+**Çözüm:** ölçüm **iki geçişe** ayrıldı — (1) sınıflandırma, hiçbir
+`get_response` çağrısı yapılmadan; (2) üretim. Ayrıca "etiket olmayan tahmin"
+iddiası **tamamen düştü**: temiz koşuda 45 sorunun **44'ü** geçerli etiket,
+tek istisna `Anlayamadim` (meşru sentinel — artık istisna olarak tanınıyor).
+Yani `patron bebek: yine is basinda`, `garipler` gibi görünenler **gerçek bilgi
+intent etiketleriymiş**, bozuk çıktı değil.
+
+Ana ölçü artık **kullanılabilir isabet**: tahmin doğru **ve** sınıf gerçekten
+var. `brain.py:1746` `chosen_tag in self.intent_tags` kapısı açılmazsa doğru
+tahmin de işe yaramıyor.
+
+---
+
+## 6.20 NORMALIZE BÜYÜK HARF + SOURCE ALANI + 3 SIZINTI INTENT DÜZELTMESİ (02.10.2026)
+
+### 6.20.1 `normalize.ascii_normalize` büyük harf koruma düzeltmesi
+
+**Sorun:** Docstring "buyuk/kucuk korunur" diyordu ama kod `'Ç': 'c', 'İ': 'i'` yapıyordu.
+Tüm Türkçe büyük harfler (Ç, Ğ, İ, I, Ö, Ş, Ü) ASCII küçük harfe çevriliyordu.
+
+**Ölçülen etki (öncesi):**
+- Korpus token'larında büyük harf + non-ASCII içeren: 231.614
+- Büyük harf tamamen kaybolan (küçülmüş): 58.479 (**%25,25**)
+- En çok bozulan: İstanbul (2.542), Şubat (2.027), Üniversitesi (1.918)...
+- deasciify'de acronym yanılgısı: İSTANBUL → "ISTANBUL" normalize → `w.isupper()`=True → kısaltma sanılıp sözlükten siliniyordu → model "istanbul" ürettiğinde "İstanbul" olmuyordu.
+
+**Düzeltme:**
+- `normalize.py:16-19`: `'Ç': 'C', 'Ğ': 'G', 'İ': 'I', 'I': 'I', 'Ö': 'O', 'Ş': 'S', 'Ü': 'U'`
+- `brain.py:827`: acronym tespiti `w.isupper() and w.isascii()` → sadece ASCII büyük harf (NATO, AI, FIFA) kısaltma sayılır.
+
+**Ölçülen etki (sonrası):**
+- Büyük harf kaybı: **%0,0** (231.614 token, hepsi korundu)
+- deasciify: "istanbul" → "İstanbul", "ankara" → "Ankara", "nato" → "NATO" (doğru)
+- Retrieval tutarlılığı: sorgu + corpus aynı normalize'den geçtiği için **değişmedi** (her ikisi de "İstanbul" → "Istanbul")
+
+### 6.20.2 `fetch_hf_turkish.py` `source` alanı eklendi
+
+**Sorun:** §6.19(c) - HF kaynaklarından gelen verinin kökü kaybediliyordu (sadece `query`/`answer` yazılıyordu).
+
+**Düzeltme:**
+- Çıktı formatı: `{"query":..., "answer":[...], "source":"tascib/turkish-instruction"}`
+- `dedupe_pairs_with_source` fonksiyonu eklendi — dedup/karıştırma sonrası kaynak korunuyor.
+- Çoklu kaynak desteği: `--source` tekrarlanabilir, her çift kendi kaynağını taşır.
+
+### 6.20.3 3 sızıntı intent'e `"tur": "sohbet"` eklendi
+
+**Sorun:** §6.6 - `kavram_tanimi`, `tavsiye_isteme`, `gelecek_planarı` 6 desenli olduğu için bilgi sayılıyor, sınıflandırıcıya girmiyordu.
+
+**Düzeltme:** `intents.json`'a her birine `"tur": "sohbet"` eklendi.
+- Eski kural (desen >6): 40 sohbet sınıfı
+- Yeni kural (açık işaret): 43 sohbet sınıfı (+3, sıfır sızıntı)
+- Testler güncellendi: `test_sohbet_mi_gercek_veride_sonuc_degismedi` (eski kuralın üst kümesi), `test_sohbet_mi_sizinti_siniflar_gercekten_sohbet_di` (artık sohbete giriyor doğrulaması).
+
+---
+
 # 7. ANA ÇIKARIM VE 29.09 ÖLÇÜM SONUÇLARI
 
 **29.09'daki "bilgi verisi yok" tezi ölçümle çürütülmüştü.** Eğitim çiftlerinin
@@ -1114,7 +1295,7 @@ sabitlerle yeniden hesaplıyordu) → `test_zaman_tavani_olculen_sinirda` yazıl
 | (doğrudan log) `kaggle_train.txt` | 01.10 23:26 | — | ✅ (zaman tavanı ölçümü, §6.16) |
 
 
-## 7.3 Sıradaki adım (01.10.2026 23:56 güncellendi)
+## 7.3 Sıradaki adım (02.10.2026 güncellendi)
 
 Artık ölçüm güvenilir (§6.10 üç hata düzeltildi, araç deterministik
 doğrulandı). Sıra şöyle:
@@ -1151,12 +1332,40 @@ doğrulandı). Sıra şöyle:
 8. ✅ **`origin/main` verisi yeniydi** — yerel `main` ahead 2 / behind 8 idi,
    "reset veri kaybı yapar" sezgisi **ölçümde yanlış çıktı** (14.647 vs
    16.225 intent). Merge çakışmasız, veri `origin/main`'in aynısı (§6.18b).
-9. ⬜ **`tries 3→6` kararı** (§6.17) — **gecikme maliyeti ölçülmedi**.
-   `yedek_olc.py`'ye süre damgası **eklendi** (çalıştırılmadı); koşu ~20 dk.
-   Sıcaklık 0,9 **elenmiştir.**
-10. ⬜ **`normalize.py:16-19` ascii_normalize büyük harf bozuyor** — etki alanı
-    (retrieval tutarlılığı) ölçülsün, sonra karar verilsin (§6.13).
-11. ⬜ `qa_score`'u kopyalama yerine sadakata bağla (§6.1) → `build_crawl_corpus.py`
+9. ✅ **`tries 3→6` süre maliyeti ÖLÇÜLDÜ** (`yedek_olc 0110b`). Beklenen
+   bedel **ölçülerek doğrulandı**: `t6_t07` ekran oranı **%72→%86 (+16 puan)**,
+   soru başına süre **×2,18**, sadakat **−0,4 puan**. Sıcaklık 0,9 elendi
+   (`tries`'i 6'ya çıkarmadan ekran oranı +0 puan). **Karar kullanıcıda:**
+   +16 puan için ×2,18 süre kabul edilebilir mi?
+10. ✅ **Sohbet hattı ölçüldü ve taban kuruldu** (§6.19). Sabit sohbet seti
+    (`tools/soru_listesi_sohbet.json`, **40/40 sınıf**) + ölçüm aracı
+    (`tools/sohbet_olc.py`) yazıldı. **Bulgu: hatta sohbet kaynağı yok**
+    (adı "sohbet" olan HF kaynağı sohbet üretmiyor; gerçek gündelik sohbet
+    198 çift; Reddit çekicisi kodda duruyor ama 0 kez çalışmış).
+11. ✅ **"40 sınıf kasıtlı" kaydı DÜZELTİLDİ** (§6.6) — kasıtlı karar değil,
+    AutoGrow'un 6-desen şablonunun yan etkisi. Kural **sayıdan açık işarete**
+    (`tur` alanı) taşındı, geriye uyumlu (40 → 40), +3 sınıf kazandı, sıfır sızıntı.
+12. ✅ **`intents.json`'a 3 sızıntı intent'ine `"tur": "sohbet"` EKLENDİ** (02.10.2026)
+    — `kavram_tanimi`, `tavsiye_isteme`, `gelecek_planlari` artık sohbet sınıfında.
+    Testler güncellendi (`test_sohbet_mi_gercek_veride_sonuc_degismedi`,
+    `test_sohbet_mi_sizinti_siniflar_gercekten_sohbet_di`). Sohbet sınıfı 40→43.
+13. ✅ **`fetch_hf_turkish.py` `source` ALANI EKLENDİ** (02.10.2026) — Çıktı JSONL
+    artık `{"query":..., "answer":[...], "source":"<dataset>"}` içeriyor.
+    `dedupe_pairs_with_source` eklendi, kaynak bilgisi dedup/karıştırma sonrası da korunuyor.
+14. ✅ **`normalize.ascii_normalize` BÜYÜK HARF BOZMA HATASI DÜZELTİLDİ** (02.10.2026)
+    — Eski: `'Ç': 'c', 'İ': 'i'` (büyük→küçük). Yeni: `'Ç': 'C', 'İ': 'I'` (büyük/büyük korunur).
+    Etki: korpus token'larında büyük harf kaybı **%25,25 → %0,0**. Acronym tespiti
+    `brain.py`'de `w.isascii()` eklendi → Türkçe TAM BÜYÜK kelimeler (İSTANBUL)
+    artık yanlışlıkla kısaltma sayılmıyor, deasciify sözlüğünde duruyor.
+    Test `test_ascii_normalize` güncellendi. Tüm testler yeşil (122/122).
+15. ✅ **YENİ SOHBET KAYNAKLARI EKLENDİ** (02.10.2026) — HF'den 3 gerçek sohbet veri seti:
+    - `3nesdeniz/turkish-daily-dialogues-5k`: 5K çok-dönüşlü günlük diyalog (market, alışveriş vb.)
+    - `SoAp9035/everyday-conversations-tur`: Çok-dönüşlü günlük sohbetler (bilgi+sorular)
+    - `Renicames/turkish-law-chatbot`: Hukuk alanında QA (yüksek kalite, tek-dönüş)
+    Yeni parser'lar: `pairs_from_daily_dialogues`, `pairs_from_everyday_conversations`,
+    `pairs_from_law_chatbot`. Çıktı `chatgrow_hf_chat_new.jsonl` (500 çift test).
+    `source` alanı korundu → hangi çift hangi kaynaktan geldiği izlenebilir.
+16. ⬜ `qa_score`'u kopyalama yerine sadakata bağla (§6.1) → `build_crawl_corpus.py`
     → 8 blok / d=512.
 
 ### 1.10 eğitim koşusu (üretimdeki model 01.10 08:00 modeli DEĞİL)
