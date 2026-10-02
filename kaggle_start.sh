@@ -34,12 +34,19 @@
 #   yondu: MS_PER_PAIR kucuk saymak butceyi BUYUTUYORDU (12 epoch 396 dk
 #   yerine gercekte 431 dk ister -> oturum kesilirdi).
 #
+#   DIKKAT 3 (02.10.2026): DIKKAT 2'nin buldugu birim hatasinin IKINCISI
+#   bulundu ve o da duzeltildi -- bu sefer hata sure_olc.py'nin KENDISINDE
+#   idi: MS_HAM'a encode katiliyordu, ama sure_ve_hesapla encode'u
+#   kalan_dk'dan zaten dusuyor -> encode IKI KEZ sayiliyordu, sabit
+#   %9,45 yuksekti. Dogru sabit 7,3927 ms/ham/epoch; tavan 234.207 ->
+#   256.333. OLCUM: tools/sure_olc.py, DEVAM_PROMPTU.md 6.18.
+#
 #   DIKKAT 2 (01.10.2026): yukaridaki "zaman butcesi pratikte baglayici
 #   DEGIL" yorumu YANLISTI ve kaldirildi. Asil hata sabit yanlisi degil
 #   BIRIM hatasiydi: MS_PER_PAIR egitim cifti, tavan ham cift sayiyordu
 #   (expansion 01.10'da OLCULDU: 4,7711). Tavan gercek sinirdan 5,34 KAT
 #   uzaktaydi ve 29.09'dan beri hic baglamiyordu. Artik HAM cift sabiti
-#   kullaniliyor ve tavan GERCEKTEN bagliyor (1.251.733 -> 234.207).
+#   kullaniliyor ve tavan GERCEKTEN bagliyor.
 #   OLCUM: tools/sure_olc.py, DEVAM_PROMPTU.md 6.16.
 #   Erken durdurma (patience) val yukselmeye baslayinca keser; EPOCH
 #   vermezsen 12 kullanilir, yine olusturulabilir. Daha uzun egitim istersen

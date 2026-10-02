@@ -173,16 +173,30 @@ bilinmiyor. `tries` kararından önce eklenmeli (`DEVAM_PROMPTU.md` §6.17).
 `train_llm.sure_ve_hesapla()`'nın tavanının **gerçekte ne kadar yanlış**
 olduğunu logdan ölçer; `train_llm.py`'ye dokunmaz.
 
-**Bulduğu hata (01.10.2026, §6.16):** formül `MS_PER_PAIR`'ı kullanıyordu
+**Bulduğu 1. hata (01.10.2026, §6.16):** formül `MS_PER_PAIR`'ı kullanıyordu
 — bu bir **eğitim çifti** (post-expansion) maliyeti — ama dönen sayı
 `coz_max_pairs` → `MAX_PAIRS` zincirinde **ham çift** (pre-expansion)
 biriminde kullanılıyor. 01.10'da ölçülen expansion **4,7711** → birim hatası
 tam o kadar. Sonuç: tavan gerçek sınırın **5,34 KAT** uzaktaydı ve 29.09'dan
 beri **hiç bağlamıyordu**.
 
+**Bulduğu 2. hata (01.10–02.10.2026, §6.18a) — araç KENDİSİNİN hatası:**
+`MS_HAM` hesaplanırken encode de içine katılıyordu
+(`EPOCH_SN + ENCODE_SN`), ama `sure_ve_hesapla` encode'u
+`kalan_dk`'dan **zaten** düşüyor → **encode iki kez sayılıyordu**.
+Sabit %9,45 yüksek → tavan 234.207 yerine doğru değer **256.333**.
+Ders: sabiti türeten arac ile onu kullanan kod arasında **hiçbir muhasebe
+kalemi karşılıklı sayılmamalı.** `MS_HAM` artık encode içermez
+(88,7127 ms/ham, 12 epoch); encode içeren değer yalnızca rapor için
+`MS_HAM_ENCODE_DAHIL` olarak yazılır.
+
 Arac üç seçeneğin tavanını yan yana basar ve **hangisinin yetersiz olduğunu
 gösterir**: (A) sadece `MS_PER_PAIR`'ı düzeltmek yalnızca %12,1 düşürür →
-**yetersiz**; (B) ham çift başına ölçülen sabit → 234.207 → **doğru**.
+**yetersiz**; (B) ham çift başına ölçülen sabit → **256.333** → **doğru**.
+
+Araç ayrıca **kapsama kaybını canlı `intents.json`'dan ölçer** (varsayım
+yazmaz) ve "düzeltme uygulanmış mı" durumunu `DURUM:` bloğunda kendisi
+söyler — elle bakılmaz.
 
 Yeni sabiti `MS_PER_HAM_CIFT_EPOCH` olarak `train_llm.py`'ye yazdıktan sonra
 **yeni koşu olçtüğünde bu araç tekrar çalıştırılıp sabit güncellenir.**

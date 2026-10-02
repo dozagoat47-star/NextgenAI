@@ -401,34 +401,37 @@ class TestSureTavani(unittest.TestCase):
         01.10 23:26 kosusu OLCUMU (tools/sure_olc.py, kaggle_train.txt):
             ham 288.802 -> egitim 1.377.895        (expansion 4,7711)
             12 epoch toplami 25.620,4 sn
-            encode 2.420,0 sn
-            toplam 28.040,4 sn / 288.802 ham = 97,09 ms/ham
-        Bu sabitten turetilen MS_PER_HAM_CIFT_EPOCH = 97,09/12 = 8,0911.
+            encode 2.420,0 sn  (AYRI: sure_ve_hesapla zaten dusuyor)
+            toplam 25.620,4 sn / 288.802 ham = 88,71 ms/ham
+        Bu sabitten turetilen MS_PER_HAM_CIFT_EPOCH = 88,71/12 = 7,3927.
+
+        ENCODE NEDEN HARIC: ilk yazimda encode de toplama katiliyordu
+        (97,09 ms -> 8,0911) ama sure_ve_hesapla encode'u kalan_dk'dan
+        AYRICA dusuyor -> encode iki kez sayiliyordu, sabit %9,45
+        YUKSEKti. Ayni yonlu IKINCI birim hatasi.
 
         IKILERI (sabit degil, olcumden gelen):
-        UST = 540 dk'nin tamami, olculen hizla: 540 x 60000 / 97,09
-              = 333.699 ham cift. Bu, oturumun ASLA tasamayacagi sinirdir.
-              Ustune cikarsa sessizce tasar -> KESILMEZ.
-        ALT = 01.10 kosusunda 288.802 ham ciftin oturumu BITIRDI (540 dk
+        UST = 540 dk'nin tamami, olculen hizla: 540 x 60000 / 88,71
+              = 365.223 ham cift. Bu, oturumun ASLA tasamayacagi
+              sinirdir. Ustune cikarsa sessizce tasar -> KESILMEZ.
+        ALT = 01.10 kosusunda 288.802 ham ciftin oturumu BITTI (540 dk
               icinde; olculen kismi 467,3 dk = %86,5, veri hazirligi
               olculmedi). Yani bu hacim MAKULDE CALISMI olarak kanitli.
               Tavan bunun en az %75'ini tutmali; altina duserse kanitli
-              calisan bir hacmin yarisini de atiyoruz demektir.
-        ARA = tavan 234.207 = 288.802 x %81,1. %25 bosluk politikasinin
-              bedeli: OLCULEN kapsama kaybi canli intents.json uzerinde
-              cift %15,1, benzersiz ctx %0,9, benzersiz cevap %0,1.
+              calisan bir hacmin yarisini de atiyoruz demekir.
+        ARA = tavan 256.333 = 288.802 x %88,7.
 
-        Onceki kod 1.251.733 diyordu -> UST'un 3,75 KATI, yani bu test
+        Onceki kod 1.251.733 diyordu -> UST'un 3,43 KATI, yani bu test
         kirmizi olurdu. Hata birim hatasidi (egitim cifti / ham cift).
         """
         import train_llm
         # --- sabit OLCULEN log degerine bagli mi?
         ms_ham_toplam = train_llm.MS_PER_HAM_CIFT_EPOCH * 12
         self.assertAlmostEqual(
-            ms_ham_toplam, 97.09, delta=0.05,
+            ms_ham_toplam, 88.7127, delta=0.05,
             msg='MS_PER_HAM_CIFT_EPOCH=%s -> 12 epoch toplami %.2f ms/ham. '
-                '01.10 23:26 kosusunda OLCULEN deger 97,09 ms/ham. Yeni bir '
-                'kosu olcuyse tools/sure_olc.py calistir ve burasi guncelle.'
+                '01.10 23:26 kosusunda OLCULEN deger 88,71 ms/ham (encode HARIC). Yeni bir '
+                'kosu olcuyse tools/sure_olc.py calistir ve burasi gunceller.'
                 % (train_llm.MS_PER_HAM_CIFT_EPOCH, ms_ham_toplam))
         ust = int(540 * 60 * 1000 / ms_ham_toplam)
         kanitli = 288802          # bittigi OLCULEN kosunun ham cift sayisi
@@ -547,15 +550,15 @@ class TestSureTavani(unittest.TestCase):
         test de onu yansitmali, yoksa boru hatti hakkinda YANLIIS bilgi
         verir.
 
-        Bugun (birim duzeltmesinden sonra) tavan GERCEKTEN bagliyor:
-            veri butcesi 276.096 > zaman tavani 234.207 -> tavan kazandi
-        Kirpma bedeli OLCULDU (canli intents.json, seqgen.load_pairs):
-            cift 276.016 -> 234.207           (%84,9 kaldi, %15,1 kesildi)
-            benzersiz ctx  88.650 ->  87.829 (%99,1 kaldi, %0,9 kesildi)
-            benzersiz cevap 45.705 ->  45.645 (%99,9 kaldi, %0,1 kesildi)
-        Yani %15,1 cift kaybi ama %0,9 kapsama kaybi: kesilen kisim
-        cogunlukla ayni ctx/cevap'in tekrarlari. Zamana karsi alinan
-        bedel bu kadar ucuz.
+        Bugun (iki duzeltmeden sonra) tavan GERCEKTEN bagliyor:
+            ham veri 302.506 cift > zaman tavani 256.333 -> tavan kazandi
+        Kirpma bedeli OLCULDU (canli intents.json, seqgen.load_pairs,
+        16.225 intent):
+            cift 302.506 -> 256.333           (%84,7 kaldi, %15,3 kesildi)
+            benzersiz ctx 98.116 -> 98.116  (%100,0 kaldi)
+        Cift sayisi %15,3 dustu ama kapsama DUSMEDI: kirpma once her
+        ctx'den 1 cift garanti ediyor. Onceki 'shuffle -> kes' yontemi
+        ayni kapta 2.039 ctx'i (%2,08) tamamen susturuyordu.
         """
         import train_llm
         tavan = train_llm.sure_ve_hesapla(oturum_dk=540, epochs=12)
@@ -570,18 +573,23 @@ class TestSureTavani(unittest.TestCase):
             % (format(butce, ','), format(tavan, ',')))
 
     def test_kirpma_kapsamayi_agirmeden_atmiyor(self):
-        """Kirpma %15,1 cift aliyor ama sadece %0,9 benzersiz ctx.
+        """Kirpma HICBIR benzersiz ctx'i susturmamali.
 
-        Bu, onceki "kirpma aktif olmali" varsayiminin YERINI alir. Kirpma
-        aktif olmasi iyi bir sey degil; kirpinin kapsamayi bozmamasi iyi
-        bir sey. Cift sayisi kombinasyoneldir (N pattern x M cevap), o
-        yuzden once tekrarlar kesilir.
+        Kirpma %15,3 cift aliyor ama kapsama %100 kalir. Onceki yontem
+        (shuffle -> kes) ayni kapta 2.039 ctx'i (%2,08) tamamen susturuyordu:
+        medyan ctx yalnizca 3 cift, rastgele kesme onlari siliyor.
 
-        OLCUM (01.10.2026, canli intents.json):
-            sinirsiz      -> cift 276.016 | ctx 88.650 | cevap 45.705
-            tavan 234.207 -> cift 234.207 | ctx 87.829 | cevap 45.645
-        Esik %99 ctx kapsamasi: kapsama %1'den fazla duserse kirpma bir
-        seyi bozmaya basliyor demektir.
+        BURADA YUZDE ESIGI DEGIL KESIN SOZLESME olculuyor:
+            benzersiz ctx = min(kap, benzersiz ctx)
+        Yuzde esigi %99 idi; kirpma %97,92'ye dusunca kirmizi verdi, ama
+        %99 esigi kirpmanin sessizce 1.000 ctx kaybettigini de gecirirdi.
+        Sozlesme her butcede ya saglanir ya saglanmaz.
+
+        OLCUM (01.10.2026, canli intents.json, 16.225 intent):
+            sinirsiz   -> cift 302.506 | ctx 98.116
+            tavan 256.333 -> cift 256.333 | ctx 98.116  (= %100)
+        Kap x0,5'e (128.166) inilse bile %100; x0,35'te (89.716 < 98.116
+        ctx) butce yetmez, o durum kirpma lehine dogru davranis.
         """
         import train_llm
         from seqgen import load_pairs
@@ -591,21 +599,61 @@ class TestSureTavani(unittest.TestCase):
         tavan = train_llm.sure_ve_hesapla(oturum_dk=540, epochs=12)
         tam = load_pairs(yol, max_pairs=10 ** 9, use_query=True,
                          ctx_len=train_llm.CTX_CHARS)
+        ctx_tam = set(p[0] for p in tam)
+        self.assertGreater(len(ctx_tam), 0, 'intents.json bos')
         kirp = load_pairs(yol, max_pairs=tavan, use_query=True,
                           ctx_len=train_llm.CTX_CHARS)
-        ctx_tam = set(p[0] for p in tam)
         ctx_kirp = set(p[0] for p in kirp)
-        oran = 100.0 * len(ctx_kirp) / max(1, len(ctx_tam))
-        self.assertGreaterEqual(
-            oran, 99.0,
-            'zaman tavani %s ham cift: benzersiz ctx kapsamasi %.1f '
-            '(tam %s -> kirpilan %s). Kirpma kapsamayi bozuyor; esik %%99.'
-            % (format(tavan, ','), oran, format(len(ctx_tam), ','),
-               format(len(ctx_kirp), ',')))
+        # KESIN SOZLESME: butce yetiyorsa HICBIR ctx dusmemeli
+        self.assertEqual(
+            len(ctx_kirp), min(tavan, len(ctx_tam)),
+            'zaman tavani {0} ham cift, benzersiz ctx {1}. Kirpma {2} '
+            'benzersiz ctx susturdu (kalan {3}). Sozlesme: kirpma hicbir '
+            'benzersiz contexti dusurmemeli (kirpma "her ctxden en az 1" '
+            'garantisi verir).'.format(format(tavan, ','), format(len(ctx_tam), ','),
+                                       format(len(ctx_tam) - len(ctx_kirp), ','),
+                                       format(len(ctx_kirp), ',')))
+        # Kirpma butceyi ASLA asmamali
+        self.assertLessEqual(
+            len(kirp), tavan,
+            'kirpma zaman tavanini asti: {0} > {1} cift'.format(
+                format(len(kirp), ','), format(tavan, ',')))
+        # Kirpma gercekten calisiyor (yoksa zaman tavani islevsiz olurdu)
         self.assertLess(
             len(kirp), len(tam),
             'kirpma hicbir cift atmadi: tavan veriyi kirpmiyor, zaman '
-            'tavani islevsiz (5,34 KAT birim hatasinin belirtisi).')
+            'tavani islevsiz (birim hatasinin belirtisi).')
+
+    def test_kirpma_yariya_inse_de_kapsama_durur(self):
+        """Kapsama butceye bagli mi, yoksa butceden BAGIMSIZ mi?
+
+        Kirpma duzeltmesinin asil degeri bu: kapsama zaman tavanindan
+        bagimsiz. Butce yarilirsa cift sayisi duser ama ctx kapsamasi
+        DUSMEZ (cift/ctx orani 1'in uzerinde oldugu surece).
+        """
+        import train_llm
+        from seqgen import load_pairs
+        yol = os.path.join(BASE, 'intents.json')
+        if not os.path.exists(yol):
+            self.skipTest('intents.json yok')
+        tavan = train_llm.sure_ve_hesapla(oturum_dk=540, epochs=12)
+        tam = load_pairs(yol, max_pairs=10 ** 9, use_query=True,
+                         ctx_len=train_llm.CTX_CHARS)
+        ctx_tam = set(p[0] for p in tam)
+        for kat in (1.0, 0.75, 0.5):
+            kap = int(tavan * kat)
+            kirp = load_pairs(yol, max_pairs=kap, use_query=True,
+                              ctx_len=train_llm.CTX_CHARS)
+            self.assertEqual(
+                len(kirp), kap,
+                'kat x{0:.2f}: kirpma butceyi doldurmadi ({1} cift, beklenen '
+                '{2})'.format(kat, format(len(kirp), ','), format(kap, ',')))
+            self.assertEqual(
+                len(set(p[0] for p in kirp)), min(kap, len(ctx_tam)),
+                'kat x{0:.2f}: kirpma butceyi doldurdu ama bir ctx susturdu'
+                .format(kat))
+
+
     def _sync_ps1(self):
         yol = os.path.join(BASE, 'sync_chatgrow.ps1')
         if not os.path.exists(yol):

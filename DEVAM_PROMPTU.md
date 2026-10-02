@@ -768,6 +768,12 @@ rakamının karşılaştırma tabanı eksikti — §6.16'da düzeltildi.)
 
 ## 6.16 Zaman tavanı: **BİRİM HATASI** bulundu ve düzeltildi (01.10 2026)
 
+> ⚠️ **Bu bölümdeki iki sayı §6.18 ile DÜZELTİLDİ:** `8,0911` →
+> **7,3927**, tavan `234.207` → **256.333** (encode iki kez sayılıyordu).
+> Aşağıdaki "Kırpma artık gerçekten çalışıyor — bedeli ölçüldü" tablosu
+> da **hatalı**: kırpma %0,9 değil **%2,08 kapsamayı** siliyordu.
+> Ayrıntı ve doğru ölçümler için **§6.18**.
+
 §6.15 "formül birimsiz" diye teşhis koydu ama **iki seçeneği de ölçmemişti**.
 İkisi de ölçüldü: **ikisi de tek başına yetersiz.**
 
@@ -894,6 +900,95 @@ birlikte vermek. Sıcaklık 0,9 **elenmiştir** (+2 soru için sadakat
 
 ---
 
+## 6.18 Zaman tavanı: **İKİNCİ** birim hatası + kırpma **%2,08 kapsamayı** siliyordu (01.10–02.10 2026)
+
+> **§6.16'daki iki sayı bu bölümle düzeltildi:** `MS_PER_HAM_CIFT_EPOCH`
+> **8,0911 değil 7,3927**, tavan **234,207 değil 256,333**. §6.16'daki
+> "kırpma bedeli %0,9 kapsama" ölçümü de **hatalı** (aşağıda).
+
+### (a) Encode iki kez sayılıyordu — `tools/sure_olc.py`'nin kendi hatası
+
+`MS_HAM` hesaplanırken encode de içine katılıyordu:
+
+```
+sure_olc.py (ESKI):  MS_HAM = EPOCH_SN*1000/HAM + ENCODE_SN*1000/HAM  = 97,0921 ms
+sure_olc.py (YENI):  MS_HAM = EPOCH_SN*1000/HAM                        = 88,7127 ms
+sure_ve_hesapla:      kalan_dk = oturum_dk*bosluk - encode_dk          <-- encode TEKRAR
+```
+
+Encode `sure_ve_hesapla` tarafından **zaten** düşülüyor; `MS_HAM`'e de
+katılınca **iki kez** sayıldı. Sabit **%9,45 yüksek** → tavan gereksiz
+dar. **İki hata da aynı yöndeydi** (tavanı daraltıyor).
+
+| | ölçülen | sabit | tavan |
+|---|---|---|---|
+| encode'la | 97,0921 ms/ham | 8,0911 | 234.207 |
+| **encode'sız (doğru)** | **88,7127 ms/ham** | **7,3927** | **256.333** |
+
+**Ders (araca değil üretime de yazıldı):** sabiti türeten araç ile onu
+kullanan kod arasındaki **her muhasebe kalemi** karşılıklı sayılmamalı.
+`test_olcum_araclari.py` aracın bu satırı üretmesini kapatıyor.
+
+### (b) `origin/main` verisi **yeni**ydi — yerel bayattı (merge)
+
+Yerel `main` **ahead 2 / behind 8** idi ve iki commit'i de veri
+dosyalarına dokunmuştu. "Reset 42.000 satır veri kaybı yapar" sezgisi
+**ÖLÇÜMDE YANLIŞ ÇIKTI**:
+
+| | bilgi intent |
+|---|---|
+| yerel çalışma ağacı / HEAD | 14.647 |
+| `origin/main` | **16.225** (+1.578) |
+
+Merge **çakışmasız** (`git merge-tree --write-tree` → exit 0) ve
+`intents.json`/`corpus.jsonl`/`corpus_ids.jsonl`/`knowledge_map.jsonl`
+merge sonrası `origin/main`'in **birebir aynısı**. Yani merge veriyi
+**ileri** götürdü. Push'un tek veri etkisi: 3 `chatgrow_hf_*.jsonl`
+(01.10 08:04/11:00/19:54, 0,19 MB) — deponun mevcut düzeni zaten bu
+(origin'de 24.09–29.09'dan 8 tane var).
+
+### (c) ANA BULGU: kırpma kapsamayı **sessizce** bozuyordu
+
+`seqgen.load_pairs` son satırları: `random.Random(3).shuffle(pairs)` →
+`pairs[:max_pairs]`. Rastgele kesme. **Medyan ctx'in yalnızca 3 çifti**
+(min 1, maks 36) olduğu için küçük bağlamlar tamamen siliniyor:
+
+| kap | önce: ctx % | **sessiz ctx** | sonra: ctx % | sessiz ctx |
+|---|---|---|---|---|
+| **256.333 (yeni tavan)** | 97,92 | **2.039** | **100,00** | **0** |
+| ×0,90 | 95,90 | 4.028 | 100,00 | 0 |
+| ×0,80 | 92,75 | 7.113 | 100,00 | 0 |
+| ×0,70 | 88,38 | 11.398 | 100,00 | 0 |
+| ×0,50 | 74,88 | 24.652 | 100,00 | 0 |
+| ×0,35 (89.716 < 98.116 ctx) | — | — | 91,44 | 8.400 = 98.116−89.716 ✓ |
+
+**Çift sayısı birebir aynı** → süre ve eğitim maliyeti değişmiyor; sadece
+**hangi** çiftlerin seçildiği değişiyor. Yöntem: önce her ctx'den 1 çift
+garanti, sonra kalan bütçe rastgele. Tohum 3/7/11/42'de de %100.
+
+**Bu bir regresyondu, kazanç değil:** son gerçek koşu **%100,0 kapsama**
+ile bitmişti (`[butce] ham 288.802 cift -> ... 100.0% kapsama`).
+§6.16'daki düzeltme uygulansaydı bir sonraki koşuda 2.039 bağlam
+**sıfır eğitim verisi** alacaktı.
+
+**Asıl kazanç: kapsama artık zaman tavanından BAĞIMSIZ.** Tablodaki
+%100, veri tabanının fiyatı değil, `butce / ctx` oranından gelir; bütçe
+ctx sayısının altına düşünce kırpma lehine açıkça devreye giriyor.
+
+### (d) Testler
+
+| test | önce | şimdi |
+|---|---|---|
+| `test_kirpma_kapsamayi_agirmeden_atmiyor` | ≥**%99** eşiği (kirpma %97,85'te kırmızı) | **kesin sözleşme:** `benzersiz ctx == min(kap, benzersiz ctx)` |
+| `test_kirpma_yariya_inse_de_kapsama_durur` | — | **YENİ** — ×1,0 / ×0,75 / ×0,5'te bütce dolar mı, kapsama durur mu |
+
+**%99 eşiği neden bırakıldı:** kirpma sessizce 1.000 ctx kaybetseydi
+geçerdi. Sözleşme ya sağlanır ya sağlanmaz.
+
+Tam paket: **589 → 590 test**, `test_autogrow_kapi` 26 → **27**.
+
+---
+
 # 7. ANA ÇIKARIM VE 29.09 ÖLÇÜM SONUÇLARI
 
 **29.09'daki "bilgi verisi yok" tezi ölçümle çürütülmüştü.** Eğitim çiftlerinin
@@ -968,8 +1063,17 @@ BİLİNMEYEN değil, ÖLÇÜLMÜŞTÜR (§6.14, §6.15).**
 `ENCODE_DK = 26,0` → **ölçüldü: 40,3 dk (%35,5 daha yavaş)**.
 ~~`MS_PER_PAIR`'ın hangi çift sayımına ait olduğu belirsiz.~~
 → **ÇÖZÜLDÜ (§6.16): `eğitim` çifti. Formül `ham` çift sayıyordu →
-birim hatası, 5,34 kat. `MS_PER_HAM_CIFT_EPOCH = 8,0911` eklendi ve
-`sure_ve_hesapla` düzeltildi.** Tavan 1.251.733 → 234.207.
+birim hatası, 5,34 kat. `MS_PER_HAM_CIFT_EPOCH` eklendi ve `sure_ve_hesapla`
+düzeltildi.** Tavan 1.251.733 → 234.207 → **256.333**.
+~~`MS_HAM` encode'u içine katıyordu ama `sure_ve_hesapla` zaten düşüyor.~~
+→ **ÇÖZÜLDÜ (§6.18a): encode iki kez sayılıyordu → sabit %9,45 yüksek.**
+Doğru sabit **7,3927** (encode hariç). **İki hata da aynı yöndeydi.**
+~~Kırpma bazı benzersiz ctx'leri tamamen susturuyor.~~
+→ **ÖLÇÜLDÜ ve DÜZELTİLDİ (§6.18c):** `shuffle → kes` yeni tavanda
+**2.039 benzersiz ctx'i (%2,08) sıfır eğitim verisiyle** bırakıyordu
+(son gerçek koşuda kapsama %100,0'dı → **regresyon**). Yeni yöntem:
+önce her ctx'den 1 çift. Çift sayısı ve süre aynı, kapsama **her bütçede
+%100**. Kapsama artık zaman tavanından **bağımsız**.
 Ayrıca: **sabitlerin doğruluğunu ölçen test YOKTU** (hepsi formülü aynı
 sabitlerle yeniden hesaplıyordu) → `test_zaman_tavani_olculen_sinirda` yazıldı.
 
@@ -1033,18 +1137,27 @@ doğrulandı). Sıra şöyle:
    Sezgi yanlış çıktı: **ham kb modelin metninden daha temiz** (dolgu %7,5 vs
    %21,9; yarım cümle %0,0 vs %8,1). Gerçek kaldıraç **kapı değil `tries`**:
    `tries 3→6` ekran oranını **%72→%86** çıkarıyor, kapı kuralına dokunmadan.
-6. ✅ **Zaman tavanı** — **ÖLÇÜLDÜ ve DÜZELTİLDİ (§6.16).** Asıl hata
+6. ✅ **Zaman tavanı** — **ÖLÇÜLDÜ ve DÜZELTİLDİ (§6.16 + §6.18).** Asıl hata
    **birim hatasıydı** (eğitim çifti ↔ ham çift), sabit yanlış değildi.
-   Tavan 1.251.733 → **234.207**. `MS_PER_HAM_CIFT_EPOCH = 8,0911` eklendi.
-   Kırpma artık çalışıyor; bedeli ölçüldü: **%15,1 çift / %0,9 kapsama**.
-   Döngsel testlerin yerine ölçüme bağlı testler yazıldı.
-7. ⬜ **`tries 3→6` kararı** (§6.17) — **gecikme maliyeti ölçülmedi**.
-   `yedek_olc.py`'ye süre damgası ekle (deterministik kalır), sonra karar ver.
+   Tavan 1.251.733 → 234.207 → **256.333**. `MS_PER_HAM_CIFT_EPOCH` =
+   8,0911 → **7,3927** (encode iki kez sayılıyordu, §6.18a).
+7. ✅ **Kırpma kapsamayı sessizce bozuyordu — DÜZELTİLDİ (§6.18c).**
+   `shuffle → kes` medyan-3-çiftli ctx'leri siliyordu: yeni tavanda
+   **2.039 benzersiz ctx (%2,08) sıfır eğitim verisi** alıyordu, son gerçek
+   koşuda ise kapsama **%100,0**'dı. Yeni yöntem: önce her ctx'den 1 çift.
+   Çift sayısı aynı → süre aynı; kapsama **her bütçede %100** (×0,5'e kadar).
+   Kapsama artık **zaman tavanından bağımsız**. Test: %99 eşiği yerine
+   **kesin sözleşme** (`ctx == min(kap, ctx)`) + 1 yeni test.
+8. ✅ **`origin/main` verisi yeniydi** — yerel `main` ahead 2 / behind 8 idi,
+   "reset veri kaybı yapar" sezgisi **ölçümde yanlış çıktı** (14.647 vs
+   16.225 intent). Merge çakışmasız, veri `origin/main`'in aynısı (§6.18b).
+9. ⬜ **`tries 3→6` kararı** (§6.17) — **gecikme maliyeti ölçülmedi**.
+   `yedek_olc.py`'ye süre damgası **eklendi** (çalıştırılmadı); koşu ~20 dk.
    Sıcaklık 0,9 **elenmiştir.**
-8. ⬜ **`normalize.py:16-19` ascii_normalize büyük harf bozuyor** — etki alanı
-   (retrieval tutarlılığı) ölçülsün, sonra karar verilsin (§6.13).
-9. ⬜ `qa_score`'u kopyalama yerine sadakata bağla (§6.1) → `build_crawl_corpus.py`
-   → 8 blok / d=512.
+10. ⬜ **`normalize.py:16-19` ascii_normalize büyük harf bozuyor** — etki alanı
+    (retrieval tutarlılığı) ölçülsün, sonra karar verilsin (§6.13).
+11. ⬜ `qa_score`'u kopyalama yerine sadakata bağla (§6.1) → `build_crawl_corpus.py`
+    → 8 blok / d=512.
 
 ### 1.10 eğitim koşusu (üretimdeki model 01.10 08:00 modeli DEĞİL)
 
@@ -1078,10 +1191,14 @@ ilişkili olabilir — bu ilişki ölçülmedi, varsayım olarak yazılmadı.**
 - ~~Çalışan VS Code debug sunucusu (PID 7064, port 5000)~~ → **ÇÖZÜLDÜ**
   (29.09 sonrası ölçüldü: PID 7064 yok, port 5000'de dinleyen yok). Artık
   `corpus.jsonl` bozma riski yok.
-- **589 test, `OK (skipped=1)`, 452,7 sn** (01.10 2026 ölçümü, tam paket).
-  Süre **makineye bağlı**: iki ölçümde 511,4 sn ve 452,7 sn → "~270 sn"
-  tahmini düzeltildi. Ölçüm aracı çalıştırırken `train_llm.py`'ye dokunma
-  (`eval_llm.py` import ediyor).
+- **590 test, `OK (skipped=1)`, 364,7 sn** (02.10 2026 ölçümü, tam paket).
+  Süre **makineye bağlı**: 01.10'da 452,7 sn, 02.10'da 364,7 sn. Ölçüm aracı
+  çalıştırırken `train_llm.py`'ye dokunma (`eval_llm.py` import ediyor).
+- **`origin/main` verisi yeniydi** — yerel `main` 02.10'da **ahead 2 /
+  behind 8** idi; "reset 42.000 satır veri kaybı yapar" sezgisi
+  **ölçümde yanlış çıktı**: yerel 14.647, `origin/main` **16.225** bilgi
+  intent. Merge **çakışmasız**, veri dosyaları `origin/main`'in aynısı
+  oldu (§6.18b).
 - **Kök dizinde 13 untracked tek-seferlik script** (30.09/01.10'dan kalma).
   Ölçüldü (01.10): **13/13 untracked**, CI yalnızca `-s tests` taradığı için
   **13/13 CI-dışı**. 4 tanesi **veri dosyasına YAZIYOR**:
@@ -1101,10 +1218,11 @@ ilişkili olabilir — bu ilişki ölçülmedi, varsayım olarak yazılmadı.**
 | `kaggle_start.sh` | 1-50, 60-140, 149 | Kullanım, env değişkenleri, asıl eğitim komutu |
 | `train_llm.py` | 185, 207, 210 | `MAX_SEQ_LEN=256`, **`KB_TEXT_CHARS=300`**, `SEED=7` |
 | `train_llm.py` | 213, 232, 858 | `TOKEN_PER_PAIR`, `ENC_CIFT_SN`, `MS_PER_PAIR` (**eğitim çifti** — bütçe formülünü artık beslemiyor) |
-| `train_llm.py` | 916 | **`MS_PER_HAM_CIFT_EPOCH = 8,0911`** — bütçe formülünün tek kullandığı sabit (§6.16) |
+| `train_llm.py` | 944 | **`MS_PER_HAM_CIFT_EPOCH = 7,3927`** — bütçe formülünün tek kullandığı sabit (encode **hariç**; §6.16 + §6.18a) |
+| `seqgen.py` | 412-455 | **KIRPMA: önce her ctx'den 1 çift, sonra kalan bütçe.** Eski `shuffle → kes` 2.039 benzersiz ctx'i (%2,08) susturuyordu; çift sayısı aynı, süre aynı, kapsama **%100** (§6.18c) |
 | `train_llm.py` | 485 | `make_batches` (PAD budama + `_pack_encoded`) |
 | `train_llm.py` | 737, ~760 | `build_kb_lut`, `rag_context_stats` (29.09 düzeltmesi) |
-| `train_llm.py` | 936 | `sure_ve_hesapla` — **MAX_PAIRS tavanının tek doğruluk kaynağı** (birim: ham çift) |
+| `train_llm.py` | 952 | `sure_ve_hesapla` — **MAX_PAIRS tavanının tek doğruluk kaynağı** (birim: ham çift; `encode_dk`'yı **bir kez** düşer) |
 | `train_llm.py` | ~1090 | RAG yazdırma satırı (yalnızca log) |
 | `train_llm.py` | 386 | `_cache_fp` |
 | `train_llm.py` | 920, 1021-1023 | `load_chatgrow_pairs`, RAG eşiği (`use_corpus`) |
@@ -1113,7 +1231,7 @@ ilişkili olabilir — bu ilişki ölçülmedi, varsayım olarak yazılmadı.**
 | `brain.py` | 2035 | decoding — 4 eksende ölçüldü, hiçbiri kazandırmadı (§7) |
 | `brain.py` | 1467, 1469 | **`random.choice(responses)`** — bilgi metni seçimi; NumPy tohumundan bağımsız, ölçümü bozuyordu (§6.10 hata 3) |
 | `tools/uretim_olc.py` | 93 | `icerik_kelimeler` — Türkçe harf **silme** hatası düzeltildi (§6.10 hata 1) |
-| `tools/sure_olc.py` | — | **zaman tavanını `kaggle_train.txt`'ten ölçer.** Birim hatasını buldu (§6.16); `MS_PER_HAM_CIFT_EPOCH`'u yeniden ölçmek için çalıştırılır |
+| `tools/sure_olc.py` | — | **zaman tavanını `kaggle_train.txt`'ten ölçer.** İKİ birim hatasını buldu: eğitim çifti ↔ ham çift (§6.16) ve **encode'un iki kez sayılması** (§6.18a). `MS_HAM` artık encode içermez; kapsama **canlı veriden** ölçülür. Sabiti yeniden ölçmek için çalıştırılır |
 | `tools/yedek_olc.py` | — | kapı reddedince ekrana ne çıktığını ölçer; `tries`×`temp` 4 varyant (§6.17) |
 | `tools/model_ab.py` | — | "hangi modeli kuralım" kararını ölçümle verdirir (modeli kurmaz) |
 | `tools/soru_listesi.json` | — | **SABİT 50 soru.** Elle değiştirme; değişirse raporlar kıyaslanamaz |
@@ -1149,10 +1267,13 @@ ilişkili olabilir — bu ilişki ölçülmedi, varsayım olarak yazılmadı.**
 # 11. TEST / CI
 
 - `pytest` **yok** → `python -m unittest discover -s tests -p "test_*.py"`
-- **452,7 saniye**, **589 test OK (skipped=1)** — tam yeşil (01.10 2026).
-  Önceki ölçüm 511,4 sn / 587 test idi; süre makineye bağlı, iki sayı da
-  kayıtlı. **589 = 587 + 2** (`test_zaman_tavani_olculen_sinirda`,
-  `test_kirpma_kapsamayi_agirmeden_atmiyor` — §6.16).
+- **364,7 saniye**, **590 test OK (skipped=1)** — tam yeşil (02.10 2026).
+  Önceki ölçüm 01.10'da 452,7 sn / 589 test idi; süre makineye bağlı,
+  iki sayı da kayıtlı. **590 = 589 + 1**
+  (`test_kirpma_yariya_inse_de_kapsama_durur` — §6.18d).
+- **`test_kirpma_kapsamayi_agirmeden_atmiyor`** artık %99 eşiği değil
+  **kesin sözleşme** ölçüyor: `benzersiz ctx == min(kap, benzersiz ctx)`.
+  %99 eşiği, kirpma sessizce 1.000 ctx kaybetseydi de geçerdi.
 - CI (`ci.yml`, Python 3.12) yalnız **`pip install numpy requests flask`** yapar →
   `torch` bağımlı testler `@requires_torch` ile **skip** edilir (aksi halde
   `unittest.loader._FailedTest` modülü düşürüp tüm suite'i kırmızı eder).

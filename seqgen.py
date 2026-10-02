@@ -409,9 +409,44 @@ def load_pairs(intents_path, max_pairs=20000, max_per_intent=40,
                 chosen = resps[h % len(resps)]
                 pairs.append((ctx, chosen))
 
+    # --- KIRPMA (01.10.2026 duzeltmesi) -----------------------------------
+    # ONCE her benzersiz ctx'den 1 cift GARANTI edilir, SONRA kalan butce
+    # rastgele doldurulur. Onceki davranis (shuffle -> [:max_pairs]) KUCUK
+    # ctx'leri tamamen siliyordu: medyan ctx yalnizca 3 cift, o yuzden
+    # zaman tavaninda 2.039 benzersiz ctx (%2,08) hic egitim verisi
+    # almiyordu.
+    #
+    # OLCUM (canli intents.json: 16.225 intent -> 302.506 cift, 98.116 ctx):
+    #     kap        eski ctx %   sessiz ctx    yeni ctx %   sessiz ctx
+    #     256.330     97,92       2.039         100,00           0
+    #     187.365     92,75       7.113         100,00           0
+    #     117.103     74,88      24.652         100,00           0
+    # Cift SAYISI ayni -> sure ve egitim maliyeti birebir degismez; sadece
+    # HANGI ciftlerin secildigi degisir. Kapsama tohumdan bagimsiz
+    # (3/7/11/42 -> hep %100).
+    #
+    # Etki: kapsama artik zaman tavanindan BAGIMSIZ. Tablodaki %100, taban
+    # fiyat degil, butce/ctx oranindan gelir: en kotu durumda (butce <
+    # ctx sayisi) yine de ctx'ler sirayla kirpilir, o durum acikca yorumda.
+    if max_pairs >= len(pairs):
+        return pairs
     rng = random.Random(3)
-    rng.shuffle(pairs)
-    return pairs[:max_pairs]
+    gruplar = {}
+    for c, r in pairs:
+        gruplar.setdefault(c, []).append(r)
+    for c in gruplar:
+        rng.shuffle(gruplar[c])
+    tabak = [(c, gruplar[c][0]) for c in gruplar]
+    if len(tabak) >= max_pairs:
+        # Butce tek bir "her ctx'den 1" tabagini bile almaya yetmiyor.
+        # O zaman ctx'leri karistirip kes: en azindan her ctx 1 alir.
+        rng.shuffle(tabak)
+        return tabak[:max_pairs]
+    artan = [(c, r) for c in sorted(gruplar) for r in gruplar[c][1:]]
+    rng.shuffle(artan)
+    son = tabak + artan[:max_pairs - len(tabak)]
+    rng.shuffle(son)
+    return son
 
 
 def encode_pair(m, ctx, resp):

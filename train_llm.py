@@ -915,20 +915,38 @@ VARSAYILAN_BOSLUK = 0.75   # oturumun %75'i veriye, %25'i bosluk/erteleme
 #
 # OLCULEN GERCEK (01.10 23:26 kosusu, 12 epoch):
 #   ham 288.802 -> egitim 1.377.895 (expansion 4,7711)
-#   epoch toplami 25.620,4 sn + encode 2.420,0 sn = 28.040,4 sn
-#   28.040.400 ms / 288.802 ham = 97,09 ms/ham (12 epoch toplami)
-#   -> 8,0911 ms/ham/epoch
+#   epoch toplami 25.620,4 sn  (12 epoch'un sn toplami, log'dan)
+#   encode AYRI: 2.420,0 sn (1.240.102 + 137.793 cift)
+#   25.620.400 ms / 288.802 ham = 88,71 ms/ham (12 epoch toplami)
+#   -> 7,3928 ms/ham/epoch
 #
-# ETKI (olculdu): eski formul 1.251.733 cift diyordu; dogru tavan 234.210.
-# Tavan gercek sinirdan 5,34 KAT uzakta ve HICBIR ZAMAN baglamiyor
+# DUZELTME 2 (01.10.2026, OLCULARAK bulundu): ilk yazimda encode de bu
+# toplama DAHIL edilmisti (25.620,4 + 2.420,0 = 28.040,4 sn -> 8,0911 ms).
+# Ama sure_ve_hesapla encode'u AYRICA kalan_dk'dan dusuyor:
+#     kalan_dk = oturum_dk * bosluk - encode_dk
+# Yani encode IKI KEZ sayiliyordu -> sabit %9,45 YUKSEK -> tavan gereksiz
+# dar. Buradaki deger encode HARIC sadece epoch surudur; encode'un tek
+# muhatabi ENCODE_DK'dir. (Birim hatasinin IKINCISI; birincisi MS_PER_PAIR
+# idi. Ikisi de ayni yonde etki yapti: tavanı daraltmak.)
+#
+# ETKI (olculdu): eski formul 1.251.733 cift diyordu; duzeltilmis tavan
+# 234.210. Tavan gercek sinirdan 5,34 KAT uzakta ve HICBIR ZAMAN baglamiyor
 # (29.09'dan beri baglamiyor). Yanlis yondu: cok FAZLA cift vaat ediyor,
 # yani oturum sessizce tasar. Veri buyume %6,9/kosu -> ~3 kosu sonra tasar.
+#
+# ETKI 2 (encode cift sayimi duzeltmesi): tavan 234.207 -> 256.335
+# (+%9,45). Ham veri 16.225 intent ile 302.506 cift; eski tavan bunun
+# %77,4'unu aliyordu.
 #
 # Regresyon korumasi: tests/test_autogrow_kapi.py icinde
 # test_zaman_tavani_olculen_sinirda — GERCEK olculen tavana karsilastirir,
 # formulu kendisiyle degil.
-MS_PER_HAM_CIFT_EPOCH = 8.0911   # ms / ham cift / epoch. Kaynak: yukarida.
+MS_PER_HAM_CIFT_EPOCH = 7.3927   # ms / ham cift / epoch. Kaynak: yukarida.
+# tools/sure_olc.py 01.10 23:26 logundan 88,7127 ms (12 epoch toplami)
+# uretiyor; 88,7127 / 12 = 7,3927.
 # Yeni olcum gelince tools/sure_olc.py calistirilip burasi guncellenir.
+# OLCUM ARACI DA AYNI HATAYI DUZELTMELI: sure_olc.py MS_HAM'a encode'u
+# ekliyordu; test_olcum_araclari.py aracin bu satiri uretmesini kapatir.
 
 
 def sure_ve_hesapla(oturum_dk=540, epochs=12, encode_dk=ENCODE_DK,

@@ -22,10 +22,18 @@ KOK NEDEN (olculerek gosteriliyor, tahmin degil):
   Aradaki expansion olcumu: 1.377.895 / 288.802 = 4,7711
   -> birim hatasi tam olarak bu carpan kadar.
 
-DUZELTME YAPILMADI. Bu arac sadece olcer ve iki secenek uretir:
-  A) MS_PER_PAIR'i olculen degerle guncelle           -> yetersiz
-  B) HAM cift basina olculen sabit kullan              -> dogru
-Cikti: her iki secenegin TAVANINI ve olculen gercek siniri yazar.
+DUZELTME UYGULANDI (01.10.2026): MS_PER_HAM_CIFT_EPOCH eklendi ve
+  sure_ve_hesapla onu kullaniyor. Tavan 1.251.733 -> 256.330 ham cift.
+  Aracin "DURUM:" blogu duzeltmenin uygulanip uygulanmadigini
+  KENDISI sorar; elle bakilmaz.
+
+IKINCI HATA, AYNI YONDE (01.10.2026, olcum aracinda bulundu):
+  MS_HAM hesaplanirken encode de icine katiliyordu:
+      (EPOCH_SN + ENCODE_SN) / HAM = 97,09 ms
+  Ama sure_ve_hesapla encode'u AYRICA dusuyor:
+      kalan_dk = oturum_dk * bosluk - encode_dk
+  Encode iki kez sayiliyordu -> sabit %9,45 YUKSEK. Dogru deger
+  encode HARIC: 88,7127 ms (12 epoch) = 7,3927 ms/ham/epoch.
 
 Kullanim:
     python tools/sure_olc.py [kaggle_train.txt]
@@ -106,7 +114,12 @@ ENCODE_SN = sum(float(x) for x in
 
 GENISLEME = float(EGITIM) / HAM          # ham cift -> egitim cifti
 MS_EGITIM = ORT_EPOCH_SN * 1000.0 / TRAIN  # ms / egitim cifti
-MS_HAM = EPOCH_SN * 1000.0 / HAM + ENCODE_SN * 1000.0 / HAM
+# ms / HAM cift / epoch. ENCODE DAHIL DEGIL: sure_ve_hesapla encode'u
+# kalan_dk'dan AYRICA dusuyor (kalan_dk = oturum_dk*bosluk - encode_dk).
+# 01.10'da buraya encode eklendiydi -> encode iki kez sayildi -> sabit
+# %9,45 yuksek -> tavan gereksiz dar (234.207 yerine dogru deger 256.335).
+MS_HAM = EPOCH_SN * 1000.0 / HAM
+MS_HAM_ENCODE_DAHIL = MS_HAM + ENCODE_SN * 1000.0 / HAM   # yalnizca rapor
 
 print('VERI')
 print('  MAX_PAIRS butcesi          : %s' % format(BUDCE, ','))
@@ -120,8 +133,10 @@ print()
 print('OLCULEN MALIYETLER')
 print('  egitim cifti basina        : %.4f ms   (ort epoch %.1f sn / %s train)'
       % (MS_EGITIM, ORT_EPOCH_SN, format(TRAIN, ',')))
-print('  HAM cift basina            : %.2f ms   (toplam %.1f sn / %s ham)'
-      % (MS_HAM, EPOCH_SN + ENCODE_SN, format(HAM, ',')))
+print('  HAM cift basina            : %.4f ms   (%.1f sn / %s ham, 12 epoch)'
+      % (MS_HAM, EPOCH_SN, format(HAM, ',')))
+print('  HAM cift basina + encode   : %.4f ms   (encode AYRI hesaplanir)'
+      % MS_HAM_ENCODE_DAHIL)
 print('  expansion (ham->egitim)    : %.4f' % GENISLEME)
 print()
 print('SURE')
@@ -176,9 +191,12 @@ print('  B) ham cift sabiti         : %10s   %5.2f   DOGRU'
 print('  C) ham cift, bosluk YOK    : %10s   %5.2f   sinir (%%0 pay)'
       % (format(C, ','), ESKI / float(C)))
 print()
-print('  HAM cift BASINA OLCULEN DEGER: %.2f ms' % MS_HAM)
-print('    = epoch %.1f sn + encode %.1f sn, %s ham cift icin'
-      % (EPOCH_SN, ENCODE_SN, format(HAM, ',')))
+print('  HAM cift BASINA OLCULEN DEGER: %.4f ms = %.1f sn / %s ham (12 epoch)'
+      % (MS_HAM, EPOCH_SN, format(HAM, ',')))
+print('    encode HARIC. sure_ve_hesapla encode suresini ENCODE_DK ile ayrica')
+print('    dusuyor; ikisini toplamak encode suresini iki kez sayardi')
+print('    (01.10 hatasi: 8,0911 ms yerine dogru deger %.4f ms, %%9,45 fark)'
+      % MS_HAM)
 print('    (egitim cifti basina %.4f ms, expansion %.4f)'
       % (MS_EGITIM, GENISLEME))
 print()
@@ -209,8 +227,28 @@ if abs(VAZIF - B) <= max(2, B * 0.001):
         print('       Bu kosuda ham veriyi {0} cift ({1:.1f} yuzde) kirpar.'
               .format(format(HAM - VAZIF, ','),
                       100.0 * (HAM - VAZIF) / HAM))
-        print('       Canli veride kapsama kaybi OLCULDU: yuzde 0,9 benzersiz '
-              'ctx (cift kaybi yuzde 15,1).')
+        # Kapsama kaybini VARSAYMA, canli veriden olc. seqgen kirpmasi
+        # "her ctx'den en az 1" garantisi veriyor (01.10 duzeltmesi), yani
+        # kapsama %100 olmali; olcmuyorsak soylemiyoruz.
+        try:
+            sys.path.insert(0, BASE)
+            from seqgen import load_pairs
+            yol = os.path.join(BASE, 'intents.json')
+            if os.path.exists(yol):
+                import train_llm
+                K = dict(use_query=True, ctx_len=train_llm.CTX_CHARS)
+                tum = load_pairs(yol, max_pairs=10 ** 9, **K)
+                kirp = load_pairs(yol, max_pairs=VAZIF, **K)
+                ct = set(p[0] for p in tum)
+                ck = set(p[0] for p in kirp)
+                print('       CANLI VERIDE OLCULDU (16k intent): cift {0} -> {1} '
+                      '(%{2:.1f}) | benzersiz ctx {3} -> {4} = %{5:.2f}'
+                      .format(format(len(tum), ','), format(len(kirp), ','),
+                              100.0 * len(kirp) / max(1, len(tum)),
+                              format(len(ct), ','), format(len(ck), ','),
+                              100.0 * len(ck) / max(1, len(ct))))
+        except Exception as exc:                       # noqa: BLE001
+            print('       (kapsama olculemedi: %s)' % (exc,))
 else:
     print('DURUM: duzeltme UYGULANMAMIS. sure_ve_hesapla hala {0} cift '
           'diyor; olculen guvenli sinir B = {1}. Tavan {2:.2f} KAT uzakta.'
