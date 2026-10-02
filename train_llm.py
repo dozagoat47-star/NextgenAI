@@ -1349,6 +1349,11 @@ def main():
                          'durdurma noktasina kadar gercekten inmesini garanti eder. '
                          'Cok dusuk -> LR erken flattening yapar; cok yuksek '
                          '(orn. --epochs) -> decay yine calismaz.')
+    ap.add_argument('--grad-accum', type=int, default=1, metavar='N',
+                    help='Gradient accumulation adimlari (1 = kapali). N > 1: '
+                         'effective batch = batch_size * N, optimizer step her N '
+                         'batchte bir. Kaggle tek GPU icin: LLM_DP_OFF=1 --grad-accum 2 '
+                         '--batch-size 64 -> effective batch 128, VRAM yarilanir.')
     ap.add_argument('--export-dir', default=None,
                     help='llm_model.json + _weights.npz ciktisi (varsayilan: SAVE_DIR)')
     ap.add_argument('--fresh', action='store_true',
@@ -1364,6 +1369,7 @@ def main():
     bs, lr_base = args.batch_size, args.lr_base
     wd, tie_embed = args.weight_decay, args.tie_embed
     drop = args.dropout
+    grad_accum = args.grad_accum
     export_dir = args.export_dir or SAVE_DIR
     # Cosine ufku. Gercek bitis noktasi --epochs degil, ~patience civaridir
     # (patience artik EPOCH cinsinden; once val olcumu sayiyordu ve val_every
@@ -1378,10 +1384,6 @@ def main():
         raise SystemExit(f'--d-model {dm} --num-heads {nh} ile bolunebilir olmali')
     os.makedirs(export_dir, exist_ok=True)
 
-    print('CONFIG: d_model=%d blocks=%d heads=%d ff_mult=%d '
-          'max_ctx=%d max_seq=%d batch=%d val_every=%d lr=%.1e export=%s' % (
-              dm, nb, nh, ff, mxc, mxs, bs, val_every, lr_base, export_dir),
-          flush=True)
     # patience ve val_every'yi AYRIK goster: ikisi carpilirsa kullanici
     # gercek epoch butcesini yanlis hesaplar. Kotu val OLCUMU sayisi de
     # yazilir (gercekte kac olcumun "iyilesme yok" sayilacagi) ve toplam
@@ -1714,74 +1716,31 @@ def main():
                 cur = lr_base * (LR_MIN + (1 - LR_MIN) * 0.5 * (1 + math.cos(math.pi * prog)))
             for g in opt.param_groups:
                 g['lr'] = cur
-            opt.zero_grad()
+            # Gradient accumulation: loss bolunur, optimizer step her grad_accum batch'te bir
             with torch.autocast('cuda', torch.float16) if use_amp \
                     else contextlib.nullcontext():
-                loss = llm_loss(model(trX[bi]), trX[bi], trM[bi])
+                loss = llm_loss(model(trX[bi]), trX[bi], trM[bi]) / grad_accum
             scaler.scale(loss).backward()
+            if step % grad_accum == 0:
+                scaler.unscale_(opt)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), GRAD_CLIP)
+                scaler.step(opt)
+                scaler.update()
+                opt.zero_grad()
+            tl += loss.item() * grad_accum  # log icin gercek loss
+            if os.environ.get('SMOKE') and step >= 2:
+                print('SMOKE OK:', float(loss.item() * grad_accum), flush=True)
+                return 0
+        # Epoch sonunda kalan gradient'ler varsa flush et (step % grad_accum != 0 durumu)
+        if step % grad_accum != 0:
             scaler.unscale_(opt)
             torch.nn.utils.clip_grad_norm_(model.parameters(), GRAD_CLIP)
             scaler.step(opt)
             scaler.update()
-            tl += loss.item()
-            if os.environ.get('SMOKE') and step >= 2:
-                print('SMOKE OK:', float(loss.item()), flush=True)
-                return 0
+            opt.zero_grad()
         tl /= len(trX)
 
-        _set_mode(False)
-        # --val-every N: val gecisi yalnizca her N epochda bir yapilir
-        # (val, train-isleminin yarisi kadar tutar; N>1 epoch suresini kisaltir).
-        do_val = (ep % val_every == 0 or start_ep == 0 and ep == 1)
-        if do_val:
-            vl = va_acc = 0.0
-            with torch.no_grad():
-                for x, m in zip(vaX, vaM):
-                    lg = model(x)
-                    vl += llm_loss(lg, x, m).item()
-                    va_acc += masked_acc(lg, x, m)
-            vl /= len(vaX)
-            va_acc /= len(vaX)
-            print(f'epoch {ep:3d}/{EPOCHS} | train {tl:.4f} | val {vl:.4f} | acc {va_acc:.3f} | '
-                  f'{time.time()-t0:.1f}s | lr {cur:.5f} | step {step}/{tot_steps}', flush=True)
-        else:
-            vl = best_val
-            print(f'epoch {ep:3d}/{EPOCHS} | train {tl:.4f} | (val atlandi) | '
-                  f'{time.time()-t0:.1f}s | lr {cur:.5f} | step {step}/{tot_steps}', flush=True)
-
-        # EARLY-STOP: val LOSS tabanli, tolerans EPOCH cinsinden -> early_stop_step
-        if do_val:
-            bad, improved, stop = early_stop_step(vl, best_val, bad, val_every,
-                                                  patience, VAL_IMP)
-            if improved:
-                # gercek kayip iyilesmesi -> rekor guncellenir
-                best_val = vl
-                best_acc = va_acc
-                best_state = {k: v.detach().cpu().clone()
-                              for k, v in base.state_dict().items()}
-            elif stop:
-                print(f'[llm] Erken durdurma: val loss yukselmeye basladi '
-                      f'(son {bad} epoch iyilesme yok, esik {patience}). '
-                      f'En iyi val: {best_val:.4f} | best acc: {best_acc:.3f}',
-                      flush=True)
-                done = True
-        if ep % CKPT_FREQ == 0 or done:
-            torch.save({'epoch': ep, 'step': step, 'model': best_state,
-                        'opt': opt.state_dict(), 'best_val': best_val,
-                        'best_state': best_state, 'best_acc': best_acc,
-                        'bad': bad, 'val_every': val_every,
-                        'arch': {'d_model': dm, 'num_blocks': nb, 'num_heads': nh,
-                                 'ff_mult': ff, 'max_seq_len': mxs, 'V': V,
-                                 'drop': drop,
-                                 'tied_embeddings': base.tie_embeddings},
-                        'data': data_fp}, CKPT)
-            print(f'  checkpoint -> {CKPT}', flush=True)
-        if done:
-            break
-
-    print('\nToplam egitim suresi: %.1f dk' % ((time.time() - t0_all) / 60), flush=True)
-
-    # ---------------- export (numpy inference ile uyumlu compact NPZ format)
+        _set_mode(False)    # ---------------- export (numpy inference ile uyumlu compact NPZ format)
     if best_state is None:
         # uc durum: acc hic (0.0) ile rekor kirmadan erken durma -> son hal kullan
         best_state = {k: v.detach().cpu().clone() for k, v in base.state_dict().items()}

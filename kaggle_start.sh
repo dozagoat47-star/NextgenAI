@@ -166,23 +166,26 @@ fi
 #     LLM_DROPOUT=0.2 LLM_NATURAL=2 bash kaggle_start.sh train
 DROPOUT="${LLM_DROPOUT:-0.10}"
 NATURAL="${LLM_NATURAL:-5}"
+GRAD_ACCUM="${LLM_GRAD_ACCUM:-1}"
 REGARGS="$REGARGS --dropout $DROPOUT"
+# Gradient accumulation: --grad-accum N. Effective batch = batch_size * N.
+# Tek GPU (LLM_DP_OFF=1) icin: LLM_GRAD_ACCUM=2 --batch-size 64 -> eff_batch 128, VRAM yarilanir.
 
 DONE=''
 case "$MODE" in
   train)
-    echo "[1/3] RAG egitim (natural $NATURAL, dropout=$DROPOUT, epochs=$EPOCHS, patience=${PATIENCE} epoch, d=384/6 blok) -> llm_model.json"
+    echo "[1/3] RAG egitim (natural $NATURAL, dropout=$DROPOUT, grad_accum=$GRAD_ACCUM, epochs=$EPOCHS, patience=${PATIENCE} epoch, d=${LLM_CAP:-384}/${LLM_BLOCKS:-6}) -> llm_model.json"
     # --val-every 2 yalnizca VAL MALIYETI icin (olculmus: epoch 7.5 -> 7.1 dk).
     # Erken durdurma esigini ETKILEMEZ: patience artik epoch cinsinden.
     python train_llm.py --rag --kb-map knowledge_map.jsonl --natural "$NATURAL" $CGARG \
       --epochs "$EPOCHS" --patience "$PATIENCE" \
-      --batch-size 128 --val-every 2 $DPARGS $REGARGS $MPCARGS 2>&1 | tee kaggle_train.log
+      --batch-size 128 --val-every 2 --grad-accum "$GRAD_ACCUM" $DPARGS $REGARGS $MPCARGS 2>&1 | tee kaggle_train.log
     DONE='yes'
     ;;
   bench)
     echo "[1/3] 1-epoch zamanlama (cache/encode + 1 epoch, birlikte olculur)"
     python train_llm.py --rag --kb-map knowledge_map.jsonl --natural "$NATURAL" $CGARG \
-      --epochs 1 --batch-size 128 --val-every 1 --fresh $DPARGS $REGARGS $MPCARGS 2>&1 | tee kaggle_bench.log
+      --epochs 1 --batch-size 128 --val-every 1 --fresh --grad-accum "$GRAD_ACCUM" $DPARGS $REGARGS $MPCARGS 2>&1 | tee kaggle_bench.log
     echo ""
     echo "[2/3] Son egitim satiri (epoch suresi '| NN.Ns' bolumundedir):"
     grep 'epoch ' kaggle_bench.log | tail -1

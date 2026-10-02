@@ -282,8 +282,8 @@ class TestMetricVersionGuard(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertIn('PAIRED', buf.getvalue())
 
-    def test_current_version_is_two(self):
-        self.assertEqual(METRIC_VERSION, 2)
+    def test_current_version_is_three(self):
+        self.assertEqual(METRIC_VERSION, 3)
 
     def test_aggregate_carries_version(self):
         rows = sample_report(_StubModel(), [('hava nasil', 'bugun guzel')],

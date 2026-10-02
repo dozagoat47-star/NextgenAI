@@ -1365,8 +1365,26 @@ doğrulandı). Sıra şöyle:
     Yeni parser'lar: `pairs_from_daily_dialogues`, `pairs_from_everyday_conversations`,
     `pairs_from_law_chatbot`. Çıktı `chatgrow_hf_chat_new.jsonl` (500 çift test).
     `source` alanı korundu → hangi çift hangi kaynaktan geldiği izlenebilir.
-16. ⬜ `qa_score`'u kopyalama yerine sadakata bağla (§6.1) → `build_crawl_corpus.py`
-    → 8 blok / d=512.
+16. ✅ **`qa_score` v3 — KOPYALAMA ODULLANDIRMESİ AZALTILDI** (02.10.2026)
+    - v2: `%50 tmean + %25 fluency + %15 copy_bleu + %10 length_fit`
+    - v3: `%65 tmean + %25 fluency + %5 copy_bleu + %5 length_fit`
+    - `copy_bleu` ağırlığı **%15 → %5** (kopyalama teşviki minimize edildi)
+    - `tmean` (gold_recall + topic_k) ağırlığı **%50 → %65** (fidelity/icerik kapsama ANA eksen)
+    - `METRIC_VERSION = 3` (eval_llm.py, test_eval_llm.py güncellendi)
+    - Neden: §6.1'de kanıtlandı — copy_bleu ve gold_recall zıt eksenler; kopyalama düşürürken
+      gold_recall da düşüyordu. Metrik kopyalamayı ödüllüyordu, model "ezber" yapıyordu.
+17. ✅ **MODEL BÜYÜME ALTYAPISI HAZIR: Gradient Accumulation + 2 Oturumlu Kaggle** (02.10.2026)
+    - `train_llm.py`: `--grad-accum N` eklendi (loss/grad_accum, step % grad_accum == 0'da step)
+    - `kaggle_start.sh`: `LLM_GRAD_ACCUM`, `LLM_CAP`, `LLM_BLOCKS`, `LLM_DP_OFF` env değişkenleri
+    - Resume mekanizması zaten var (`llm_ckpt.pt` → optimizer state + epoch + best_val)
+    - Kaggle 2 oturumlu eğitim: Oturum 1 (epoch 1-8) → checkpoint indir → Oturum 2 (epoch 9-16) resume
+    - Test: `--dry-run --grad-accum 2 --batch-size 64` çalışıyor
+18. ⬜ **MODEL BÜYÜME: d=512, 8 blok (~33.4M tied)** — Kaggle'de çalıştırılacak
+    - Mevcut: d=384, 6 blok, 16.9M param, 12 epoch ≈ 467 dk
+    - Hedef: d=512, 8 blok, 33.4M param (tied), ~2x parametre
+    - Strateji: `LLM_CAP=512 LLM_BLOCKS=8 LLM_GRAD_ACCUM=2 LLM_DP_OFF=1` + epoch 16 (2 oturum)
+    - `train_llm.py` ve `kaggle_start.sh` hazır — sadece Kaggle'de çalıştırmak kalıyor
+19. ⬜ `build_crawl_corpus.py` → 8 blok / d=512 (büyüttükten sonra)
 
 ### 1.10 eğitim koşusu (üretimdeki model 01.10 08:00 modeli DEĞİL)
 

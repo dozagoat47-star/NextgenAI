@@ -56,7 +56,7 @@ STOPWORDS = frozenset("""
 #   1 = tmean ana eksen: topic_overlap(uretilen, SORGU)  [BOZUK: iyi cevap
 #       soruyu tekrarlamaz -> dogru cevap ~0 alir]
 #   2 = tmean ana eksen: gold_recall(uretilen, ALTIN) (+ topic_k varsa)
-METRIC_VERSION = 2
+METRIC_VERSION = 3
 
 _WORD_RE = re.compile(r'[a-z\u00e7\u011f\u0131\u00f6\u015f\u00fc0-9]+')
 
@@ -210,29 +210,23 @@ def _measure(query, gold, generated, knowledge, stopwords):
     else:
         tmean = gr
     gen_index = 0.5 * (1.0 - copy_bleu) + 0.3 * tmean + 0.2 * fluency
-    # --- qa_score: ALAKA-ONCELIKLI skor -------------------------------------
-    # gen_index OZELLIKLE konu dokunusunu %5 agirlikla olcer; agirliklarin
-    # %63'u copy_bleu, %31'i fluency. Oylece 13 raporda goruldugu gibi
-    # alaka ekseni (tmean 0.098-0.134) model siralamasini hic belirlemiyor.
-    # qa_score alakayi ANA eksen yapar:
-    #   %50 konu dokunusu  -> altin cevabin icerigini tasiyor mu (gold_recall)
-    #                         + bilgiye dokunuyor mu (topic_k)
-    #   %25 fluency        -> tekrar/bozuk metin degil (donusmus cirpinti)
-    #   %15 copy_bleu     -> altin yanitin icerigini de veriyor mu
-    #   %10 uzunluk uyumu -> 1 kelimeye 20 kelimelik soruya kisa kesme
+    # --- qa_score: ALAKA-ONCELIKLI skor (v3, 02.10.2026) ---------------------------------
+    # v2: %50 tmean + %25 fluency + %15 copy_bleu + %10 length_fit
+    # v3: %65 tmean + %25 fluency + %5 copy_bleu + %5 length_fit
+    # Degisiklik: copy_bleu %15 -> %5 (kopyalama odullendirmesi minimize edildi),
+    # tmean (gold_recall + topic_k) %50 -> %65 (fidelity/icerik kapsama ANA eksen).
     # Bos uretim EN kotu basarisizliktir: agirlikli ortalama onu yalnizca
     # 0.5 * (1/n) kadar kistirirdi, bu yuzden acik -0.5 ceza.
-    #
-    # METRIC_VERSION 1 -> 2 (olculmus duzeltme):
-    #   %50 ekseni tq (URETILEN ~ SORU) idi. Iyi bir cevap soruyu tekrarlamaz,
-    #   o yuzden dogru cevaplar bu eksende ~0 aliyor, soru kelimelerini
-    #   yankilayan bozuk cevaplar ise yuksek aliyordu. Birebir kopya ornek:
-    #   copy_bleu=1.000, topic_q=0.000 -> qa=0.489. Eksen ters calisiyordu.
     lr = length_ratio(cand, ref)
     length_fit = max(0.0, 1.0 - min(1.0, abs(lr - 1.0)))
     is_empty = 1.0 if not cand else 0.0
-    qa_score = (0.50 * tmean + 0.25 * fluency + 0.15 * copy_bleu
-                + 0.10 * length_fit - 0.5 * is_empty)
+    # qa_score v3 (02.10.2026): copy_bleu agirligi %15 -> %5, gold_recall/fidelity agirligi artirildi.
+    # Onceki (v2): 0.50*tmean + 0.25*fluency + 0.15*copy_bleu + 0.10*length_fit
+    # Yeni:       0.65*tmean + 0.25*fluency + 0.05*copy_bleu + 0.05*length_fit
+    # Amaç: kopyalama odullendirmesini minimize et, altin icerik kapsamayi (gold_recall)
+    # ve bilgiye dokunmayi (topic_k) ANA eksen yap.
+    qa_score = (0.65 * tmean + 0.25 * fluency + 0.05 * copy_bleu
+                + 0.05 * length_fit - 0.5 * is_empty)
     return dict(
         query=query,
         generated=generated,
