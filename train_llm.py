@@ -872,10 +872,24 @@ MS_PER_PAIR = 1.5139  # ms/cift. KAYNAK: 29.09 kaggle kosusu (OLCULDU).
                       #
                       # DANGER: burada ilk yazimda 70.000 cift varsayildi ve
                       # 6,266 ms/cift cikti — 4,5 KAT YANLIStI ve zaman
-                      # tavanini gereksiz yere 316.000'a cekti (halbuki
-                      # 9 saatlik oturuma ~1,46 MILYON cift sigiyor).
+                      # tavanini gereksiz yere 316.000'a cekti.
                       # Olcum satiri okunmadan varsayim yapilmayacak:
                       # test_olculen_sabitler_birlikte_tutarli bunu kapatir.
+                      #
+                      # DUZELTME (01.10.2026): o zaman yazilan "halbuki 9
+                      # saatlik oturuma ~1,46 MILYON cift sigiyor" cumlesi
+                      # YANLISTI ve bu sabitin yanlis oldugunu sandirdi. Gercek
+                      # hata sabitte degil BIRIMDE: MS_PER_PAIR egitim cifti
+                      # (post-expansion) maliyetidir ama tavan ham cift
+                      # (pre-expansion) sayiyordu. 01.10 kosusunda expansion
+                      # 4,7711 OLCULDU -> birim hatasi tam 4,77 KAT.
+                      # Duzeltme: MS_PER_HAM_CIFT_EPOCH (asagida).
+                      #
+                      # BU SABIT ARTIK BUTCE FORMULUNU BESLEMIYOR. Yine de
+                      # tutuluyor: test_olculen_sabitler_birlikte_tutarli
+                      # kaggle_start.sh yorumundaki OLCULEN epoch hizina bagliyor
+                      # ve o olcumun ham/e gitim birimi kaggle_start.sh
+                      # yorumunda degistirilmeden bu kapatilamaz.
 ENCODE_DK = 26.0      # ilk kez BPE encode, bir kez. 29.09 OLCUMU:
                       # 1.024.172 cift -> 1385 + 156 = 1541 sn = 25,7 dk.
                       # Onceki deger 9,0 DU ve 315.883 cift icindi; veri
@@ -891,10 +905,49 @@ ENCODE_DK = 26.0      # ilk kez BPE encode, bir kez. 29.09 OLCUMU:
                       # tekrar olculmelidir.
 VARSAYILAN_BOSLUK = 0.75   # oturumun %75'i veriye, %25'i bosluk/erteleme
 
+# --- HAM cift basina sure (01.10.2026 23:26 kosusundan OLCULDU) ---
+#
+# NEDEN AYRI SABIT: MS_PER_PAIR bir EGTIM cifti (post-expansion) maliyetidir
+# (1.395.350 sn / 921.748 egitim cifti = 1,5139 ms). Ama sure_ve_hesapla'nin
+# sonucu coz_max_pairs'a gider ve orada HAM cift birimiyle kullanilir
+# (kaggle_train.txt: "[butce] ham 288.802 cift"). Iki farkli birim, arada
+# expansion (01.10'da 4,7711) var.
+#
+# OLCULEN GERCEK (01.10 23:26 kosusu, 12 epoch):
+#   ham 288.802 -> egitim 1.377.895 (expansion 4,7711)
+#   epoch toplami 25.620,4 sn + encode 2.420,0 sn = 28.040,4 sn
+#   28.040.400 ms / 288.802 ham = 97,09 ms/ham (12 epoch toplami)
+#   -> 8,0911 ms/ham/epoch
+#
+# ETKI (olculdu): eski formul 1.251.733 cift diyordu; dogru tavan 234.210.
+# Tavan gercek sinirdan 5,34 KAT uzakta ve HICBIR ZAMAN baglamiyor
+# (29.09'dan beri baglamiyor). Yanlis yondu: cok FAZLA cift vaat ediyor,
+# yani oturum sessizce tasar. Veri buyume %6,9/kosu -> ~3 kosu sonra tasar.
+#
+# Regresyon korumasi: tests/test_autogrow_kapi.py icinde
+# test_zaman_tavani_olculen_sinirda — GERCEK olculen tavana karsilastirir,
+# formulu kendisiyle degil.
+MS_PER_HAM_CIFT_EPOCH = 8.0911   # ms / ham cift / epoch. Kaynak: yukarida.
+# Yeni olcum gelince tools/sure_olc.py calistirilip burasi guncellenir.
+
 
 def sure_ve_hesapla(oturum_dk=540, epochs=12, encode_dk=ENCODE_DK,
-                    bosluk=VARSAYILAN_BOSLUK, ms_per_pair=MS_PER_PAIR):
-    """SURE TAVANI: kac cift bu oturumda sigar? (cift sayisi, dk cinsinden)
+                    bosluk=VARSAYILAN_BOSLUK,
+                    ms_per_ham=MS_PER_HAM_CIFT_EPOCH):
+    """SURE TAVANI: kac HAM cift bu oturumda sigar? (cift = pre-expansion)
+
+    BIRIM SOZLESMESI: donen sayi HAM cift birimindedir, cunku sonucu
+    `coz_max_pairs` -> MAX_PAIRS -> prepare_data zincirinde o birimde
+    kullanilir (kaggle_train.txt: "[butce] ham 288.802 cift").
+
+    BAYEM BIRIM HATASI (01.10.2026, OLCULEREK bulundu): once
+    `ms_per_pair=MS_PER_PAIR` kullaniliyordu. MS_PER_PAIR bir EGTIM cifti
+    (post-expansion) maliyetidir; expansion 01.10'da 4,7711. Iki birim
+    karistirilinca tavan 1.251.733 cift diyordu, oysa ayni oturuma
+    OLCULEN 234.210 ham cift sigiyor -> tavan 5,34 KAT uzakta ve HICBIR
+    ZAMAN baglamiyordu (29.09'dan beri). Yanlis yondu: cok FAZLA cift
+    vaat ediyor, yani oturum sessizce tasar.
+    Kaynak ve yeniden olcum: MS_PER_HAM_CIFT_EPOCH, tools/sure_olc.py.
 
     NEDEN BURADA: oturum suresi ve EPOCHS sadece kaggle_start.sh'da
     biliniyor ama formul bash'ta yazilirsa test EDILEMEZ. Tek dogruluk
@@ -909,9 +962,9 @@ def sure_ve_hesapla(oturum_dk=540, epochs=12, encode_dk=ENCODE_DK,
     if kalan_dk <= 0 or epochs <= 0:
         return 0
     dk_per_epoch = kalan_dk / epochs
-    # dk -> sn -> ms, sonra ms_per_pair'a bol. Tek ceviri; iki kez
+    # dk -> sn -> ms, sonra ms_per_ham'a bol. Tek ceviri; iki kez
     # yapildiginda sonuc 1000 kere kuculur.
-    return int(dk_per_epoch * 60 * 1000 / ms_per_pair)
+    return int(dk_per_epoch * 60 * 1000 / ms_per_ham)
 
 
 def coz_max_pairs(intents_path=None, ust_tavan=0, yaz=True):

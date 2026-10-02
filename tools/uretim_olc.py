@@ -4,8 +4,8 @@
 NEDEN BU SCRIPT: onceki kapi olcumleri elle sabitlenmis metinlerden
 hesapliyordu (sadakat.py) ve 15 soruyla sinirliydi (uretim_kabul.py).
 Ikisi de iki modeli A/B karsilastirmaya yaramaz. Burada:
-  * sorular CORPUS.jsonl'den deterministik secilir (veri dosyasi SALT
-    OKUNUR, hicbir sey yazilmaz),
+  * sorular SABIT listeden gelir (tools/soru_listesi.json), veri
+    dosyasi SALT OKUNUR, hicbir sey yazilmaz,
   * uretim GERCEK yoldan olur: app.load_bot() -> bot.get_response(),
   * her uretim denemesi (best-of-3) kaydedilir: kabul/red + sebep,
   * sadakat = uretilen metnin icerik kelimelerinden bilgi parcasinda
@@ -13,12 +13,35 @@ Ikisi de iki modeli A/B karsilastirmaya yaramaz. Burada:
   * cikti JSON -> paired karsilastirma yapilabilir.
 
 KULLANIM:  python uretim_olc.py <etiket> [cikti.json]
-  np.random.seed(7) her kosudan once -> iki model AYNI rastgelelik
-  dizisini gorur, fark yalnizca modelden gelir.
+  np.random.seed(7) VE random.seed(7) her sorudan once -> iki model AYNI
+  rastgelelik dizisini gorur, fark yalnizca modelden gelir.
+  (Iki tohumun ikisi de sart: NumPy tohumu LLM orneklemesini, Python `random`
+  tohumu ise bilgi metni secimini kontrol ediyor. 01.10'da olculdu.)
+
+01.10.2026 - IKI DUZELTME (raporlar bu tarihten sonra eskilerle
+karsilastirilamaz; olcum degeri degisti, model degismedi):
+
+1) Sorular artik `i % 600` satir adimiyla degil, `tools/soru_listesi.json`
+   dosyasindan okunur. Satir adimi veri surumune BAGLIYDI:
+   knowledge_map.jsonl CI'da yeniden uretildigi icin ayni adim farkli
+   sorulari seciyordu. Olculdu: 29.09 raporu ile 01.10 raporunda
+   yalnizca 3/50 ortak soru vardi, yani "ekrana cikan metin %52 -> %76"
+   gibi zaman serisi iddialari ayni sorularla olculmedigi icin gecersizdi.
+   Liste dosyasi yoksa eski adimla turetilir ve OLUSTURULUR (uyari basar).
+
+2) `icerik_kelimeler` Turkce harfleri CEVIRMIYOR, SILIYORDU
+   (`re.sub(r'[^a-z0-9 ]+')`). "sarkinin" -> "sarkinin" ama
+   "sarkinin" (klasik i) -> "ark". Modelin ciktisi ASCII, bilgi metni
+   Turkce oldugu icin iki taraf HIC eslesemiyor; sadakat yapay olarak
+   dusuk olculuyordu. Artik `normalize.ascii_normalize` kullanilir.
+   Olculen etki (01.10 raporu, ayni metinler): sadakat %33,3 -> %57,1.
+   `uretim_karsilastir.py` rapor JSON'undaki `sadakat` alanini okudugu
+   icin o arac da eski (bozuk) sayilarla calisir.
 """
 import io
 import json
 import os
+import random
 import re
 import sys
 import time
@@ -32,6 +55,8 @@ BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE)
 os.chdir(BASE)
 
+from normalize import ascii_normalize  # noqa: E402  (sys.path gerekli)
+
 ETIKET = sys.argv[1] if len(sys.argv) > 1 else 'bilinmeyen'
 # Cikti repo-relative: .gitignore'da (olcum_raporlari/). Onceki hali
 # %TEMP%\opencode idi - o dizin gecici oldugu icin olcum raporlari
@@ -43,7 +68,76 @@ CIKTI = sys.argv[2] if len(sys.argv) > 2 else os.path.join(
 SEED = 7
 N_SORU = 50
 
+# Sabit soru listesi. NEDEN AYRI DOSYA: sorular knowledge_map.jsonl'den
+# uretiliyordu ve knowledge_map.jsonl CI'da (kbmap.yml) her gun yeniden
+# uretiliyor -> satir adimi ayni kalir, satir icerigi degisir -> ayni adim
+# FARKLI sorulari secer. 01.10 olcumu: 29.09 raporuyla 3/50 ortak soru.
+# Bu dosya repodadir (veri dosyasi degil, olcum tanimidir) ve elle
+# degistirilmemelidir: degistirilirse yeni rapor eskisiyle kiyaslanamaz.
+SORU_LISTESI = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            'soru_listesi.json')
+
+# --------------------------------------------------- damga (rapor izi)
+# NEDEN: 01.10'da iki rapor "paired" sanildi ama aralarinda 2 saatte bir
+# chatgrow dosyasi degismisti. Raporun hangi VERI ve hangi MODEL ile
+# uretildigi JSON'a yazilir; sonradan soru sorulmaz, rapordan okunur.
+# Bu bir OLUM aracidir: uretim koduna, veriye dokunmaz.
+
+
+def _damga(yol):
+    try:
+        st = os.stat(yol)
+        return [st.st_size, int(st.st_mtime)]
+    except OSError:
+        return None
+
+
+def veri_damgasi():
+    """URETIMI ETKILEYEN veri dosyalari. knowledge_map/corpus/intents +
+    chatgrow_* (generator bunlari da okur)."""
+    adlar = ['intents.json', 'knowledge_map.jsonl', 'corpus.jsonl',
+             'corpus_ids.jsonl']
+    d = {}
+    for ad in adlar:
+        d[ad] = _damga(os.path.join(BASE, ad))
+    try:
+        for ad in sorted(os.listdir(BASE)):
+            if ad.startswith('chatgrow_') and ad.endswith('.jsonl'):
+                d[ad] = _damga(os.path.join(BASE, ad))
+    except OSError:
+        pass
+    return d
+
+
+def model_damgasi():
+    """Kurulu LLM agirligi. Konusmada uretilen metin bunu degistirir."""
+    d = {}
+    for ad in ('llm_model.json', 'llm_model_weights.npz'):
+        d[ad] = _damga(os.path.join(BASE, 'model', ad))
+    return d
+
+
+def soru_listesi_damgasi():
+    d = _damga(SORU_LISTESI)
+    # soru listesinin KENDISI de damga (elle degistirilirse yakalanir)
+    return {'dosya': d, 'soru_sayisi': len(SORULAR),
+            'ilk': SORULAR[0] if SORULAR else '',
+            'son': SORULAR[-1] if SORULAR else ''}
+
 # ---------------------------------------------------------------- sorular
+# Once SABIT LISTE. Sorular buradan gelir; boylece uretim raporlari
+# yalnizca ayni sorular uzerinden kiyaslanabilir.
+SORULAR = []
+LISTE_KAYNAK = 'sabit liste'
+if os.path.exists(SORU_LISTESI):
+    with io.open(SORU_LISTESI, encoding='utf-8') as f:
+        SORULAR = [str(s).strip() for s in json.load(f)['sorular']]
+    SORULAR = [s for s in SORULAR if s]
+else:
+    LISTE_KAYNAK = 'URETILDI (satir adimi - veri surumune bagli!)'
+
+# Liste yoksa eski yol: knowledge_map.jsonl'den turet ve SABITLE.
+#
 # KAYNAK: knowledge_map.jsonl. NEDEN corpus.jsonl degil: 29.08'te konulari
 # corpus id'lerinden sectim ("pachnaeus nedir", "vaughanella nedir") ve
 # 50 sorunun 48'i "bilgim yok" ile dondu, yani URETIM YOLU HIC ACILMADI
@@ -71,7 +165,21 @@ with io.open('knowledge_map.jsonl', encoding='utf-8') as f:
             sorular.append(c)
         if len(sorular) >= N_SORU:
             break
-SORULAR = sorular
+if not SORULAR:
+    SORULAR = sorular
+    os.makedirs(RAPOR_DIZIN, exist_ok=True)
+    with io.open(SORU_LISTESI, 'w', encoding='utf-8') as f:
+        json.dump({'aciklama': 'Sabit uretim yolu olcum sorulari.',
+                   'soru_sayisi': len(SORULAR),
+                   'kaynak': 'uretim_olc.py i % 600 (otomatik uretildi)',
+                   'sorular': SORULAR}, f, ensure_ascii=False, indent=2)
+        f.write('\n')
+    print('[UYARI] %s yoktu; sorular knowledge_map.jsonl satir '
+          'adimindan uretildi ve SABITLENDI.' % SORU_LISTESI)
+    print('[UYARI] Bu liste veri surumune bagli; sonraki kosular ayni sorulari '
+          'kullanacak. Eski raporlarla kiyas YAPILAMAZ (satir icerigi degisti).')
+
+SORULAR = SORULAR[:N_SORU]
 secilen = SORULAR
 
 # ---------------------------------------------------------------- kurulum
@@ -90,7 +198,20 @@ STOP = set(('ve ile bir bu da de ki en cok daha cok gibi olarak ancak icin '
 
 
 def icerik_kelimeler(metin):
-    t = re.sub(r'[^a-z0-9 ]+', ' ', (metin or '').lower())
+    """Icerik kelimeleri: once Turkce'yi ASCII'ye katla, sonra kirp.
+
+    01.10.2026 DUZELTME: onceki hali `re.sub(r'[^a-z0-9 ]+', ' ', lower())`
+    idi ve Turkce harfleri SILIYORDU. Model ciktisi ASCII, bilgi metni
+    (kb) Turkce oldugu icin iki taraf hic eslesemiyordu:
+      "sarkinin"  -> ['sarkinin']      (bozulmadan kalir)
+      "sarkinin"  -> ['ark']           (s ve iki noktaLI i silinir)
+    Ayni kelime iki farkli sekilde cikiyor; sadakat yapay olarak dusuyordu.
+    Projenin kanonik katlamasi `normalize.ascii_normalize` kullanilir
+    (fetch_hf_turkish, corpus, brain ile ayni esleme).
+    Olculen etki ayni metinlerde: sadakat %33,3 -> %57,1.
+    """
+    t = ascii_normalize((metin or '').lower())
+    t = re.sub(r'[^a-z0-9 ]+', ' ', t)
     return [w for w in t.split() if len(w) > 2 and w not in STOP]
 
 
@@ -164,6 +285,19 @@ BILGISIZ = ('bilgim yok', 'uydurmak istemem', 'bilmiyorum')
 
 for soru in SORULAR:
     np.random.seed(SEED)          # her soruda ayni tohum: modele gore degismez
+    # AYNI SEY AYRI: bilgi metni secimi de tohumlanir.
+    #
+    # 01.10.2026 OLCULDU: brain.py:1467/1469 `random.choice(responses)`
+    # kullaniyor. Bilgi intent'inde sorgu kelimeleri yanitla eslesmedigi icin
+    # `best_score <= 0` -> yanitlar listesinden RASTGELE biri seciliyor ve bu
+    # metin LLM'e bilgi olarak giriyor. Python `random` modulu NumPy tohumundan
+    # BAGIMSIZ oldugu icin np.random.seed(7) bunu kontrol ETMIYORDU.
+    # Sonuc: ayni soru, ayni tohum, ayni surec icinde ikinci kez soruldugunda
+    # FARKLI bilgi metni geliyordu. Olculdu: 11 sorunun 6'sinda ayni surec
+    # icinde 2. cagri farkli kb verdi; iki kosunun raporu 11/50 soruda farkli
+    # kb iceriyordu. Yani aracinin "iki kosu birebir ayni" iddasi gecersizdi
+    # ve A/B karsilastirmasi olcum gurultusu iceriyordu.
+    random.seed(SEED)
     # konu etiketi: soru bicimine gore kirp (soru[:-6] sadece "X nedir" icin
     # dogruydu, "X ne demek" / "X hakkinda bilgi ver" bozulurdu)
     konu = soru
@@ -236,7 +370,10 @@ if seb:
 
 os.makedirs(os.path.dirname(CIKTI), exist_ok=True)
 with io.open(CIKTI, 'w', encoding='utf-8') as f:
-    f.write(json.dumps({'etiket': ETIKET, 'seed': SEED, 'kayitlar': kayitlar},
+    f.write(json.dumps({'etiket': ETIKET, 'seed': SEED, 'kayitlar': kayitlar,
+                        'veri_damgasi': veri_damgasi(),
+                        'model_damgasi': model_damgasi(),
+                        'soru_listesi_damgasi': soru_listesi_damgasi()},
                        ensure_ascii=False, indent=1))
 print()
 print('rapor yazildi: %s' % CIKTI)

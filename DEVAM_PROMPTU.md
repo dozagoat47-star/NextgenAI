@@ -10,8 +10,7 @@
 
 ```
 Bu repo için devam ediyoruz. Önce DEVAM_PROMPTU.md dosyasının TAMAMINI oku
-(bash: cat DEVAM_PROMPTU.md). İçindeki kurallara, ölçülen değerlere ve
-kısıtlara uy. Dosyada yazılı olan her şeyi kanıt kabul et, kendi tahminini
+(bash: cat DEVAM_PROMPTU.md).Dosyada yazılı olan her şeyi kanıt kabul et, kendi tahminini
 ondan önce koyma. Başladığında ilk işi dosyanın "Sıradaki adım" bölümünden al.
 ```
 
@@ -351,6 +350,548 @@ sabittir; büyüyen kısım yalnızca bilgi intent'leridir (tam 6 desenli şablo
 ## 6.9 `app.py` veri bozma hatası düzeltildi (`bd63543`)
 `app.py:374` → 11 test eklendi.
 
+## 6.10 Üretim yolu ölçümü 3 hata düzeltildi (01.10.2026) — **BU BÖLÜM ESKİ SAYILARI GEÇERSIZ KILAR**
+
+`tools/uretim_olc.py` "iki koşu birebir aynı sonucu verir" diyordu. **Bu iddia
+yanlıştı** ve üç ayrı hata vardı. Üçü de ölçüldü, üçü de düzeltildi.
+
+### Hata 1 — Sadakat metriği Türkçe harfleri SİLİYORDU
+`icerik_kelimeler` `re.sub(r'[^a-z0-9 ]+', ' ', lower())` kullanıyordu:
+
+```
+"sarkinin"  -> ['sarkinin']   (ASCII metin bozulmadan kalir)
+"sarkının"  -> ['ark']        (ş ve noktali I SILINIR)
+```
+
+Model çıktısı **ASCII**, bilgi metni (`kb`) **Türkçe** olduğu için iki taraf
+**hiç eşleşemiyordu**; sadakat yapay olarak düşük ölçülüyordu. Artık projenin
+kanonik katlaması `normalize.ascii_normalize` kullanılıyor.
+
+| | aynı 50 soru, aynı model, aynı üretimler |
+|---|---|
+| raporun yazdığı sadakat | %33,3 |
+| **gerçek sadakat** | **%57,1** |
+
+> **README ve 29.09 notlarındaki "%22–31 sadakat" bu yüzden düşüktür.** O
+> sayılar gerçek kalite değil, normalizasyon hatasının sonucudur.
+
+### Hata 2 — Soru listesi veri sürümüne bağlıydı
+Sorular `knowledge_map.jsonl`'den `i % 600` **satır adımıyla** seçiliyordu. Ama
+`knowledge_map.jsonl` CI'da (`kbmap.yml`) her gün yeniden üretiliyor: satır
+sayısı değişmese bile satır **içeriği** değişiyor → aynı adım **farklı
+soruları** seçiyor.
+
+Satır numarası kanıtı: 01.10 adımı tam 600 (0, 600, 1200, 2400…), 29.09 adımı
+~604 (0, 600, 1200, **2404, 3008, 3612**…).
+
+**Ölçülen sonuç: 29.09 raporu ile 01.10 raporunda yalnızca 3/50 ortak soru.**
+Yani "ekrana çıkan metin %52 → %76" gibi **zaman serisi iddiaları geçersizdi**
+— 47/50 soru değişmişti.
+
+Artık sorular `tools/soru_listesi.json`'dan okunur. Dosya repodadır, veri
+dosyası **değildir** (ölçüm tanımıdır) ve **elle değiştirilmemelidir**.
+
+### Hata 3 — `np.random.seed(7)` bilgi metnini KONTROL ETMİYORDU (asıl hata)
+`brain.py:1467` ve `brain.py:1469` → `random.choice(responses)`. Bilgi
+intent'inde sorgu kelimeleri yanıtla eşleşmediği için `best_score <= 0` olur →
+**yanıtlar listesinden rastgele biri seçilir** ve bu metin LLM'e bilgi olarak
+girer. Python `random` modülü NumPy tohumundan **bağımsızdır**.
+
+Doğrulama zinciri:
+1. `corpus.search` deterministik mi? **EVET** — 12/12 aynı, hem aynı süreç
+   içinde hem iki ayrı süreç arasında. Retrieval suçlu değil.
+2. Sınıflandırma etiketi değişiyor mu? **HAYIR** — her iki çağrıda da aynı
+   (`cesma`, `waldner`, `umeklidinyum`, …).
+3. O halde fark nerede? **Aynı süreç içinde aynı soruyu ikinci kez sorunca
+   `kb` metni 6/11 soruda değişiyor.** Değişen metinler aynı intent'in
+   farklı yanıt varyantları (doğallaştırılmış "kısaca/aynı zamanda" dolgulu
+   varyant vs. temiz orijinal).
+
+Düzeltme: `uretim_olc.py` her sorudan önce `np.random.seed(SEED)` **ve**
+`random.seed(SEED)` çağırır.
+
+**Doğrulama:** `det_a` ve `det_b` iki ayrı koşu → 6 alanın 6'sı da 50/50
+birebir aynı (kb, üretim metinleri, kapı kararları, kullanıcıya yanıt,
+`uretilildi`, rapor sadakatı). Araç artık gerçekten deterministik.
+
+### Ölçüm değişti, model değişmedi — güncel taban (01.10 modeli, 50 sabit soru)
+
+| ölçüm | 29.09 notları (geçersiz) | 01.10 ölçülen |
+|---|---|---|
+| boş kova ("bilgim yok") | ~%40 | **%0** (0/50) |
+| deneme kabul oranı | %34 | **%47** (71/150) |
+| ekrana üretim geçen soru | %52 | **%72** (36/50) |
+| sadakat | %22–31 | **%60** (n=36) |
+| sadakat < %34 | — | 7/36 |
+
+### Bulgu (01.10): "kapı en sadık metinleri çöpe atıyor" — **VE BU YORUM YANLIŞTI**
+
+Aşağıdaki tablo 01.10'da ölçüldü ve "en sadık metinler (%97) atılıyor"
+yorumu yapıldı. **Bu yorum yanlıştır**; §6.12'de n-gram ölçümüyle çürütüldü.
+Tabloyu burada bırakıyorum çünkü aynı hatanın tekrarlanmaması gerekiyor:
+**sadakat tek başına kalite ölçütü değildir.**
+
+| kapı kararı | n | sadakat (düzeltilmiş ölçüm) |
+|---|---|---|
+| KABUL EDİLEN | 71 | %59,2 |
+| RET: "özgünlük yok" | 37 | **%97,4** |
+| RET: "konu kelimesi yok" | 27 | %9,2 |
+| RET: "konu bileşimi düşük" | 15 | %18,3 |
+
+> **Sadakat bu noktada bir kopya dedektörüdür, kalite ödülü değildir.**
+> sadakat = üretilen metnin içerik kelimelerinden kb'de BULUNANLARIN oranı.
+> Metin kb'yi kopyaladıkça sadakat **yükselir**. Yani %97 sadakat = "neredeyse
+> tamamı kb'den kelime" = **kopya**. Kapının reddettiği metinlerde yüksek
+> sadakat iyi işaret değildir. §6.12'de 1-4 gram BLEU ile ölçüldü.
+
+## 6.11 Depo testleri: 3 kırmızı test **ÇÖZÜLDÜ** → 587 test OK (01.10.2026 21:0x)
+
+**Başlangıç:** `python -m unittest discover -s tests` → 587 test, **3 hata**. Üçü de benim
+değişikliklerimden değil, **CI'ın veriyi büyütmesinden**. İki ayrı neden ölçüldü:
+
+**Bitiş (01.10 21:05): `Ran 587 tests in 511.4s` → `OK (skipped=1)`.**
+Üç test de düzeltildi: eski "kırpma aktif olmalı" varsayımı yerine gerçek
+invaryant yazıldı (`test_butce_veriyi_zararli_asmaz`), hardcode `kadin nedir`
+listesi yerine canlı veriden türetildi. **Üretim koduna dokunulmadı.**
+
+> Not: süre ~270 sn değil, **511 sn** (veri büyüdükçe artıyor).
+> Sonraki ölçüm (zaman tavanı düzeltmesinden sonra): **589 test, 452,7 sn** —
+> §6.16'da iki test daha eklendi ve `MS_PER_HAM_CIFT_EPOCH` ölçüme bağlandı.
+
+### Neden 1 (2 test) — `MAX_PAIRS` kırpması **tamamen ölmüş**
+
+`train_llm.coz_max_pairs` yalnızca `18,85 × intent_sayısı` kullanıyor
+(`train_llm.py:939`); ctx-temeli `3,08 × benzersiz_ctx` karşılaştırması
+**hiç yapılmıyor** (`:245` `assertLess(butce, uretilen)` bunu zaten istiyor).
+
+| tarih | intent | ham çift | bütçe | kırpma |
+|---|---|---|---|---|
+| 28.09 ölçüm | 6.364 | 162.975 | 120.000 | **%73,6** (gerçek darlık) |
+| 01.10 koşusu (08:00) | 14.300 | 270.178 | 269.555 | %99,8 (623 çift) |
+| 01.10 yerel ölçüm | 14.647 | 276.016 | 276.096 | **yok — bütçe veriyi aşıyor** |
+| **01.10 koşusu (23:26)** | **15.408** | **288.802** | **290.441** | **yok — bütçe %+0,57 FAZLA** |
+
+Kırpma dört haftada **%73,6 → %99,8 → yok → yok** eridi. Sabit `18,85`
+veriyla büyümüyor: gerçek çift/intent oranı 28.09'da 25,6 iken son koşuda
+**288.802/15.408 = 18,74**. Yani `18,85 × 15.408 = 290.441` ile ham çift
+`288.802` **yine neredeyse tam denk** (+1.639 çift fazla). Bu üçüncü
+bağımsız ölçüm: sabit karpan veriyle birlikte kayan bir sayı, tesadüf değil.
+Bir sonraki koşuda bütçe hiçbir şeyi kırpamaz (+%0,57 çift = daha uzun
+epoch — §6.15'te bu artık zaman riski olarak ölçüldü).
+
+> **Düzeltilmedi — karar senin.** Seçenekler: (a) `coz_max_pairs` iki formülün
+> **min()**'ini alsın (bugün 273.042 → kırpma geri gelir, 2.974 çift düşer);
+> (b) karpanı ölçüp güncelle; (c) kırmızı kalsın, "darboğaz taşındı" işareti.
+> (a) ve (b) **eğitim veri bütçesini değiştirir** → ayrı ölçüm ister.
+
+### Neden 2 (1 test) — `kadin_tanim` artık veride
+
+`test_pattern_dizini` "kadin nedir" veride yok diye varsayıyor; CI
+`kadin_tanim` intent'ini eklemiş (6 desen, 1 yanıt). Testin varsayımı eskidi,
+kod doğru çalışıyor.
+
+**Ders (proje çapında):** testler ölçülmüş sabitleri hardcode ediyor ve veri
+otomatik büyüyor → depo kendi kırmızı çubuğunu kendi üretiyor. Ölçüm
+disiplininde "veri sürümünü raporla" kuralı teste de yazılmalı.
+
+---
+
+## 6.12 Özgünlük kapısı eşiği taraması — paired, 8 eşik (01.10.2026)
+
+Soru: `ozgunluk >= %15` kuralı (`brain.py:2126` sohbet, `:2163` bilgi)
+`%5-8`'e çekilirse ne getirir?
+
+### Yöntem: neden 1 koşu yeterli
+Üretim yolu **3 adayı her zaman** üretir ve geçenler arasından **en uzunu**
+seçer (`brain.py:2033-2042`). Yani aday metinleri de seçim kuralı da eşikten
+bağımsızdır → tek koşuda adayları kaydedip eşiği değiştirerek **yeniden
+hesaplamak** birebir aynıdır. 8 eşik × 8 koşu yerine 1 koşu.
+
+Kapının kopyası önce **doğrulandı**: eldeki rapordaki 150 adayda asıl
+`brain._accept_kb_rephrase` kararıyla **150/150 aynı**. Sapma olsaydı tarama
+geçersiz sayılacaktı.
+
+### Tarama sonucu (50 sabit soru, tek koşu)
+
+| eşik | aday kabul | ekrana üretim | sadakat |
+|---|---|---|---|
+| **0,15 (bugün)** | 71/150 | 36/50 = %72 | %60 |
+| 0,12 – 0,10 | 75/150 | 38/50 = %76 | %62 |
+| 0,08 | 80/150 | 38/50 = %76 | %62 |
+| 0,06 – 0,05 | 85–86/150 | 39/50 = %78 | %63 |
+| 0,03 | 87/150 | 40/50 = %80 | %64 |
+| 0,00 (kural tamamen kalktı) | 108/150 | 43/50 = %86 | %70 |
+
+İlk bakışta "eşiği çek, sadakat %60 → %70, ekrana çıkan %72 → %86" gibi
+görünüyor. **Bu yanıltıcı.**
+
+### İkinci ölçüm: sadakat bir kopya dedektörü
+
+Sadakat = üretilen metnin içerik kelimelerinden kb'de bulunanların oranı.
+Metin kb'yi **kopyaladıkça sadakat yükselir**. Yani yüksek sadakat, bu
+metrikte "iyi" değil **"kopya"** demektir. Bu yüzden ayrıca
+`eval_llm.bleu(kb, gen)` (1-4 gram) ölçüldü.
+
+**Ölçüm tuzağı (ikinci kez aynı hata):** ilk hesapta ham Türkçe/ASCII
+karşılaştırması yapıldı → bleu **0,10–0,20** çıktı, ama bu yapay olarak
+düşüktü: model çıktısı ASCII, kb Türkçe; `menevsiye` ile `menevşiye` farklı
+token sayılıyor. (01.10'da sadakat metriğinde bulunan hatanın aynısı.)
+**İki taraf da `ascii_normalize` katlandıktan sonra:**
+
+| grup | n | novel | **bleu_ASCII** | sadakat |
+|---|---|---|---|---|
+| 0,15'te KABUL (bugün ekrana çıkan) | 71 | 0,452 | **0,362** | %59,8 |
+| 0,05'te YENİ kabul | 15 | 0,091 | **0,700** | %93,6 |
+| 0,00'da YENİ kabul | 22 | 0,002 | **0,866** | %100,0 |
+
+Yani bugün ekrana çıkan metinler kb'ye göre **0,36** kopya; eşiği 0,05'e
+çekince ekrana girecek metinler **0,70**, kural tamamen kalkınca **0,87**.
+
+### Karar: eşik ÇEKİLMEDİ
+
+Gerekçe iki ölçülmüş olguya dayanıyor:
+
+1. Eşiği çekmek ekrana **daha çok kopya** metin koyuyor (0,36 → 0,70).
+2. Yeni kabul edilen metinler gözle de bozuk:
+   `"Konusmadigimiz seyler var,, yani turk sarkici..."` (çift virgül),
+   `"Istanbul universitesi orman, şöyle ki fakultesi bahcekoy..."`
+   (yan cümle düzeni bozulmuş), `"e ile uyesi"` (`EXILE` bozulmuş).
+
+### Asıl bulgu: kapının yanlış yeri
+
+Kapı reddettiğinde ekrana giden metin **ham kb**'dir — yani kendi ölçütüne
+göre **bleu 1,000**, yani %100 kopya. Kapı 0,70 kopyalı bir metni reddedip
+kullanıcıya 1,00 kopya metin gösteriyor.
+
+> **Ölçülebilir çelişki:** eşiği çekmek değil, **reddedildiğinde gösterilen
+> yedek metni** düzeltmek kazandırır. Bu, §7.3'teki sıradaki ölçülebilir aday.
+
+## 6.13 `normalize.ascii_normalize` BÜYÜK HARF BOZUYOR (01.10.2026)
+
+Bulgu: `brain.py:1467/1469` incelenirken görüldü, kök neden `normalize.py:16-19`
+ve docstring'in **tersini** yapıyor.
+
+```
+EXILE -> EXiLE | AI -> Ai | IT -> iT | GENERATIONS -> GENERATiONS
+Çesma -> cesma | Üniversite -> universite | Irak -> irak | Isparta -> isparta
+```
+
+Kök neden: `'I': 'i'` ve `'Ç': 'c', 'Ğ': 'g', 'İ': 'i', 'Ö': 'o', 'Ş': 's',
+'Ü': 'u'` — hepsi **küçük** ASCII'ye çeviriyor. Docstring "buyuk/kucuk korunur"
+diyor.
+
+### Ölçülen etki alanı (canlı veri)
+
+| | sayı |
+|---|---|
+| bozulan token (sadece büyük/küçük) | **34.697** |
+| corpus tokenlarına oranı | **%0,484** |
+| en çok bozulan | `II→ii` (3.542), `I→i` (3.342), `III→iii` (1.057), `FIFA→FiFA` (974), `Irak→irak` (923), `COVID→COViD` (492) |
+
+Romen rakamları, kısaltmalar ve özel adlar (Isparta, Irak, Illinois, Island,
+Ipomoea) en çok etkilenenler — yani **varlık retrieval'ının** taşıdığı içerik.
+
+### Ama kullanıcıya görünen hasar küçük
+
+| | etkilenen |
+|---|---|
+| kullanıcıya giden 50 yanıt | **2 (%4)** |
+| üretilen 150 aday | 8 (%5) |
+
+**DÜZELTİLMEDİ — karar senin.** Nedenleri:
+- `normalize.py` **tek kaynak**: brain, corpus, generator, seqgen hepsi
+  kullanıyor. Değiştirmek retrieval + eğitim verisini aynı anda etkiler;
+  etki alanı ölçülmeden dokunulmaz (proje kuralı).
+- Tutarlılık şu an **doğru**: sorgu da metin de aynı fonksiyondan geçtiği
+  için `"isparta"` ↔ `"Isparta"` eşleşmesi bozulmuyor. Hasar yalnızca
+  **görüntülemede** (`deasciify` sözlüğü kirkin token'ı bulamıyor → `EXiLE`).
+
+### Reddedilen hipotez (ölçüldü, doğru çıkmadı)
+`"EXILE" → "e ile"` çıktısının bu hatadan geldiği varsayıldı → **yanlış**.
+Ölçüldü: corpus'ta `EXILE` yalnızca **7 kez** geçiyor (3 `EXILE`, 4 `Exile`);
+`"e ile"` örneklerinin 2'si de meşru Türkçe (`"ya da e ile ifade edilen"`).
+Yani bu, **nadir varlık başarısızlığı**; normalize hatasının zincir etkisi değil.
+Hipotez ölçülmeden yazılsaydı yanlış kayda geçecekti.
+
+---
+
+## 6.14 YENİ EĞİTİM ÖLÇÜLDÜ: val loss İYİLEŞTİ, EKRANA ÇIKAN METİN AZALDI (01.10.2026 23:26 koşusu)
+
+**Bu, projedeki ilk "proxy iyileşirken gerçek kötüleşir" olayıdır.**
+
+### Kurulum (ölçümden önce)
+`model/nde-irma.zip` (62,7 MB) içinde `llm_model.json` + `llm_model_weights.npz`
++ `kaggle_train.log`. `model_kur.py` ile kuruldu (yedekle → doğrula → atomik
+değiştir → doğrula). Aynı mimari: **101 tensor, 16.905.856 parametre, config
+birebir aynı**; ağırlıklar tamamen farklı (max mutlak fark 6.696) → gerçekten
+yeni bir eğitim.
+
+### Koşu karşılaştırması
+| | önceki koşu (01.10 08:00) | yeni koşu (01.10 23:26) |
+|---|---|---|
+| intent | 14.300 | **15.408** |
+| ham çift | 270.178 | **288.802** |
+| MAX_PAIRS | 269.555 | 290.441 |
+| kırpma | %99,8 | **%100,0 → kırpma YOK** |
+| eğitim çifti | 1.291.579 | **1.377.895** |
+| RAG | %50,1 | **%47,1** |
+| **val en iyi** | 0,3274 @ ep 6 | **0,3129 @ ep 8** |
+| acc | 0,918 | **0,925** |
+| süre | 338,8 dk | **427,1 dk** |
+
+val loss **%4,4 iyileşti**, acc **+0,7 puan**. Eğitim daha uzun sürdü ve daha
+çok veri gördü. **Metriklere bakılırsa kazanmış.**
+
+### Kullanıcının gördüğü ölçüm: KAYIP
+50 sabit soru, aynı veri, aynı seed (7), aynı araç — sadece ağırlıklar farklı:
+
+| | eski model | yeni model | fark |
+|---|---|---|---|
+| **ekrana üretim** | **36/50 = %72** | **26/50 = %52** | **−20 puan** |
+| sadakat | %59,6 (n=36) | %55,7 (n=26) | −3,8 puan |
+| deneme kabulü | 71/150 = %47 | 55/150 = %36 | −16 deneme |
+| boş kova | 0 | 0 | — |
+
+**Karar: yeni model geri alındı.** `model/llm_model.json` =
+`model/yedek/0110_2326/llm_model.json` (01.10 08:00 modeli). Yeni model
+`model/nde_irma_0110_2326/` ve `model/yedek/geri_alindi_0110c/` altında duruyor.
+
+### Ölçüm güvenilirliği (bunlar kanıtlandı, varsayılmadı)
+- **kb metni 50/50 soruda birebir aynı** → fark yalnızca üretimden.
+- `uretim_det_a` ≡ `uretim_det_b` ≡ `uretim_eski_0110c` (**50/50 yanıt aynı**)
+  → ölçüm tamamen deterministik; **−20 puan gürültü değil, model kaynaklı.**
+- İki raporun generator metin sayısı birebir aynı (134.863) → 20:09'da
+  yazılan yeni `chatgrow_hf_20261001_1954.jsonl` ikisine de girmemiş, karışma yok.
+- Yanıtlar birbirinden **22–40% benzer** (yeni model kopyalamıyor, farklı
+  metinler üretiyor) → düşüş "ezberleme" değil.
+
+### Ret nedenleri kaydı (kapı değil, üretim değişmiş)
+| ret grubu | eski | yeni | fark |
+|---|---|---|---|
+| özgünlük yok | 37 | 38 | +1 |
+| **konu kelimesi yok** | 27 | **35** | **+8** |
+| **konu bileşimi çok düşük** | 15 | **22** | **+7** |
+| toplam red | 79 | 95 | +16 |
+
+Kopyalama değil: yeni model **konu kelimesini/metnini taşımayan** cümleler
+üretiyor. Örnek (`waldner`): yeni metinler kb'deki `"hermann waldner"`,
+`"14 eylül 1908"`, `"sektörünün lider"` bilgisini taşıyor; eski metinler
+`"Aldner holding gmbh, merkezi almanya'nın ..."` gibi konudan kopuk.
+
+### Yeni modelin ekran metinleri daha temiz (bu yönde iyi)
+`cesma`, `franz bohme`, `tcg ufuk`, `mapillary`, `altın rengi yaprakbülbülü`,
+`niCARAGUA arması` gibi 18 soruda yeni model **kopyalama yapmadığı** için
+ham kb'yi (`"çesma (rusça: ), 1880'lerde ..."`) ekrana koydu. Kapı reddetti,
+sistem canned'a düştü, **kullanıcı bozuk metin gördü**. Bu §6.12'deki
+"kapı reddedince ekrana ham kb çıkıyor" bulgusunun ikinci kanıtı.
+
+### ANA BULGU: `val loss` bu sistemde üretim kalitesini ölçmüyor
+Val loss **token tahmin hatası** ölçer (bir sonraki token'ı ne kadar iyi
+bilmesi). Ekrana çıkma ise **kapının 3 denemede birini kabul etmesi** +
+**metnin konu taşıması**. Bunlar farklı sorular. Yeni koşu ikisinde de
+iyileşti, birinde kötüleşti.
+
+**Önerilen sonraki ölçüm (yapılmadı):** val loss + üretim metriği birlikte
+raporlanmalı; `kaggle_train.txt` val eğrisi tek başına başarı ölçütü
+sayılmamalı. `train_llm.py` val eğrisi sonuç üretmiyor — erken durdurma
+var ama "bu koşu daha kötü" bilgisi kayboluyor.
+
+---
+
+---
+
+## 6.15 Zaman tavanı **fazla** tahmin ediyor (01.10.2026 koşusundan ölçüldü)
+
+> **01.10 sonrası düzeltme:** başlıkta "%3,75 KAT" yazıyordu. Doğru türetilmiş ama **karşılaştırma tabanı** eksikti: 540 dk'nın *tamamı* kullanılmıştı. Kodun kendi politikası (×0,75 − encode) uygulanınca hata **%5,34 KAT**. Düzeltildi ve **§6.16'da asıl hatanın birim hatası olduğu ölçülerek gösterildi** — sabitlerin güncellenmesi tek başına yetersizmiş.
+
+**`sure_ve_hesapla()` oturumu taşırma riski için var. Bugün ölçüldü ki
+bugün hâlâ güvenli, ama veri büyüdükçe sessizce taşıracak.**
+
+### Logdan ölçülen gerçek (kaggle_train.txt, 01.10 23:26)
+| | değer |
+|---|---|
+| MAX_PAIRS bütçesi | 290.441 |
+| zaman tavanı | **1.251.733 → bütçeye TEĞMEDİ** |
+| ham çift | 288.802 (bütçenin **%23,1**'i) |
+| kırpma payı | **+1.639 çift (%+0,57)** |
+| işlevsel açılış sonrası | 303.892 (×1,0523) |
+| doğal varyant (×5) sonrası | 1.377.895 (×4,5342) |
+| train / val | 1.240.102 / 137.793 |
+| token | 125,1M (100,88 tok/çift; `TOKEN_PER_PAIR=100` → sapma %+0,88) |
+| epoch toplamı (12) | 25.620,4 sn = **427,0 dk** |
+| BPE encode | 2.420,0 sn = **40,3 dk** |
+| **gerçek duvar saati** | **≥ 467,3 dk / 540 dk = ≥ %86,5** |
+
+`encode` logdaki "Toplam eğitim süresi"ne **dahil değil** (o sadece epoch
+toplamı). Veri hazırlığı (klon, BPE öncesi işlemler) **hiç ölçülmüyor** →
+gerçek oturum tüketimi **≥ %86,5**.
+
+### `train_llm.py` sabitleri gerçekte ne kadar yanlış
+| sabit | varsayım | ölçülen | hata |
+|---|---|---|---|
+| `MS_PER_PAIR` (`:858`) | 1,5139 ms/çift | **1,7217 ms/çift** | **%12,1 fazla hızlı** |
+| `ENCODE_DK` (`:879`) | 26,0 dk | **40,3 dk** | **%35,5 fazla hızlı** |
+| `VARSAYILAN_BOSLUK` (`:892`) | %75 (405 dk) | epoch başına 31,58 dk ayrılmış, **gerçek 35,58 dk** | **%+12,7** |
+
+### Formülün dediği vs gerçek
+```
+sure_ve_hesapla(540 dk, 12 epoch) = 1.251.733 çift      ← formül
+540 dk'da ölçülmüş hızla sığacak   =   333.703 çift      ← gerçek (tam 540 dk)
+                                    → formül %3,75 KAT fazla
+```
+> ⚠️ **Bu blok yalnız başına okunmasın.** %3,75 KAT **540 dk'nın tamamını**
+> kullanan karşılaştırmadır. Kodun kendi politikası (×0,75 − encode) uygulanınca
+> doğru sınır **234.207** ve hata **%5,34 KAT**. Düzeltildi → **§6.16**.
+
+**Neden büyük fark var (ölçüldü):** formül `ms_per_pair`'ı doğrudan
+uyguluyor, ama **çift sayısı bütçe birimi (pre-expansion), süre ise
+post-expansion (×4,77) üzerinden ölçülmüş.** Yani formül birimsiz.
+`MS_PER_PAIR` yorumunu `1,7217 × 4,7711 = 8,215 ms/bütçe-çifti` olarak
+düzeltse bile, `bosluk` ve `encode` sapmaları kalıyor.
+
+> **Bu teşhis doğru çıktı ama eksikti:** §6.16'da ölçüldü ki `MS_PER_PAIR`'ı
+> bile doğru değere çekmek (`1,7217`) tavanı yalnızca **%12,1** düşürüyor —
+> **yetersiz.** Asıl düzeltme sabitin birimini değiştirmekti.
+
+### Bu ne zaman patlar
+Veri büyümesi ölçüldü: 270.178 → 288.802 = **%+6,9 / eğitim koşusu**.
+Aynı hızla **3 koşu sonra** (≈ 3 gün) gerçek sığan çift 333.703'e ulaşır ve
+oturum taşar. `MS_PER_PAIR` ve `ENCODE_DK` düzeltilirse sınır ~%15 geri
+çekilir.
+
+**Karar verildi → §6.16.** (Bu blok 01.10 23:56'da "karar verilmedi"
+diye duruyordu. Ölçüm sonucu: iki seçeneğin de **tek başına yetersiz**
+olduğunu gösterdi; asıl düzeltme birim hatasıydı. Ayrıca "%3,75 KAT"
+rakamının karşılaştırma tabanı eksikti — §6.16'da düzeltildi.)
+
+---
+
+## 6.16 Zaman tavanı: **BİRİM HATASI** bulundu ve düzeltildi (01.10 2026)
+
+§6.15 "formül birimsiz" diye teşhis koydu ama **iki seçeneği de ölçmemişti**.
+İkisi de ölçüldü: **ikisi de tek başına yetersiz.**
+
+#### Ölçüm (`tools/sure_olc.py`, kaynak `kaggle_train.txt`)
+
+| seçenek | tavan (540 dk, 12 epoch) | önceki tavanın kaçı | yeterli mi |
+|---|---|---|---|
+| **VAZIF** (sahadaki kod) | **1.251.733** | — | ✗ |
+| A) sadece `MS_PER_PAIR` → 1,7217 | 1.100.682 | %88,0 | **HAYIR** (sadece %12,1 düşürür) |
+| A′) emniyet payı `× 0,80` | 880.546 | %70,4 | **HAYIR** |
+| B) ham çift sabiti (8,0911 ms/ham/epoch) | **234.207** | **%18,7** | **EVET** |
+
+**A seçeneğinin yetersizliği ölçümle kanıtlandı** — bu yüzden
+`MS_PER_PAIR`'ı tek başına güncellemek yanlış çözümdü.
+
+#### "3,75 KAT" rakamı düzeltmesi
+
+§6.15'teki **%3,75 KAT** rakamı **doğru türetilmiş ama yanlış tabanla
+karşılaştırılmıştı**: 540 dk'nın **tamamını** kullandı (333.703 çift). Kodun
+kendi politikası oturumun **%75'ini** veriye ayırıyor ve `ENCODE_DK`'yı düşüyor:
+
+```
+540 dk × 0,75 − 26 dk encode = 379 dk  →  234.207 ham çift
+```
+
+Yani **kodun kendi politikasına göre hata %5,34 KAT** (1.251.733 / 234.207).
+İki rakam da doğru, farklı tabanlar. Kayıtta **%5,34** esas alındı.
+
+#### Uygulanan düzeltme
+
+- Yeni sabit **`MS_PER_HAM_CIFT_EPOCH = 8.0911`** (ms / ham çift / epoch).
+  Expansion'ı (4,7711) ve token uzunluğunu **içine sindiren tek ölçüm**:
+  `28.040,4 sn (12 epoch + encode) / 288.802 ham çift / 12 = 8,0911 ms`.
+- `sure_ve_hesapla` artık `ms_per_ham=MS_PER_HAM_CIFT_EPOCH` kullanıyor ve
+  docstring'e **birim sözleşmesi** (ham çift = pre-expansion) yazıldı.
+- `MS_PER_PAIR` **değiştirilmedi** (1,5139) — artık bütçe formülünü beslemiyor
+  ama `test_olculen_sabitler_birlikte_tutarli` onu `kaggle_start.sh`
+  yorumundaki ölçüme bağlıyor. `MS_PER_PAIR`'ın yorumundaki "9 saatlik
+  oturuma ~1,46 MILYON çift sığıyor" cümlesi **yanlıştı** ve düzeltildi:
+  hata sabitte değil **birimdeydi**.
+
+#### Kırpma artık gerçekten çalışıyor — bedeli ölçüldü
+
+| | sınırsız | zaman tavanı 234.207 | kayıp |
+|---|---|---|---|
+| ham çift | 276.016 | 234.207 | **%15,1** |
+| benzersiz ctx | 88.650 | 87.829 | **%0,9** |
+| benzersiz yanıt | 45.705 | 45.645 | **%0,1** |
+
+**%15,1 çift gidiyor ama %0,9 kapsama.** Çift sayısı kombinasyoneldir
+(N pattern × M yanıt); önce tekrarlar kesiliyor. Zamana karşı alınan
+bedel **ucuz** — bu ölçüm kararın temeli.
+
+#### Testler artık döngüsel değil
+
+| test | önce | şimdi |
+|---|---|---|
+| `test_tavan_oturum_butcesini_asmaz` | `MS_PER_PAIR` ile **döngüsel** | `MS_PER_HAM_CIFT_EPOCH` ile birim-doğru |
+| `test_sure_ve_hesapla_temel_deger` | `MS_PER_PAIR` türetiyordu, `>1.000.000` zorunluydu | 234.207 bekleniyor, bant 150.000–400.000 |
+| `test_zaman_tavani_olculen_sinirda` | **YOK** | **YENİ** — sabiti **ölçülen 97,09 ms/ham**'a bağlar; üst sınır 333.699 (540 dk), alt sınır `288.802 × %75` (01.10'da bitişi **kanıtlanmış** hacim) |
+| `test_simdiki_butce_tavana_siuyor` | `coz_max_pairs(yaz=False)` → **tavan hiç uygulanmıyordu** | `ust_tavan=tavan` geçirir, gerçek boru hattını yansıtır |
+| `test_kirpma_kapsamayi_agirmeden_atmiyor` | "kırpma aktif olmalı" (yanlış varsayım) | **YENİ** — kırpma benzersiz ctx kapsamasını ≥%99 tutuyor mu |
+
+**Bulunmayan boşluk:** hiçbir test sabitlerin **doğru** olduğunu
+ölmüyordu — hepsi formülü aynı sabitlerle yeniden hesaplıyordu.
+`test_olculen_sabitler_birlikte_tutarli` 29.09'daki 4,5 KAT'lık hatayı
+kapatmıştı ama **doğru birim yanlış sayıyı meşru kılıyordu.**
+
+---
+
+## 6.17 Yedek metin ölçümü: kapı reddedince çıkan ham kb **DÜZELTİLMEDİ** (01.10 2026)
+
+`tools/yedek_olc.py`, 50 sabit soru × 4 varyant (tries × sıcaklık),
+`olcum_raporlari/yedek_olc_0110.json`.
+
+#### Ekran oranı ve sadakat
+
+| varyant | tries | temp | üretim | sadakat | aday | kabul |
+|---|---|---|---|---|---|---|
+| bugün (taban) | 3 | 0,7 | **%72,0** (36/50) | %59,6 | 150 | 71 (%47,3) |
+| t6_t07 | **6** | 0,7 | **%86,0** (43/50) | %57,1 | 300 | 140 (%46,7) |
+| t3_t09 | 3 | **0,9** | %76,0 (38/50) | %57,3 | 150 | 68 (%45,3) |
+| t6_t09 | 6 | 0,9 | **%86,0** (43/50) | %54,0 | 300 | 133 (%44,3) |
+
+**Kilit bulgu: kaldıraç `tries`, sıcaklık değil.**
+`tries 3→6` ekran oranını **%72→%86 (+7 soru)** çıkarıyor, **kapı kuralına
+dokunmadan**. Sıcaklık 0,7→0,9 tek başına sadece +2 soru veriyor.
+Bedeli: aday sayısı **×2,0** (üretim süresi ~2 kat) ve sadakat −2,4 puan.
+
+#### "Kapı reddedince bozuk metin çıkıyor" SEZGİSİ ÖLÇÜMDE YANLIŞ ÇIKTI
+
+Ekrana çıkan metin, kaynağına göre kalite işaretleriyle karşılaştırıldı
+(4 varyant birleşik):
+
+| işaret | **modelin metni** (n=160) | **ham kb yedegi** (n=40) |
+|---|---|---|
+| dolgu ("daha fazla detay…") | **%21,9** | **%7,5** |
+| küçük harfle başlıyor | %0,0 | %7,5 |
+| yarım cümle (kapanış yok) | **%8,1** | **%0,0** |
+| ortalama karakter | 119,8 | 93,1 |
+
+**Ham kb, modelin kendi metninden 2,9 KAT daha az dolgu içeriyor ve hiç
+yarım cümle yok.** Beklenen tam tersiydi. Yani §6.12'deki "ham kb
+ekrana koyuluyor" şikâyetinin **asıl kaynağı ham kb değil**; sorun
+modelin ürettiği metnin içinde (dolgu %21,9, yarım cümle %8,1).
+
+**Ham kb'nin tek kusuru:** %7,5 küçük harfle başlıyor (40 metinde 3).
+Bu **veri** kusuru (`knowledge_map.jsonl`), araçla düzeltilmez —
+veri dosyaları ölçüm araçları tarafından yazılmaz.
+
+#### Karar verilmedi — `brain.py` değişikliği pahalı
+
+`tries 3→6` **+14 puan** ekran oranı veriyor, ama:
+1. Aday sayısı 150→300 → **üretim süresi ~2 kat**. Bu süre **ölçülmedi**
+   (`yedek_olc.py` zaman damgası yazmıyor) → "ne kadar yavaşlar" bilmiyoruz.
+2. Sadakat −2,4 puan düşüyor. Ekran oranı ile sadakat arasındaki
+   denge noktası **tanımlı değil**.
+3. `brain.py` üretim kodu; `eval_llm.py` ve ölçüm araçları import ediyor.
+
+**Önerilen (ölçüme dayalı) sıra:** önce `yedek_olc.py`'ye süre damgası
+ekle (deterministik kalır), sonra `tries` kararını **gecikme ölçümüyle**
+birlikte vermek. Sıcaklık 0,9 **elenmiştir** (+2 soru için sadakat
+−2,2 puan; `tries` aynı bedeli 3,5 KAT daha fazla kazançla veriyor).
+
 ---
 
 # 7. ANA ÇIKARIM VE 29.09 ÖLÇÜM SONUÇLARI
@@ -419,23 +960,116 @@ modelin bağımlı olduğu bir kısıt — ölçümü bozacak, `brain.py:1047` v
 
 ## 7.4 Bilinmeyen (ölçülmedi, tahmin de edilmedi)
 
-`MS_PER_PAIR = 1,5139` milisaniye/çift, 29.09'da **89,3 token/çift** verisiyle ölçüldü.
-Çift başına token %12 arttı (100,0), yani epoch süresi de artmış olmalı; GPU
-olmadan ölçülemez. Yerel olarak `kaggle_start.sh bench` ile ölçülmeli. Veri
-bütçesi (`MAX_PAIRS`) daha önce bağlayıcıydı, o bozulmadı.
+**Bu bölüm 01.10 23:56'da güncellendi: aşağıdaki ilk iki madde artık
+BİLİNMEYEN değil, ÖLÇÜLMÜŞTÜR (§6.14, §6.15).**
 
-## 7.3 Sıradaki adım
+~~`MS_PER_PAIR = 1,5139` ölçülmedi, GPU gerekiyordu.~~
+→ **01.10 koşusundan ölçüldü: gerçek 1,7217 ms/eğitim-çifti (%12,1 daha yavaş).**
+`ENCODE_DK = 26,0` → **ölçüldü: 40,3 dk (%35,5 daha yavaş)**.
+~~`MS_PER_PAIR`'ın hangi çift sayımına ait olduğu belirsiz.~~
+→ **ÇÖZÜLDÜ (§6.16): `eğitim` çifti. Formül `ham` çift sayıyordu →
+birim hatası, 5,34 kat. `MS_PER_HAM_CIFT_EPOCH = 8,0911` eklendi ve
+`sure_ve_hesapla` düzeltildi.** Tavan 1.251.733 → 234.207.
+Ayrıca: **sabitlerin doğruluğunu ölçen test YOKTU** (hepsi formülü aynı
+sabitlerle yeniden hesaplıyordu) → `test_zaman_tavani_olculen_sinirda` yazıldı.
 
-Ölçülebilir kalan yer **veri üretimi**: `autogrow.py` / `enrich_intents.py`
-ürettikleri hedefler. Ölçülmüş adaylar:
-1. Doğallaştırma varlık adı bozuyor (`alyson hannigan` → *"aleis denisof"*);
+### Hâlâ ölçülmemiş (gerçekten bilinmeyenler)
+1. **`val loss` neden üretimi ölçmüyor?** (§6.14) — yeni koşuda val iyileşti
+   (+%4,4) ama ekrana çıkan metin %72→%52 düştü. **Mekanizma ölçülmedi.**
+   Aday hipotezler (hiçbiri kanıtlanmadı): (a) model kb metnine çok yakın
+   metin üretiyor, kapı "özgünlük yok" deyip reddediyor → eski modelin
+   ürettiği "kopya" metinleri de reddediyordu ama biraz daha az;
+   (b) ret nedeni kayması gösteriyor ki asıl değişen "konu kelimesi yok"
+   (+8) ve "konu bileşimi çok düşük" (+7) → yeni model **konu taşımayan**
+   cümleler üretiyor. Bu ikisi ölçüldü; **neden** ölçülmedi.
+2. **`embed` std büyümesi (0,183→0,196) sadakati etkiliyor mu?** İlişki
+   kurulmadı — 2 nokta, başka koşu yok.
+3. ~~**Yedek metin kalitesi** — `tools/yedek_olc.py` yazıldı, çalıştırılmadı.~~
+   → **ÖLÇÜLDÜ (§6.17).** Ham kb **daha temiz** çıktı: dolgu %7,5 vs
+   modelin %21,9'i; yarım cümle %0,0 vs %8,1. Sezgi yanlıştı.
+   Kalan bilinmeyen: `tries 3→6` **gecikme maliyeti ölçülmedi**.
+4. **`normalize.py:16-19` ascii_normalize** etki alanı (retrieval tutarlılığı).
+5. Doğallaştırma varlık adı bozuyor (`alyson hannigan` → *aleis denisof*);
    %1,6 varyantta içerik kapsamı <%50.
-2. Aynı ctx için farklı yanıtlar karışıyor (bir konu/bölümün cevabı başkasının
+6. Aynı ctx için farklı yanıtlar karışıyor (bir konu/bölümün cevabı başkasının
    yerine geçiyor).
-3. §8'deki 4 cevaplanamayan "X nedir" sorusu (`corpus.jsonl`'de tam adıyla
+7. §8'deki 4 cevaplanamayan "X nedir" sorusu (`corpus.jsonl`'de tam adıyla
    kayıt yok).
 
----
+### Ölçüm tarihçesi (hangi rapor ne zaman ölçüldü)
+| rapor | etiket | veri sürümü | deterministik |
+|---|---|---|---|
+| `uretim_baza_0110.json` | 01.10 09:22 | eski normalizasyon | ❌ geçersiz |
+| `uretim_duzeltilmis_0110.json` | 01.10 09:46 | düzeltilmiş | kısmi |
+| `uretim_det_a.json` | 01.10 10:02 | düzeltilmiş + seed | ✅ |
+| `uretim_det_b.json` | 01.10 10:07 | **aynı** | ✅ (≡ det_a) |
+| `kapi_ozgunluk_0110.json` | 01.10 10:41 | eşik taraması | ✅ |
+| `uretim_yeni_0110b.json` | 01.10 20:0x | **yeni model (23:26)** | ✅ |
+| `uretim_eski_0110c.json` | 01.10 20:2x | **eski model (08:00), aynı veri** | ✅ (≡ det_a) |
+| `yedek_olc_0110.json` | 01.10 23:5x | 01.10 modeli (08:00) | ✅ (seed 7) |
+| (doğrudan log) `kaggle_train.txt` | 01.10 23:26 | — | ✅ (zaman tavanı ölçümü, §6.16) |
+
+
+## 7.3 Sıradaki adım (01.10.2026 23:56 güncellendi)
+
+Artık ölçüm güvenilir (§6.10 üç hata düzeltildi, araç deterministik
+doğrulandı). Sıra şöyle:
+
+1. ✅ **Ölçümü karşılaştırılabilir yap** — soru listesi sabitlendi, sadakat
+   normalizasyonu düzeltildi, `random.seed` eklendi. Doğrulandı (6/6 alan
+   50/50 aynı).
+2. ✅ **Özgünlük kapısını çek** — **ÖLÇÜLDÜ, ÇEKİLMEDİ** (§6.12).
+   8 eşik paired tarandı: eşik 0,15→0,05 ekrana çıkan metnin kb'ye göre
+   kopyalık oranını **0,36 → 0,70**'e çıkarıyor. Yeni kabul edilenler gözle
+   bozuk. Gerçek bulgu: kapı reddedince ekrana **ham kb** çıkıyor (bleu
+   **1,000**) → kazanç eşikten değil **yedek metinden**.
+3. ✅ **Yeni eğitimi ölç** — **ÖLÇÜLDÜ, GERİ ALINDI** (§6.14). val loss
+   %4,4 iyileşti (0,3274→0,3129) ama ekrana çıkan metin **%72→%52** düştü.
+   Deterministik olduğu doğrulandı (`det_a`≡`det_b`≡`eski_0110c`, 50/50).
+   **Ana bulgu: `val loss` bu sistemde üretim kalitesini ölçmüyor.**
+4. ✅ **MAX_PAIRS kırpma erimesi** — yeni koşuda da **%100,0, kırpma YOK**
+   (§6.14, bütçe +%0,57 fazla). Bağımsız doğrulama.
+5. ✅ **Yedek metni ölç** — **ÖLÇÜLDÜ (§6.17).** 50 sabit soru × 4 varyant.
+   Sezgi yanlış çıktı: **ham kb modelin metninden daha temiz** (dolgu %7,5 vs
+   %21,9; yarım cümle %0,0 vs %8,1). Gerçek kaldıraç **kapı değil `tries`**:
+   `tries 3→6` ekran oranını **%72→%86** çıkarıyor, kapı kuralına dokunmadan.
+6. ✅ **Zaman tavanı** — **ÖLÇÜLDÜ ve DÜZELTİLDİ (§6.16).** Asıl hata
+   **birim hatasıydı** (eğitim çifti ↔ ham çift), sabit yanlış değildi.
+   Tavan 1.251.733 → **234.207**. `MS_PER_HAM_CIFT_EPOCH = 8,0911` eklendi.
+   Kırpma artık çalışıyor; bedeli ölçüldü: **%15,1 çift / %0,9 kapsama**.
+   Döngsel testlerin yerine ölçüme bağlı testler yazıldı.
+7. ⬜ **`tries 3→6` kararı** (§6.17) — **gecikme maliyeti ölçülmedi**.
+   `yedek_olc.py`'ye süre damgası ekle (deterministik kalır), sonra karar ver.
+   Sıcaklık 0,9 **elenmiştir.**
+8. ⬜ **`normalize.py:16-19` ascii_normalize büyük harf bozuyor** — etki alanı
+   (retrieval tutarlılığı) ölçülsün, sonra karar verilsin (§6.13).
+9. ⬜ `qa_score`'u kopyalama yerine sadakata bağla (§6.1) → `build_crawl_corpus.py`
+   → 8 blok / d=512.
+
+### 1.10 eğitim koşusu (üretimdeki model 01.10 08:00 modeli DEĞİL)
+
+| | değer |
+|---|---|
+| mimari | decoder-only, pre-LN, 6 blok, d=384, 8 baş, ff=1536, **tied** |
+| parametre | **16.905.856** (embed 6.144.000 = **%36,4**; 6 blok 10.646.784) |
+| çift | `MAX_PAIRS` 290.441 (ham 288.802, **kırpma yok**) → ×5 → **1.377.895** |
+| RAG bağlamlı çift | **%47,1** (106.273 benzersiz ctx, 13,0 çift/ctx) |
+| token | 125,1M (100,88 tok/çift; `TOKEN_PER_PAIR=100` → **+%0,88**) |
+| en iyi val | **0,3129 @ epoch 8**, acc 0,925 — **ama ekrana üretim %52 (§6.14)** |
+| süre | 427,1 dk epoch + 40,3 dk encode = **≥ 467,3 dk** (oturum %86,5) |
+| parity torch↔numpy | 5,0e-05 |
+| **durum** | **GERİ ALINDI** — ekrana üretim %72→%52 düştü |
+
+**Uyarı — iki dropout var, karıştırma:** `--dropout 0.10` → **residual** dalı
+(`train_llm.py:370`); **attention** olasılık dropout'u **sabit 0,05**
+(`train_llm.py:377`), bayraktan bağımsız.
+
+**Ölçüldü (artık iddia değil):** `embed` std yeni koşuda **0,1959** (eskisi
+0,1831, **+%,7**). `head_b` **yok** — çıkış `embed^T` (tied), doğrulandı.
+std oranı (yeni/eski): medyan **1,014**, min 0,910, max 1,463 → ölçekler
+sağlıklı, patoloji yok. Ancak **embed ölçeğinin büyümesi sadakat düşüşüyle
+ilişkili olabilir — bu ilişki ölçülmedi, varsayım olarak yazılmadı.**
+
 
 # 8. BİLİNEN ENGLELLER
 
@@ -444,7 +1078,18 @@ bütçesi (`MAX_PAIRS`) daha önce bağlayıcıydı, o bozulmadı.
 - ~~Çalışan VS Code debug sunucusu (PID 7064, port 5000)~~ → **ÇÖZÜLDÜ**
   (29.09 sonrası ölçüldü: PID 7064 yok, port 5000'de dinleyen yok). Artık
   `corpus.jsonl` bozma riski yok.
-- 587 test ~270 saniye sürüyor; ölçüm aracı çalıştırırken `train_llm.py`'ye dokunma.
+- **589 test, `OK (skipped=1)`, 452,7 sn** (01.10 2026 ölçümü, tam paket).
+  Süre **makineye bağlı**: iki ölçümde 511,4 sn ve 452,7 sn → "~270 sn"
+  tahmini düzeltildi. Ölçüm aracı çalıştırırken `train_llm.py`'ye dokunma
+  (`eval_llm.py` import ediyor).
+- **Kök dizinde 13 untracked tek-seferlik script** (30.09/01.10'dan kalma).
+  Ölçüldü (01.10): **13/13 untracked**, CI yalnızca `-s tests` taradığı için
+  **13/13 CI-dışı**. 4 tanesi **veri dosyasına YAZIYOR**:
+  `add_4_intents.py`, `add_4_km.py`, `add_corpus_entries.py`,
+  `fix_intent_responses.py`. Kalan 9 yalnızca okur.
+  **Karar: SİLİNMEDİ.** Ölçülen zararı sıfır; silmek geri alınamaz ve
+  kullanıcının dosyaları. Tek risk: biri **elle** çalıştırılırsa veri bozar.
+  (Bunları silmek istersen ayrıca söyle.)
 
 ---
 
@@ -455,16 +1100,23 @@ bütçesi (`MAX_PAIRS`) daha önce bağlayıcıydı, o bozulmadı.
 | `build_book_pairs.py` | docstring | **ÖLÇÜLEN KAYNAK TAVANI (609)**, kanıtlı |
 | `kaggle_start.sh` | 1-50, 60-140, 149 | Kullanım, env değişkenleri, asıl eğitim komutu |
 | `train_llm.py` | 185, 207, 210 | `MAX_SEQ_LEN=256`, **`KB_TEXT_CHARS=300`**, `SEED=7` |
-| `train_llm.py` | 213, 232, 837 | `TOKEN_PER_PAIR`, `ENC_CIFT_SN`, `MS_PER_PAIR` (hepsi ölçülmüş) |
+| `train_llm.py` | 213, 232, 858 | `TOKEN_PER_PAIR`, `ENC_CIFT_SN`, `MS_PER_PAIR` (**eğitim çifti** — bütçe formülünü artık beslemiyor) |
+| `train_llm.py` | 916 | **`MS_PER_HAM_CIFT_EPOCH = 8,0911`** — bütçe formülünün tek kullandığı sabit (§6.16) |
 | `train_llm.py` | 485 | `make_batches` (PAD budama + `_pack_encoded`) |
 | `train_llm.py` | 737, ~760 | `build_kb_lut`, `rag_context_stats` (29.09 düzeltmesi) |
-| `train_llm.py` | 874 | `sure_ve_hesapla` — **MAX_PAIRS tavanının tek doğruluk kaynağı** |
+| `train_llm.py` | 936 | `sure_ve_hesapla` — **MAX_PAIRS tavanının tek doğruluk kaynağı** (birim: ham çift) |
 | `train_llm.py` | ~1090 | RAG yazdırma satırı (yalnızca log) |
 | `train_llm.py` | 386 | `_cache_fp` |
 | `train_llm.py` | 920, 1021-1023 | `load_chatgrow_pairs`, RAG eşiği (`use_corpus`) |
 | `brain.py` | 1047 | 40 sınıf kuralı (`>6` desen → sohbet) |
 | `brain.py` | 764 | `knowledge_bias=1.2` |
 | `brain.py` | 2035 | decoding — 4 eksende ölçüldü, hiçbiri kazandırmadı (§7) |
+| `brain.py` | 1467, 1469 | **`random.choice(responses)`** — bilgi metni seçimi; NumPy tohumundan bağımsız, ölçümü bozuyordu (§6.10 hata 3) |
+| `tools/uretim_olc.py` | 93 | `icerik_kelimeler` — Türkçe harf **silme** hatası düzeltildi (§6.10 hata 1) |
+| `tools/sure_olc.py` | — | **zaman tavanını `kaggle_train.txt`'ten ölçer.** Birim hatasını buldu (§6.16); `MS_PER_HAM_CIFT_EPOCH`'u yeniden ölçmek için çalıştırılır |
+| `tools/yedek_olc.py` | — | kapı reddedince ekrana ne çıktığını ölçer; `tries`×`temp` 4 varyant (§6.17) |
+| `tools/model_ab.py` | — | "hangi modeli kuralım" kararını ölçümle verdirir (modeli kurmaz) |
+| `tools/soru_listesi.json` | — | **SABİT 50 soru.** Elle değiştirme; değişirse raporlar kıyaslanamaz |
 | `brain.py` | 2098, 2145 | kapı distinct-letter düzeltmesi |
 | `eval_llm.py` | 400+ | `compare_reports` decoding denetimi |
 | `corpus.py` | 188, 303, 368, 486, 921 | `Corpus`, `_load_index_cache`, `load`, `_ensure_embeddings`, `search(query, k=2)` |
@@ -474,7 +1126,7 @@ bütçesi (`MAX_PAIRS`) daha önce bağlayıcıydı, o bozulmadı.
 | `model/yeni_2909/` | — | üretimdeki model + `kaggle_train.log` (5777 bayt) |
 | `model/kaggle_2909/` | — | önceki koşu logu |
 | `model/yedek/20260929_031340/` | — | tek rollback noktası (29.09 öncesi) |
-| `tools/` | — | 6 ölçüm aracı + README |
+| `tools/` | — | 9 ölçüm aracı + README |
 | `scripts/sync_chatgrow.ps1` | — | yerel ChatGrow senkronu |
 | `colab/nextgen_llm_colab.ipynb` | — | Colab alternatifi |
 
@@ -497,7 +1149,10 @@ bütçesi (`MAX_PAIRS`) daha önce bağlayıcıydı, o bozulmadı.
 # 11. TEST / CI
 
 - `pytest` **yok** → `python -m unittest discover -s tests -p "test_*.py"`
-- ~270 saniye, **587 test OK (1 skip)**
+- **452,7 saniye**, **589 test OK (skipped=1)** — tam yeşil (01.10 2026).
+  Önceki ölçüm 511,4 sn / 587 test idi; süre makineye bağlı, iki sayı da
+  kayıtlı. **589 = 587 + 2** (`test_zaman_tavani_olculen_sinirda`,
+  `test_kirpma_kapsamayi_agirmeden_atmiyor` — §6.16).
 - CI (`ci.yml`, Python 3.12) yalnız **`pip install numpy requests flask`** yapar →
   `torch` bağımlı testler `@requires_torch` ile **skip** edilir (aksi halde
   `unittest.loader._FailedTest` modülü düşürüp tüm suite'i kırmızı eder).

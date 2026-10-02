@@ -25,7 +25,8 @@ if BASE not in sys.path:
 
 ARACLAR = os.path.join(BASE, 'tools')
 VARSAYILAN = ('uretim_olc.py', 'uretim_karsilastir.py', 'kapi_ab.py',
-              'kendi_cumlesi.py', 'token_olc.py', 'kalite_olc.py')
+              'yedek_olc.py', 'kendi_cumlesi.py', 'token_olc.py',
+              'kalite_olc.py', 'model_ab.py', 'sure_olc.py')
 
 
 def _kaynak(ad):

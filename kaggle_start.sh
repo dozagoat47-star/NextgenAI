@@ -32,9 +32,15 @@
 #   DIKKAT: 28.09 olcumu 315.883 CIFTTE alinmisti (585 cift/sn, 1,3884
 #   ms/cift) ve veri 3,2 KAT buyuyunca iki sabit de bayatlaydi. Yanlisi
 #   yondu: MS_PER_PAIR kucuk saymak butceyi BUYUTUYORDU (12 epoch 396 dk
-#   yerine gercekte 431 dk ister -> oturum kesilirdi). Zaman butcesi
-#   pratikte baglayici DEGIL, veri butcesi (MAX_PAIRS) asil kisittir;
-#   yine de iki sabit de OLCULDUgunu yaziyoruz, tahmin degil.
+#   yerine gercekte 431 dk ister -> oturum kesilirdi).
+#
+#   DIKKAT 2 (01.10.2026): yukaridaki "zaman butcesi pratikte baglayici
+#   DEGIL" yorumu YANLISTI ve kaldirildi. Asil hata sabit yanlisi degil
+#   BIRIM hatasiydi: MS_PER_PAIR egitim cifti, tavan ham cift sayiyordu
+#   (expansion 01.10'da OLCULDU: 4,7711). Tavan gercek sinirdan 5,34 KAT
+#   uzaktaydi ve 29.09'dan beri hic baglamiyordu. Artik HAM cift sabiti
+#   kullaniliyor ve tavan GERCEKTEN bagliyor (1.251.733 -> 234.207).
+#   OLCUM: tools/sure_olc.py, DEVAM_PROMPTU.md 6.16.
 #   Erken durdurma (patience) val yukselmeye baslayinca keser; EPOCH
 #   vermezsen 12 kullanilir, yine olusturulabilir. Daha uzun egitim istersen
 #   LLM_EPOCHS=150 gibi ver ve Kaggle oturum suren yeterli olsun.
@@ -86,18 +92,33 @@ fi
 # (6.364 intent -> ~120.000; 20.000 intent -> ~377.000).
 #
 # BURADA sure tamani hesaplanir cunku oturum suresi ve EPOCHS sadece
-# burada biliniyor. Iki olculmus sabit:
-#   7,31 dk/epoch  (MAX_PAIRS=70.000'de, bu dosyanin ust yorumu)
-#   9 dk encode    (bir kez)
-# Bu ikisi dogrusal olceklendirilir ve bosluk payi birakilir.
+# burada biliniyor.Uc olculmus sabit kullanilir:
+#   MS_PER_HAM_CIFT_EPOCH  8,0911 ms / HAM cift / epoch  (01.10 23:26)
+#   ENCODE_DK              26,0 dk  (bir kez)
+#   VARSAYILAN_BOSLUK      0,75    (oturumun %75'i veriye)
+#
+# DIKKAT (01.10.2026 duzeltmesi): once MS_PER_PAIR (1,5139 ms) kullaniliyordu
+# ama o bir EGTIM cifti (post-expansion) maliyetidir; tavan ise HAM cift
+# (pre-expansion) sayar. Expansion 01.10'da OLCULDU: 4,7711. Birim hatasi
+# tam o kadar -> tavan gercek sinirdan 5,34 KAT uzaktaydi ve 29.09'dan beri
+# HICBIR ZAMAN baglamiyordu. Eski yorumlardaki "7,31 dk/epoch" ve "9 dk
+# encode" sayilari da bu hatanin yanlis oldugunu SANYAN kaleydi; ikisi de
+# kullanilmiyor. OLCUM: tools/sure_olc.py, ayrinti DEVAM_PROMPTU.md 6.16.
+#
 # TAVAN FORMULU train_llm.sure_ve_hesapla()'da TEK DOGRULUK KAYNAGI olarak
 # yazilidir (bash'ta yazilsaydi test edilemezdi; ilk yazimda saat->dk cevirisi
 # iki kez yapildigi icin tavan 316.000 yerine 9.575 cift cikti ve egitimi
 # mahvedecekti). Burada sadece oturum bilgisi (9 saat) ve EPOCHS aktarilir.
 OTURUM_DK="${LLM_OTURUM_DK:-540}"
+# Tavan ve kullanilan iki sabit KODDAN okunur, bash'a YAZILMAZ; yoksa log
+# satiri koddaki degisikligi yansitmaz ve kaggle_train.txt olcum kaynagi
+# olarak yaniltir (29.09'da "7,31 dk/epoch" yazan yorum bu yuzden elle
+# guncellenmisti ve kodla arasi ayrilmisti).
 MPCAP=$(python -c "import train_llm as t; print(t.sure_ve_hesapla(oturum_dk=$OTURUM_DK, epochs=$EPOCHS))")
+MSHAM=$(python -c "import train_llm as t; print(t.MS_PER_HAM_CIFT_EPOCH)")
+ENCDK=$(python -c "import train_llm as t; print(t.ENCODE_DK)")
 echo "[0/3] Veri butcesi tavani: $MPCAP cift ($OTURUM_DK dk oturum, $EPOCHS epoch,"
-echo "      %75 kullanim, 9 dk encode; 7,31 dk/epoch olcusunden)"
+echo "      %75 kullanim, ${ENCDK} dk encode; ${MSHAM} ms/HAM-cift/epoch olcusunden)"
 MPCARGS="--max-pairs-cap $MPCAP"
 
 # Kapasite: varsayilan d=384 / 6 blok (~22.9M). Env ile asilabilir:

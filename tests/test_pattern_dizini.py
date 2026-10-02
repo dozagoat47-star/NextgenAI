@@ -274,14 +274,37 @@ class TestGercekVeri(unittest.TestCase):
                              '%r yanlis cozuldu' % soru)
 
     def test_veride_patterni_olmayan_konular_bos_kalir(self):
-        """Bu konularda gercekten tanim yok; bot da 'bilmiyorum' demeli,
-        UYDURMAMALI (bilgi tabaninda istenen tanim yok)."""
+        """Konu veride YOKSA dizin UYDURMAMALI -> None.
+
+        Konular SABIT LISTEDEN degil CANLI VERIDEN turetilir. Onceki surum
+        `('kadin nedir', 'kuantum bilgisayarlar nedir', 'siber guvenlik
+        nedir')` listesini hardcode ediyordu; CI intents.json'u buyuttukce
+        liste YANLISLANDI (01.10 olcumunde `kadin_tanim` verideydi, test
+        kirmiziydi, kod dogruydu). Artik "dizinde karsiligi olmayan" konu
+        sorusu veriyle birlikte ilerler.
+        """
         b = _bot(chat_tags=['spor', 'bilim', 'muzik', 'programlama'],
                  veri=self.veri)
-        for soru in ('kadin nedir', 'kuantum bilgisayarlar nedir',
-                     'siber guvenlik nedir'):
-            self.assertIsNone(b._exact_pattern_tag(soru),
-                              '%r veride yok, dizin uydurmamali' % soru)
+
+        # aday konular: eski liste + veride HICBIR ZAMAN olmayacaklar
+        adaylar = ['kadin', 'kuantum bilgisayarlar', 'siber guvenlik',
+                   'zzzqqq xvii', 'kirmizi balon uydurma',
+                   'pazartesi sabahi uydurma kelimesi']
+        yok = []
+        for konu in adaylar:
+            soru = '%s nedir' % konu
+            anahtar = b._pattern_key(soru)
+            if anahtar not in b.pattern_tags:
+                yok.append(soru)
+
+        self.assertGreater(
+            len(yok), 0,
+            'hicbir aday konu dizinde yok: ya veri butunu indekslemeye '
+            'basladi (test bosluga dustu) ya _pattern_key bozuldu')
+        for soru in yok:
+            self.assertIsNone(
+                b._exact_pattern_tag(soru),
+                '%r veride yok, dizin uydurmamali' % soru)
 
     def test_dizin_veriyle_tutarli(self):
         b = _bot(veri=self.veri)

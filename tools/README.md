@@ -25,7 +25,7 @@ Ders: **uretim yolunu sadece eval ile olcmek yaniltir.**
 python tools/uretim_olc.py <etiket> [cikti.json]
 ```
 
-50 soruyu `knowledge_map.jsonl`'den deterministik secer, her soru icin
+50 soruyu **`soru_listesi.json`'dan** (sabit liste) okur, her soru icin
 uretim denemelerini (best-of-3) kaydeder:
 
 - **deneme kabul orani** - kapidan gecen uretim / toplam deneme
@@ -34,6 +34,41 @@ uretim denemelerini (best-of-3) kaydeder:
 - **sadakat** - uretilen metnin icerik kelimelerinden bilgi parcasinda
   gercekten bulunanlarin orani (uydurma olcumu)
 - **ret nedenleri** - hangi kapi sarti ihlal edildi, dagilimiyla
+
+### `soru_listesi.json` - NEDEN SABIT (01.10.2026)
+
+Sorular once `knowledge_map.jsonl`'den satir adimiyla (`i % 600`) seciliyordu.
+Ama `knowledge_map.jsonl` CI'da (`kbmap.yml`) her gun **yeniden uretiliyor**:
+satir sayisi degismese bile satir icerigi degisiyor, yani ayni adim **farkli
+sorulari** seciyor. Olculdu: 29.09 raporu ile 01.10 raporunda **3/50 ortak
+soru** vardi. Yani "ekrana cikan metin %52 -> %76" gibi **zaman serisi
+iddialari gecersizdi** - 47/50 soru degismisti.
+
+Simdi sorular `tools/soru_listesi.json`'dan okunur; dosya yoksa eski yolla
+uretilip **sabitlenir** ve uyari basar. Dosya repodadir, veri dosyasi DEGILDIR
+(olcum tanimidir) ve **elle degistirilmemelidir**: degistirilirse yeni rapor
+eskisiyle kiyaslanamaz.
+
+### Sadakat normalizasyonu duzeltildi (01.10.2026)
+
+`icerik_kelimeler` once Turkce harfleri **siliyordu**:
+
+```
+"sarkinin"  -> ['sarkinin']    (ASCII metin bozulmadan)
+"sarkinin"  -> ['ark']         (s ve noktali i SILINDI)
+```
+
+Model ciktisi ASCII, bilgi metni (`kb`) Turkce oldugu icin iki taraf **hic
+eslesemiyordu**; sadakat yapay olarak dusuk olculuyordu. Artik projenin kanonik
+katlamasi `normalize.ascii_normalize` kullaniliyor.
+
+**Olculen etki** (01.10 modeli, ayni 50 soru, ayni tohum, ayni uretimler):
+sadakat **%33,3 -> %57,1**.
+
+> `uretim_karsilastir.py` rapor JSON'undaki `sadakat` alanini okudugu icin
+> **01.10.2026 oncesi uretilmis raporlarla** calistirilirsa eski (bozuk)
+> sayilari kullanir. Karsilastirmadan once `baza_0110.json` sonrasi uretilmis
+> rapor kullan.
 
 `np.random.seed(7)` her soruda tekrar kurulur ve `_external_knowledge`
 yereldir (ag yok), yani **iki kosu birebir ayni** sonucu verir. Iki modeli
@@ -49,13 +84,113 @@ Fark **A - B** yazilir (eval_llm.py ile ayni yon). Dort eksen: ekrana
 uretim gecen soru (ikili + McNemar), sadakat (paired t), deneme basi
 kabul, ret nedenleri farki.
 
-## kapi_ab.py - kalite kapisini iki kuralla karsilastirir
+## kapi_ab.py - OZGUNLUK ESIGI taramasi (esik 0.15 -> 0.00)
 
-Harf-cesitliligi kuralinin eski (`0.30 * harf`) ve yeni
-(`min(12, 0.30 * harf)`) halini AYNI sorularda uygular. Bu arac
-29.09'daki kapı hatasini buldu: eski kural Turkce alfabe 29 harf oldugu
-icin 96 karakterden sonra matematiksel olarak imkansizdi, yani 97-260
-karakter araliginin tamami reddediliyordu.
+Kapinin `ozgunluk >= %15` kuralini 8 esikte **paired** olarak tarar ve her
+esikte ekrana cikan metnin sadakatini olcer. Ciktida "yeni kabul" = 0.15'te
+reddedilip o esikte kabul edilen adaylar ve onlarin sadakati gorunur.
+
+**Neden tek kosu yeterli:** uretim yolu 3 adayi her zaman uretir ve gecenler
+arasindan en uzun olani secer (`brain.py:2033-2042`). Aday metinleri ve secim
+kurali esikten bagimsiz oldugu icin **tek kosuda** kaydedip esik degistirerek
+yeniden hesaplamak ayni sonucu verir (8 kosunun 1'i maliyetinde).
+
+Kapinin kopyasi once **dogrulanir**: eldeki rapordaki 150 adayda asil
+`brain._accept_kb_rephrase` karariyla **150/150 ayni** olmazsa tarama gecersiz
+sayilir. (01.10'da dogrulandi.)
+
+Onceki surumu harf-cesitliligi kuralini kiyasiyordu; o kural 25.09'da
+matematiksel olarak imkansiz bulundu ve `min(12, ...)` ile duzeltildi
+(`brain.py:2081-2098`), sorun kapandi.
+
+## model_ab.py - "hangi modeli kuralim" SORUSUNU OLCMEYLE cevaplar
+
+01.10.2026 23:26 egitimi val loss'u %4,4 iyilestirdi ama 50 sabit
+sorumada **ekrana cikan metin %72 -> %52 dustu** (deterministik
+olculdugu dogrulandi). Yani "metriglere bakin, model iyi" yaniltici.
+
+```
+python tools/model_ab.py model/nde_irma_0110_2326/llm_model.json yeni
+python tools/model_ab.py <yeni.json> yeni --rapor olcum_raporlari/uretim_eski_0110c.json
+```
+
+Yaptigi:
+
+1. **Determinizm kontrolu** - ayni modeli iki kez olcer, 5 alanin
+   (`uretilildi`, `yanit`, `sadakat`, `kb`, `bos_kova`) 50/50 ayni
+   oldugunu dogrular. Degilse sonuc gecersiz.
+2. **Asil olcum** - aday modelle bir kez daha olcer.
+3. **Veri degisti mi** - iki kosu arasinda uretimi etkileyen veri
+   dosyalarinin (intents/knowledge_map/corpus/chatgrow_*) izini karsilastirir.
+4. **Karar** - ekrana cikan metin sayisini karsilastirir, hangisinin
+   kurulacagini yazar.
+
+**Arac modeli KURMAZ** (yedekleme `model_kur.py`'nin isi). Amaci:
+karar gozle degil olcumle verilsin.
+
+### `uretim_olc.py` raporuna damga yazar
+Her rapor artik `veri_damgasi`, `model_damgasi` ve
+`soru_listesi_damgasi` tasir (dosya `boyut` + `mtime`). 01.10'da iki rapor
+"paired" sanildi ama aralarinda saatler icinde `chatgrow_*.jsonl`
+degismisti; artik rapor kendi kendini savunur.
+
+## yedek_olc.py - kapi reddedince ekrana ne cikiyor?
+
+Kapı 3 adayı reddedince `_try_kb_rephrase` **ham kb metnini** döndürüyor
+(`brain.py:2047`). Bu metin çoğu zaman küçük harfle başlıyor, yarım
+cümle olabiliyor ve doğallaştırma dolguları ("bir bakıma", "kısa ca",
+"ayrıca") taşıyor.
+
+**Kapının kuralına dokunmadan** yedekten kaçınmanın yollarını ölçer:
+`tries` 3→6 ve `temperature` 0,7→0,9 (daha çok aday / daha cesur aday →
+kapıdan geçen bulunma şansı). 4 varyantı aynı 50 sabit soruda karşılaştırır.
+
+Nesnel yedek işaretleri (metin okumadan sayılır): küçük harfle başlıyor mu,
+noktalama ile bitiyor mu, dolgu ifadesi var mı, karakter sayısı.
+
+`brain.py:2031-2047` yalnızca parametreli **kopyalanır**; üretim kodu
+değişmez.
+
+**Ölçülen sonuç (01.10.2026, `olcum_raporlari/yedek_olc_0110.json`):**
+sezgi **yanlış çıktı** — ham kb modelin metninden **daha temiz**:
+
+| işaret | modelin metni (n=160) | ham kb yedeği (n=40) |
+|---|---|---|
+| dolgu | %21,9 | **%7,5** |
+| yarım cümle | %8,1 | **%0,0** |
+| küçük harfle başlıyor | %0,0 | %7,5 |
+
+Kaldıraç **kapı değil `tries`**: `tries 3→6` ekran oranını %72→%86 çıkarıyor
+(+7 soru) kapı kuralına dokunmadan; sıcaklık 0,7→0,9 tek başına sadece +2.
+Bedeli: aday 150→300 (**×2 süre — ölçülmedi**) ve sadakat −2,4 puan.
+
+**Bilinen eksik:** araç **süre damgası yazmıyor**, yani "ne kadar yavaşlar"
+bilinmiyor. `tries` kararından önce eklenmeli (`DEVAM_PROMPTU.md` §6.17).
+
+
+## sure_olc.py - zaman tavanini kaggle_train.txt'ten OLÇER
+
+`train_llm.sure_ve_hesapla()`'nın tavanının **gerçekte ne kadar yanlış**
+olduğunu logdan ölçer; `train_llm.py`'ye dokunmaz.
+
+**Bulduğu hata (01.10.2026, §6.16):** formül `MS_PER_PAIR`'ı kullanıyordu
+— bu bir **eğitim çifti** (post-expansion) maliyeti — ama dönen sayı
+`coz_max_pairs` → `MAX_PAIRS` zincirinde **ham çift** (pre-expansion)
+biriminde kullanılıyor. 01.10'da ölçülen expansion **4,7711** → birim hatası
+tam o kadar. Sonuç: tavan gerçek sınırın **5,34 KAT** uzaktaydı ve 29.09'dan
+beri **hiç bağlamıyordu**.
+
+Arac üç seçeneğin tavanını yan yana basar ve **hangisinin yetersiz olduğunu
+gösterir**: (A) sadece `MS_PER_PAIR`'ı düzeltmek yalnızca %12,1 düşürür →
+**yetersiz**; (B) ham çift başına ölçülen sabit → 234.207 → **doğru**.
+
+Yeni sabiti `MS_PER_HAM_CIFT_EPOCH` olarak `train_llm.py`'ye yazdıktan sonra
+**yeni koşu olçtüğünde bu araç tekrar çalıştırılıp sabit güncellenir.**
+
+```
+python tools/sure_olc.py [kaggle_train.txt]
+```
+
 
 ## kendi_cumlesi.py - model kendi cumlesini mi kuriyor
 
