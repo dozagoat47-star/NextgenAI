@@ -149,6 +149,7 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
     
     # Load pairs from intents.json
     pairs = load_pairs(intents_path, max_pairs=max_pairs_cap)
+    _log(f'Loaded {len(pairs)} pairs from intents.json')
     
     # Add chatgrow pairs if provided
     if chatgrow_path:
@@ -207,6 +208,10 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
         va.append((ids, mask))
     
     _log(f'Encoded: train {len(tr)}, val {len(va)}')
+    
+    # Get vocab from tokenizer
+    vocab = list(tokenizer.vocab().values()) if hasattr(tokenizer, 'vocab') else None
+    
     return {'vocab': vocab, 'tokenizer': tokenizer, 'tr': tr, 'va': va}
 
 
