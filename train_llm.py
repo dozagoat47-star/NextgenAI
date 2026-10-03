@@ -138,14 +138,17 @@ def _log(msg):
 def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
                  max_ctx_len=MAX_CTX_LEN, max_seq_len=MAX_SEQ_LEN,
                  batch_size=64, chatgrow_path=None, limit_pairs=0,
-                 max_pairs_cap=0):
+                 max_pairs_cap=0, intents_path=None):
     """chatgrow/intent verisinden (sorgu, yanit) ciftleri uretir.
     CPU tensors dondurur; GPU'ya batch isleme tasinir."""
     if tokenizer is None:
         tokenizer = load_tokenizer()
     
+    if intents_path is None:
+        intents_path = os.path.join(BASE, 'intents.json')
+    
     # Load pairs from intents.json
-    pairs = load_pairs(max_pairs=max_pairs_cap)
+    pairs = load_pairs(intents_path, max_pairs=max_pairs_cap)
     
     # Add chatgrow pairs if provided
     if chatgrow_path:
@@ -280,10 +283,11 @@ def main():
     _log(f'PyTorch {torch.__version__} | device: {DEVICE} | GPU: {torch.cuda.get_device_name(0) if DEVICE=="cuda" else "-"} (Count: {n_gpu}) | AMP: {"fp16" if DEVICE=="cuda" else "off"} | SAVE_DIR: {SAVE_DIR} | RAG: {RAG} | patience: {patience} | dp_off: {dp_off}')
 
     _log('Veri hazirlaniyor...')
+    intents_path = os.path.join(BASE, 'intents.json')
     d = prepare_data(RAG, NATURAL=NATURAL, tokenizer=load_tokenizer(),
                      kb_map_path=args.kb_map, max_ctx_len=mxc, max_seq_len=mxs,
                      batch_size=bs, chatgrow_path=args.chatgrow,
-                     max_pairs_cap=args.max_pairs_cap)
+                     max_pairs_cap=args.max_pairs_cap, intents_path=intents_path)
     vocab = d['vocab']
     tok = d['tokenizer']
     V = tok.vocab_size if tok is not None else len(vocab)
