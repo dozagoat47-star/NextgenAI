@@ -114,6 +114,7 @@ if HAVE_TORCH:
             self.num_heads = num_heads
             self.head_dim = d_model // num_heads
             self.rsqrt = 1.0 / math.sqrt(self.head_dim)
+            self.drop = drop
             
             # Pre-LN 1
             self.ln1 = nn.LayerNorm(d_model)
