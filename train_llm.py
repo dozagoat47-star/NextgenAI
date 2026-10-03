@@ -281,7 +281,11 @@ MAX_PAIRS_INTENT_CARPAN = 18.85
 MAX_CTX_LEN = 48
 MAX_SEQ_LEN = 256
 SEED = 7
-SAVE_DIR = BASE
+# Kaggle Output paneli yalnizca /kaggle/working/ kokunu gosterir.
+# Script git klonunun icinden calisir (/kaggle/working/NextgenAI/) ->
+# ciktilari ust dizine yonlendirmezse Output'ta gorunmez.
+_KAGGLE_OUT = '/kaggle/working'
+SAVE_DIR = _KAGGLE_OUT if os.path.isdir(_KAGGLE_OUT) else os.environ.get('SAVE_DIR', BASE)
 CTX_CHARS = 48
 
 
@@ -703,6 +707,27 @@ def main():
             _log(f'checkpoint saved')
 
     _log(f'Toplam egitim suresi: {(time.time() - t0_all) / 60:.1f} dk')
+
+    # --- Egitim ciktilerini SAVE_DIR icinde zip'le (Kaggle Output icin) ---
+    try:
+        import zipfile
+        _OUTPUT_EXTS = {'.pt', '.pth', '.json', '.npz', '.log'}
+        zip_path = os.path.join(SAVE_DIR, 'model_outputs.zip')
+        packed = []
+        for fn in os.listdir(SAVE_DIR):
+            if os.path.splitext(fn)[1].lower() in _OUTPUT_EXTS:
+                packed.append(fn)
+        if packed:
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+                for fn in sorted(packed):
+                    zf.write(os.path.join(SAVE_DIR, fn), fn)
+            _log(f'Ciktilar ziplendi: {zip_path} ({len(packed)} dosya, '
+                 f'{os.path.getsize(zip_path) / 1048576:.1f} MB)')
+        else:
+            _log('Uyari: zip icin dosya bulunamadi')
+    except Exception as e:
+        _log(f'Uyari: zip olusturulamadi: {e}')
+
     return 0
 
 
