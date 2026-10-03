@@ -285,9 +285,9 @@ SAVE_DIR = BASE
 CTX_CHARS = 48
 
 
-def _log(msg):
+def _log(msg, *args, **kwargs):
     """Print with immediate flush for Kaggle real-time logs."""
-    print(msg, flush=True)
+    print(msg, *args, flush=True, **kwargs)
 
 
 def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
