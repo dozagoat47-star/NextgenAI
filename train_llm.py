@@ -560,8 +560,20 @@ def main():
             for g in opt.param_groups:
                 g['lr'] = cur
             
-            x = trX[bi].to(DEVICE, non_blocking=True)
-            m = trM[bi].to(DEVICE, non_blocking=True)
+            # Pad sequence to max_seq_len for DataParallel compatibility
+            x = trX[bi]
+            if x.shape[0] < mxs:
+                x = torch.cat([x, torch.full((mxs - x.shape[0],), PAD, dtype=x.dtype)])
+            elif x.shape[0] > mxs:
+                x = x[:mxs]
+            x = x.to(DEVICE, non_blocking=True)
+            
+            m = trM[bi]
+            if m.shape[0] < mxs:
+                m = torch.cat([m, torch.zeros(mxs - m.shape[0], dtype=m.dtype)])
+            elif m.shape[0] > mxs:
+                m = m[:mxs]
+            m = m.to(DEVICE, non_blocking=True)
             
             opt.zero_grad()
             with torch.autocast('cuda', torch.float16) if use_amp else contextlib.nullcontext():
@@ -597,8 +609,19 @@ def main():
             vl = va_acc = 0.0
             with torch.no_grad():
                 for x_v, m_v in zip(vaX, vaM):
+                    # Pad validation sequences to max_seq_len
+                    if x_v.shape[0] < mxs:
+                        x_v = torch.cat([x_v, torch.full((mxs - x_v.shape[0],), PAD, dtype=x_v.dtype)])
+                    elif x_v.shape[0] > mxs:
+                        x_v = x_v[:mxs]
                     x_v = x_v.to(DEVICE, non_blocking=True)
+                    
+                    if m_v.shape[0] < mxs:
+                        m_v = torch.cat([m_v, torch.zeros(mxs - m_v.shape[0], dtype=m_v.dtype)])
+                    elif m_v.shape[0] > mxs:
+                        m_v = m_v[:mxs]
                     m_v = m_v.to(DEVICE, non_blocking=True)
+                    
                     lg = model(x_v)
                     vl += llm_loss(lg, x_v, m_v).item()
                     va_acc += masked_acc(lg, x_v, m_v)
