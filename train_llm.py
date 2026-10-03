@@ -385,6 +385,13 @@ def llm_loss(logits, targets, mask):
 def masked_acc(logits, targets, mask):
     """Accuracy on response positions only."""
     preds = logits.argmax(dim=-1)
+    
+    # Align sequence lengths (dim 1) to minimum length
+    min_len = min(preds.size(1), targets.size(1), mask.size(1))
+    preds = preds[:, :min_len]
+    targets = targets[:, :min_len]
+    mask = mask[:, :min_len]
+    
     correct = (preds == targets) & mask.bool()
     return correct.sum().float() / mask.sum().clamp(min=1)
 
