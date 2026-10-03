@@ -547,6 +547,13 @@ def main():
     done = False
     tot_steps = EPOCHS * len(trX)  # simplified
     
+    # Memory cleanup before training
+    import gc
+    gc.collect()
+    if DEVICE.startswith('cuda'):
+        torch.cuda.empty_cache()
+    _log("Eğitim döngüsü başlıyor...", flush=True)
+    
     for ep in range(start_ep + 1, EPOCHS + 1):
         model.train()
         t0 = time.time()
