@@ -291,7 +291,7 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
     
     # Naturalize pairs
     if NATURAL > 0:
-        pairs = naturalize_pairs(pairs, NATURAL, tokenizer)
+        pairs = naturalize_pairs(pairs, k=NATURAL, seed=SEED)
         _log(f'naturalize: {len(pairs)} pairs after x{NATURAL}')
     
     # Limit pairs
