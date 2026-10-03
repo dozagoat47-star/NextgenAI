@@ -287,7 +287,8 @@ CTX_CHARS = 48
 
 def _log(msg, *args, **kwargs):
     """Print with immediate flush for Kaggle real-time logs."""
-    print(msg, *args, flush=True, **kwargs)
+    kwargs.setdefault('flush', True)
+    print(msg, *args, **kwargs)
 
 
 def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
@@ -552,7 +553,7 @@ def main():
     gc.collect()
     if DEVICE.startswith('cuda'):
         torch.cuda.empty_cache()
-    _log("Eğitim döngüsü başlıyor...", flush=True)
+    _log("Eğitim döngüsü başlıyor...")
     
     for ep in range(start_ep + 1, EPOCHS + 1):
         model.train()
