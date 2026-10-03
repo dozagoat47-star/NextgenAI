@@ -383,17 +383,25 @@ def llm_loss(logits, targets, mask):
 
 
 def masked_acc(logits, targets, mask):
-    """Accuracy on response positions only."""
-    preds = logits.argmax(dim=-1)
-    
-    # Align sequence lengths (dim 1) to minimum length
-    min_len = min(preds.size(1), targets.size(1), mask.size(1))
-    preds = preds[:, :min_len]
-    targets = targets[:, :min_len]
-    mask = mask[:, :min_len]
-    
+    """Accuracy on response positions only. Handles 1D and 2D tensors."""
+    preds = logits.argmax(dim=-1) if logits.ndim == 3 else logits
+
+    # Handle 1D tensors (align on dim 0) or 2D tensors (align on dim 1)
+    if preds.ndim == 1 or targets.ndim == 1 or mask.ndim == 1:
+        min_len = min(preds.size(0), targets.size(0), mask.size(0))
+        preds = preds[:min_len]
+        targets = targets[:min_len]
+        mask = mask[:min_len]
+    else:
+        # 2D tensors: align on sequence length (dim 1)
+        min_len = min(preds.size(1), targets.size(1), mask.size(1))
+        preds = preds[:, :min_len]
+        targets = targets[:, :min_len]
+        mask = mask[:, :min_len]
+
     correct = (preds == targets) & mask.bool()
-    return correct.sum().float() / mask.sum().clamp(min=1)
+    acc = correct.sum().item() / max(mask.sum().item(), 1e-6)
+    return acc
 
 
 def main():
