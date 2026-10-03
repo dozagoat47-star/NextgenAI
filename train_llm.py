@@ -630,7 +630,8 @@ def main():
             scaler.update()
             opt.zero_grad()
         
-        tl /= step_in_epoch        do_val = (ep % val_every == 0 or ep == 1)
+        tl /= step_in_epoch
+        do_val = (ep % val_every == 0 or ep == 1)
         if do_val:
             model.eval()
             vl = va_acc = 0.0
