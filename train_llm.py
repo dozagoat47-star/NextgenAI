@@ -543,10 +543,38 @@ def main():
     vaX = [torch.from_numpy(np.array(x, dtype=np.int64)) for x, _ in va]
     vaM = [torch.from_numpy(np.array(m, dtype=np.float32)) for _, m in va]
 
+    # Training - Use proper DataLoader for efficient batching
+    from torch.utils.data import DataLoader, TensorDataset
+    
+    # Convert to tensors and pad to max_seq_len
+    def pad_sequence(seq, max_len, pad_value):
+        if seq.shape[0] < max_len:
+            return torch.cat([seq, torch.full((max_len - seq.shape[0],), pad_value, dtype=seq.dtype)])
+        return seq[:max_len]
+    
+    _log("Preparing padded tensors for DataLoader...")
+    trX_padded = torch.stack([pad_sequence(x, mxs, PAD) for x in trX])
+    trM_padded = torch.stack([pad_sequence(m, mxs, 0.0) for m in trM])
+    vaX_padded = torch.stack([pad_sequence(x, mxs, PAD) for x in vaX])
+    vaM_padded = torch.stack([pad_sequence(m, mxs, 0.0) for m in vaM])
+    
+    # Create datasets and dataloaders (num_workers=0, pin_memory=False as requested)
+    train_dataset = TensorDataset(trX_padded, trM_padded)
+    val_dataset = TensorDataset(vaX_padded, vaM_padded)
+    
+    train_loader = DataLoader(
+        train_dataset, batch_size=bs, shuffle=True,
+        num_workers=0, pin_memory=False, drop_last=False
+    )
+    val_loader = DataLoader(
+        val_dataset, batch_size=bs, shuffle=False,
+        num_workers=0, pin_memory=False, drop_last=False
+    )
+    
     # Training
     t0_all = time.time()
     done = False
-    tot_steps = EPOCHS * len(trX)  # simplified
+    tot_steps = EPOCHS * len(train_loader)  # simplified
     
     # Memory cleanup before training
     import gc
@@ -558,38 +586,26 @@ def main():
     for ep in range(start_ep + 1, EPOCHS + 1):
         model.train()
         t0 = time.time()
-        order = list(range(len(trX)))
-        random.Random(ep).shuffle(order)
         tl = 0.0
+        step_in_epoch = 0
         
-        for bi in order:
+        for x_batch, m_batch in train_loader:
             step += 1
+            step_in_epoch += 1
             if step <= WARMUP:
                 cur = lr_base * (step / WARMUP)
             else:
-                prog = (step - WARMUP) / max(1, EPOCHS * len(trX) - WARMUP)
+                prog = (step - WARMUP) / max(1, EPOCHS * len(train_loader) - WARMUP)
                 cur = lr_base * (LR_MIN + (1 - LR_MIN) * 0.5 * (1 + math.cos(math.pi * prog)))
             for g in opt.param_groups:
                 g['lr'] = cur
             
-            # Pad sequence to max_seq_len for DataParallel compatibility
-            x = trX[bi]
-            if x.shape[0] < mxs:
-                x = torch.cat([x, torch.full((mxs - x.shape[0],), PAD, dtype=x.dtype)])
-            elif x.shape[0] > mxs:
-                x = x[:mxs]
-            x = x.to(DEVICE, non_blocking=True)
-            
-            m = trM[bi]
-            if m.shape[0] < mxs:
-                m = torch.cat([m, torch.zeros(mxs - m.shape[0], dtype=m.dtype)])
-            elif m.shape[0] > mxs:
-                m = m[:mxs]
-            m = m.to(DEVICE, non_blocking=True)
+            x_batch = x_batch.to(DEVICE, non_blocking=True)
+            m_batch = m_batch.to(DEVICE, non_blocking=True)
             
             opt.zero_grad()
             with torch.autocast('cuda', torch.float16) if use_amp else contextlib.nullcontext():
-                loss = llm_loss(model(x), x, m) / grad_accum
+                loss = llm_loss(model(x_batch), x_batch, m_batch) / grad_accum
             
             scaler.scale(loss).backward()
             
@@ -603,9 +619,10 @@ def main():
             tl += loss.item() * grad_accum
             
             if os.environ.get('SMOKE') and step >= 2:
-                _log(f'SMOKE OK: {float(loss.item() * grad_accum)}')
+                _log(f'SMOKE OK: {float(loss.item() * grad_accum)}', flush=True)
                 return 0
         
+        # Flush remaining gradients
         if step % grad_accum != 0:
             scaler.unscale_(opt)
             torch.nn.utils.clip_grad_norm_(model.parameters(), GRAD_CLIP)
@@ -613,9 +630,7 @@ def main():
             scaler.update()
             opt.zero_grad()
         
-        tl /= len(trX)
-        
-        do_val = (ep % val_every == 0 or ep == 1)
+        tl /= step_in_epoch        do_val = (ep % val_every == 0 or ep == 1)
         if do_val:
             model.eval()
             vl = va_acc = 0.0
