@@ -309,6 +309,22 @@ class BPETokenizer:
     def vocab_size(self):
         return len(self.pieces)
 
+    @property
+    def pad_id(self):
+        return self.c2i.get('<pad>', 0)
+
+    @property
+    def bos_id(self):
+        return self.c2i.get('<bos>', 1)
+
+    @property
+    def sep_id(self):
+        return self.c2i.get('<sep>', 2)
+
+    @property
+    def eos_id(self):
+        return self.c2i.get('<eos>', 3)
+
     def vocab(self):
         """Token id -> parca sözlüğü (kayit/tanimlama icin)."""
         return {i: p for i, p in enumerate(self.pieces)}
