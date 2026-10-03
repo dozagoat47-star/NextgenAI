@@ -383,25 +383,36 @@ def llm_loss(logits, targets, mask):
 
 
 def masked_acc(logits, targets, mask):
-    """Accuracy on response positions only. Handles 1D and 2D tensors."""
-    preds = logits.argmax(dim=-1) if logits.ndim == 3 else logits
+    """Accuracy on response positions only (fully vectorized, GPU-resident).
 
-    # Handle 1D tensors (align on dim 0) or 2D tensors (align on dim 1)
-    if preds.ndim == 1 or targets.ndim == 1 or mask.ndim == 1:
-        min_len = min(preds.size(0), targets.size(0), mask.size(0))
-        preds = preds[:min_len]
-        targets = targets[:min_len]
-        mask = mask[:min_len]
-    else:
-        # 2D tensors: align on sequence length (dim 1)
-        min_len = min(preds.size(1), targets.size(1), mask.size(1))
-        preds = preds[:, :min_len]
-        targets = targets[:, :min_len]
-        mask = mask[:, :min_len]
+    Accepts any mix of batch / unbatched tensors:
+      logits  – (B, T, V) or (T, V)
+      targets – (B, T) or (T,)
+      mask    – (B, T) or (T,)
+    Returns a Python float (single .item() call at the end).
+    """
+    # --- 1. preds from logits ------------------------------------------
+    preds = logits.argmax(dim=-1)          # (B, T) or (T,)
 
-    correct = (preds == targets) & mask.bool()
-    acc = correct.sum().item() / max(mask.sum().item(), 1e-6)
-    return acc
+    # --- 2. Normalise to 2-D (B, T) ------------------------------------
+    if preds.ndim == 1:
+        preds = preds.unsqueeze(0)
+    if targets.ndim == 1:
+        targets = targets.unsqueeze(0)
+    if mask.ndim == 1:
+        mask = mask.unsqueeze(0)
+
+    # --- 3. Align sequence lengths on dim-1 -----------------------------
+    min_len = min(preds.size(1), targets.size(1), mask.size(1))
+    preds   = preds[:, :min_len]
+    targets = targets[:, :min_len]
+    mask    = mask[:, :min_len]
+
+    # --- 4. Compute accuracy (single kernel, single .item()) -----------
+    mask_b  = mask.bool()
+    total   = mask_b.sum()
+    correct = ((preds == targets) & mask_b).sum()
+    return (correct.float() / total.float().clamp(min=1)).item()
 
 
 def main():
@@ -650,26 +661,18 @@ def main():
         if do_val:
             model.eval()
             vl = va_acc = 0.0
+            n_val_batches = 0
             with torch.no_grad():
-                for x_v, m_v in zip(vaX, vaM):
-                    # Pad validation sequences to max_seq_len
-                    if x_v.shape[0] < mxs:
-                        x_v = torch.cat([x_v, torch.full((mxs - x_v.shape[0],), PAD, dtype=x_v.dtype)])
-                    elif x_v.shape[0] > mxs:
-                        x_v = x_v[:mxs]
+                for x_v, m_v in val_loader:
                     x_v = x_v.to(DEVICE, non_blocking=True)
-                    
-                    if m_v.shape[0] < mxs:
-                        m_v = torch.cat([m_v, torch.zeros(mxs - m_v.shape[0], dtype=m_v.dtype)])
-                    elif m_v.shape[0] > mxs:
-                        m_v = m_v[:mxs]
                     m_v = m_v.to(DEVICE, non_blocking=True)
-                    
-                    lg = model(x_v)
+                    with torch.autocast('cuda', torch.float16) if use_amp else contextlib.nullcontext():
+                        lg = model(x_v)
                     vl += llm_loss(lg, x_v, m_v).item()
                     va_acc += masked_acc(lg, x_v, m_v)
-            vl /= len(vaX)
-            va_acc /= len(vaX)
+                    n_val_batches += 1
+            vl /= max(n_val_batches, 1)
+            va_acc /= max(n_val_batches, 1)
             _log(f'epoch {ep:3d}/{EPOCHS} | train {tl:.4f} | val {vl:.4f} | acc {va_acc:.3f} | {time.time()-t0:.1f}s | lr {cur:.5f} | step {step}')
         else:
             _log(f'epoch {ep:3d}/{EPOCHS} | train {tl:.4f} | (val atlandi) | {time.time()-t0:.1f}s | lr {cur:.5f} | step {step}')
