@@ -88,12 +88,13 @@ import numpy as np
 try:
     import torch
     import torch.nn as nn
+    import torch.nn.functional as F
     import torch.distributed as dist
     HAVE_TORCH = True
     torch.backends.cuda.matmul.allow_tf32 = False
     torch.backends.cudnn.allow_tf32 = False
 except Exception:
-    torch = nn = dist = None
+    torch = nn = F = dist = None
     HAVE_TORCH = False
 
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -102,6 +103,133 @@ sys.path.insert(0, BASE)
 from seqgen import RESP_CHARS_MAX, clean_chars, load_pairs
 from llm import PAD, LLM, build_llm_vocab, encode_llm, load_tokenizer
 from naturalize import naturalize_pairs
+
+# ---------------- TorchLLM: PyTorch mirror of NumPy LLM ----------------
+if HAVE_TORCH:
+    class TorchLLM(nn.Module):
+        """PyTorch mirror of llm.LLM (NumPy). Same architecture, same init."""
+        def __init__(self, V, d_model=256, num_blocks=4, num_heads=8, ff_mult=4,
+                     max_seq_len=256, drop=0.10, tie_embeddings=True):
+            super().__init__()
+            self.V = int(V)
+            self.d_model = int(d_model)
+            self.num_blocks = int(num_blocks)
+            self.num_heads = int(num_heads)
+            self.ff_mult = int(ff_mult)
+            self.max_seq_len = int(max_seq_len)
+            self.drop = float(drop)
+            self.tie_embeddings = bool(tie_embeddings)
+            assert self.d_model % self.num_heads == 0
+            self.head_dim = self.d_model // self.num_heads
+            self.ff_dim = self.ff_mult * self.d_model
+            self.rsqrt = float(1.0 / math.sqrt(self.head_dim))
+
+            # Embedding
+            self.embed = nn.Embedding(self.V, self.d_model, padding_idx=0)
+            nn.init.normal_(self.embed.weight, std=0.02)
+            with torch.no_grad():
+                self.embed.weight[0].zero_()
+
+            # Positional encoding
+            pe = torch.zeros(self.max_seq_len, self.d_model)
+            pos = torch.arange(self.max_seq_len, dtype=torch.float32).unsqueeze(1)
+            dim = torch.arange(self.d_model // 2, dtype=torch.float32)
+            div = 10000.0 ** (2.0 * dim / self.d_model)
+            pe[:, 0::2] = torch.sin(pos / div)
+            pe[:, 1::2] = torch.cos(pos / div)
+            pe = pe / math.sqrt(max(self.d_model, 1))
+            self.register_buffer('pos_enc', pe)
+
+            # Transformer blocks
+            self.blocks = nn.ModuleList()
+            for i in range(self.num_blocks):
+                block = nn.ModuleDict({
+                    'ln1': nn.LayerNorm(self.d_model),
+                    'ln2': nn.LayerNorm(self.d_model),
+                    'Wq': nn.Linear(self.d_model, self.d_model, bias=False),
+                    'Wk': nn.Linear(self.d_model, self.d_model, bias=False),
+                    'Wv': nn.Linear(self.d_model, self.d_model, bias=False),
+                    'Wo': nn.Linear(self.d_model, self.d_model, bias=False),
+                    'bq': nn.Parameter(torch.zeros(1, self.d_model)),
+                    'bk': nn.Parameter(torch.zeros(1, self.d_model)),
+                    'bv': nn.Parameter(torch.zeros(1, self.d_model)),
+                    'bo': nn.Parameter(torch.zeros(1, self.d_model)),
+                    'W1': nn.Linear(self.d_model, self.ff_dim),
+                    'W2': nn.Linear(self.ff_dim, self.d_model),
+                    'b1': nn.Parameter(torch.zeros(1, self.ff_dim)),
+                    'b2': nn.Parameter(torch.zeros(1, self.d_model)),
+                    'ln1_g': nn.Parameter(torch.ones(1, self.d_model)),
+                    'ln1_b': nn.Parameter(torch.zeros(1, self.d_model)),
+                    'ln2_g': nn.Parameter(torch.ones(1, self.d_model)),
+                    'ln2_b': nn.Parameter(torch.zeros(1, self.d_model)),
+                    'b1': nn.Parameter(torch.zeros(1, self.ff_dim)),
+                    'b2': nn.Parameter(torch.zeros(1, self.d_model)),
+                })
+                # Init
+                for name in ('Wq', 'Wk', 'Wv', 'Wo', 'W1', 'W2'):
+                    nn.init.normal_(block[name].weight, std=0.02)
+                self.blocks.append(block)
+
+            # Output norm
+            self.out_ln = nn.LayerNorm(self.d_model)
+            self.out_ln_g = nn.Parameter(torch.ones(1, self.d_model))
+            self.out_ln_b = nn.Parameter(torch.zeros(1, self.d_model))
+
+            # Output head
+            if not self.tie_embeddings:
+                self.head = nn.Linear(self.d_model, self.V, bias=False)
+                nn.init.normal_(self.head.weight, std=0.02)
+                self.head_b = nn.Parameter(torch.zeros(1, self.V))
+            else:
+                self.head = None
+                self.head_b = nn.Parameter(torch.zeros(1, self.V))
+
+        def _ln(self, x, g, b):
+            return g * x + b  # LayerNorm is applied before
+
+        def _attn(self, x, i, past=0):
+            B, T, d = x.shape
+            H, hd = self.num_heads, self.head_dim
+            blk = self.blocks[i]
+            p = blk
+
+            # Q, K, V projections
+            Q = (x @ p['Wq'].weight.t() + p['bq']).view(B, T, self.num_heads, self.head_dim).transpose(1, 2)
+            K = (x @ p['Wk'].weight.t() + p['bk']).view(B, T, self.num_heads, self.head_dim).transpose(1, 2)
+            V = (x @ p['Wv'].weight.t() + p['bv']).view(B, T, self.num_heads, self.head_dim).transpose(1, 2)
+
+            # Causal mask
+            scores = (Q @ K.transpose(-2, -1)) * self.rsqrt
+            mask = torch.triu(torch.ones(T, T, device=x.device, dtype=torch.bool), diagonal=1)
+            scores.masked_fill_(mask, -1e9)
+
+            attn = torch.softmax(scores, dim=-1)
+            out = (attn @ V).transpose(1, 2).contiguous().view(B, T, self.d_model)
+            return out @ p['Wo'].weight.t() + p['bo']
+
+        def forward(self, x):
+            B, T = x.shape
+            x = self.embed(x) + self.pos_enc[:T].unsqueeze(0)
+
+            for i in range(self.num_blocks):
+                blk = self.blocks[i]
+                # Pre-LN
+                x_ln = F.layer_norm(x, (self.d_model,), blk['ln1'].weight, blk['ln1'].bias, eps=1e-5)
+                x = x + self._attn(x_ln, i)
+                x_ln = F.layer_norm(x, (self.d_model,), blk['ln2'].weight, blk['ln2'].bias, eps=1e-5)
+                # FFN
+                h = F.gelu(x @ blk['W1'].weight.t() + blk['b1'])
+                h = F.dropout(h, p=self.drop, training=self.training)
+                x = x + (h @ blk['W2'].weight.t() + blk['b2'])
+
+            h = F.layer_norm(x, (self.d_model,), self.out_ln.weight, self.out_ln.bias, eps=1e-5)
+            if self.tie_embeddings:
+                logits = h @ self.embed.weight.t() + self.head_b
+            else:
+                logits = h @ self.head.weight.t() + self.head_b
+            return logits
+else:
+    TorchLLM = None
 
 # ---------------- hiperparametreler (numpy inference ile AYNI mimari) ----------------
 D_MODEL = 256
@@ -148,7 +276,9 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
         intents_path = os.path.join(BASE, 'intents.json')
     
     # Load pairs from intents.json
-    pairs = load_pairs(intents_path, max_pairs=max_pairs_cap)
+    # max_pairs=0 means no limit (use default 20000 in load_pairs)
+    effective_max_pairs = max_pairs_cap if max_pairs_cap > 0 else 20000
+    pairs = load_pairs(intents_path, max_pairs=effective_max_pairs)
     _log(f'Loaded {len(pairs)} pairs from intents.json')
     
     # Add chatgrow pairs if provided
