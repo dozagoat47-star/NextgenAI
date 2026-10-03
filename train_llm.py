@@ -237,6 +237,9 @@ if HAVE_TORCH:
                 self.head_b = nn.Parameter(torch.zeros(1, self.V))
 
         def forward(self, x):
+            # Handle 1D input (single sequence)
+            if x.ndim == 1:
+                x = x.unsqueeze(0)
             B, T = x.shape
             x = self.embed(x) + self.pos_enc[:T].unsqueeze(0)
 
