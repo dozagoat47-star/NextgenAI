@@ -389,6 +389,10 @@ def masked_acc(logits, targets, mask):
 
 
 def main():
+    # Prevent multiprocessing re-import issues (DataParallel/workers)
+    if hasattr(torch, 'multiprocessing'):
+        torch.multiprocessing.set_start_method('spawn', force=True)
+    
     ap = argparse.ArgumentParser()
     ap.add_argument('--epochs', type=int, default=250)
     ap.add_argument('--rag', action='store_true')
