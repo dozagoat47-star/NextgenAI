@@ -106,6 +106,79 @@ from naturalize import naturalize_pairs
 
 # ---------------- TorchLLM: PyTorch mirror of NumPy LLM ----------------
 if HAVE_TORCH:
+    class TransformerBlock(nn.Module):
+        """Single transformer block with pre-LN architecture."""
+        def __init__(self, d_model, num_heads, ff_dim, drop):
+            super().__init__()
+            self.d_model = d_model
+            self.num_heads = num_heads
+            self.head_dim = d_model // num_heads
+            self.rsqrt = 1.0 / math.sqrt(self.head_dim)
+            
+            # Pre-LN 1
+            self.ln1 = nn.LayerNorm(d_model)
+            # Pre-LN 2
+            self.ln2 = nn.LayerNorm(d_model)
+            
+            # Attention projections
+            self.Wq = nn.Linear(d_model, d_model, bias=False)
+            self.Wk = nn.Linear(d_model, d_model, bias=False)
+            self.Wv = nn.Linear(d_model, d_model, bias=False)
+            self.Wo = nn.Linear(d_model, d_model, bias=False)
+            self.bq = nn.Parameter(torch.zeros(1, d_model))
+            self.bk = nn.Parameter(torch.zeros(1, d_model))
+            self.bv = nn.Parameter(torch.zeros(1, d_model))
+            self.bo = nn.Parameter(torch.zeros(1, d_model))
+            
+            # FFN
+            self.W1 = nn.Linear(d_model, ff_dim)
+            self.W2 = nn.Linear(ff_dim, d_model)
+            self.b1 = nn.Parameter(torch.zeros(1, ff_dim))
+            self.b2 = nn.Parameter(torch.zeros(1, d_model))
+            
+            # Pre-LN scale/shift (NumPy style: g*x + b)
+            self.ln1_g = nn.Parameter(torch.ones(1, d_model))
+            self.ln1_b = nn.Parameter(torch.zeros(1, d_model))
+            self.ln2_g = nn.Parameter(torch.ones(1, d_model))
+            self.ln2_b = nn.Parameter(torch.zeros(1, d_model))
+            self.b1 = nn.Parameter(torch.zeros(1, ff_dim))
+            self.b2 = nn.Parameter(torch.zeros(1, d_model))
+            
+            # Init
+            for name in ('Wq', 'Wk', 'Wv', 'Wo', 'W1', 'W2'):
+                nn.init.normal_(getattr(self, name).weight, std=0.02)
+        
+        def forward(self, x, rsqrt):
+            B, T, d = x.shape
+            H, hd = self.num_heads, self.head_dim
+            
+            # Pre-LN 1 + Attention
+            x_ln = F.layer_norm(x, (self.d_model,), self.ln1.weight, self.ln1.bias, eps=1e-5)
+            x_ln = self.ln1_g * x_ln + self.ln1_b
+            
+            Q = (x_ln @ self.Wq.weight.t() + self.bq).view(B, T, self.num_heads, self.head_dim).transpose(1, 2)
+            K = (x_ln @ self.Wk.weight.t() + self.bk).view(B, T, self.num_heads, self.head_dim).transpose(1, 2)
+            V = (x_ln @ self.Wv.weight.t() + self.bv).view(B, T, self.num_heads, self.head_dim).transpose(1, 2)
+            
+            scores = (Q @ K.transpose(-2, -1)) * rsqrt
+            mask = torch.triu(torch.ones(T, T, device=x.device, dtype=torch.bool), diagonal=1)
+            scores.masked_fill_(mask, -1e9)
+            attn = torch.softmax(scores, dim=-1)
+            out = (attn @ V).transpose(1, 2).contiguous().view(B, T, self.d_model)
+            x = x + (out @ self.Wo.weight.t() + self.bo)
+            
+            # Pre-LN 2 + FFN
+            x_ln = F.layer_norm(x, (self.d_model,), self.ln2.weight, self.ln2.bias, eps=1e-5)
+            x_ln = self.ln2_g * x_ln + self.ln2_b
+            
+            h = F.gelu(x_ln @ self.W1.weight.t() + self.b1)
+            h = F.dropout(h + self.b1, p=self.drop, training=self.training)
+            x = x + (h @ self.W2.weight.t() + self.b2)
+            
+            return x
+
+
+if HAVE_TORCH:
     class TorchLLM(nn.Module):
         """PyTorch mirror of llm.LLM (NumPy). Same architecture, same init."""
         def __init__(self, V, d_model=256, num_blocks=4, num_heads=8, ff_mult=4,
@@ -143,32 +216,11 @@ if HAVE_TORCH:
             # Transformer blocks
             self.blocks = nn.ModuleList()
             for i in range(self.num_blocks):
-                block = nn.ModuleDict({
-                    'ln1': nn.LayerNorm(self.d_model),
-                    'ln2': nn.LayerNorm(self.d_model),
-                    'Wq': nn.Linear(self.d_model, self.d_model, bias=False),
-                    'Wk': nn.Linear(self.d_model, self.d_model, bias=False),
-                    'Wv': nn.Linear(self.d_model, self.d_model, bias=False),
-                    'Wo': nn.Linear(self.d_model, self.d_model, bias=False),
-                    'bq': nn.Parameter(torch.zeros(1, self.d_model)),
-                    'bk': nn.Parameter(torch.zeros(1, self.d_model)),
-                    'bv': nn.Parameter(torch.zeros(1, self.d_model)),
-                    'bo': nn.Parameter(torch.zeros(1, self.d_model)),
-                    'W1': nn.Linear(self.d_model, self.ff_dim),
-                    'W2': nn.Linear(self.ff_dim, self.d_model),
-                    'b1': nn.Parameter(torch.zeros(1, self.ff_dim)),
-                    'b2': nn.Parameter(torch.zeros(1, self.d_model)),
-                    'ln1_g': nn.Parameter(torch.ones(1, self.d_model)),
-                    'ln1_b': nn.Parameter(torch.zeros(1, self.d_model)),
-                    'ln2_g': nn.Parameter(torch.ones(1, self.d_model)),
-                    'ln2_b': nn.Parameter(torch.zeros(1, self.d_model)),
-                    'b1': nn.Parameter(torch.zeros(1, self.ff_dim)),
-                    'b2': nn.Parameter(torch.zeros(1, self.d_model)),
-                })
-                # Init
+                blk = TransformerBlock(self.d_model, self.num_heads, self.ff_dim, self.drop)
+                # Custom init to match NumPy
                 for name in ('Wq', 'Wk', 'Wv', 'Wo', 'W1', 'W2'):
-                    nn.init.normal_(block[name].weight, std=0.02)
-                self.blocks.append(block)
+                    nn.init.normal_(getattr(blk, name).weight, std=0.02)
+                self.blocks.append(blk)
 
             # Output norm
             self.out_ln = nn.LayerNorm(self.d_model)
@@ -184,45 +236,15 @@ if HAVE_TORCH:
                 self.head = None
                 self.head_b = nn.Parameter(torch.zeros(1, self.V))
 
-        def _ln(self, x, g, b):
-            return g * x + b  # LayerNorm is applied before
-
-        def _attn(self, x, i, past=0):
-            B, T, d = x.shape
-            H, hd = self.num_heads, self.head_dim
-            blk = self.blocks[i]
-            p = blk
-
-            # Q, K, V projections
-            Q = (x @ p['Wq'].weight.t() + p['bq']).view(B, T, self.num_heads, self.head_dim).transpose(1, 2)
-            K = (x @ p['Wk'].weight.t() + p['bk']).view(B, T, self.num_heads, self.head_dim).transpose(1, 2)
-            V = (x @ p['Wv'].weight.t() + p['bv']).view(B, T, self.num_heads, self.head_dim).transpose(1, 2)
-
-            # Causal mask
-            scores = (Q @ K.transpose(-2, -1)) * self.rsqrt
-            mask = torch.triu(torch.ones(T, T, device=x.device, dtype=torch.bool), diagonal=1)
-            scores.masked_fill_(mask, -1e9)
-
-            attn = torch.softmax(scores, dim=-1)
-            out = (attn @ V).transpose(1, 2).contiguous().view(B, T, self.d_model)
-            return out @ p['Wo'].weight.t() + p['bo']
-
         def forward(self, x):
             B, T = x.shape
             x = self.embed(x) + self.pos_enc[:T].unsqueeze(0)
 
-            for i in range(self.num_blocks):
-                blk = self.blocks[i]
-                # Pre-LN
-                x_ln = F.layer_norm(x, (self.d_model,), blk['ln1'].weight, blk['ln1'].bias, eps=1e-5)
-                x = x + self._attn(x_ln, i)
-                x_ln = F.layer_norm(x, (self.d_model,), blk['ln2'].weight, blk['ln2'].bias, eps=1e-5)
-                # FFN
-                h = F.gelu(x @ blk['W1'].weight.t() + blk['b1'])
-                h = F.dropout(h, p=self.drop, training=self.training)
-                x = x + (h @ blk['W2'].weight.t() + blk['b2'])
+            for blk in self.blocks:
+                x = blk(x, self.rsqrt)
 
             h = F.layer_norm(x, (self.d_model,), self.out_ln.weight, self.out_ln.bias, eps=1e-5)
+            h = self.out_ln_g * h + self.out_ln_b
             if self.tie_embeddings:
                 logits = h @ self.embed.weight.t() + self.head_b
             else:
