@@ -162,7 +162,8 @@ if HAVE_TORCH:
             
             scores = (Q @ K.transpose(-2, -1)) * rsqrt
             mask = torch.triu(torch.ones(T, T, device=x.device, dtype=torch.bool), diagonal=1)
-            scores.masked_fill_(mask, -1e9)
+            # -1e4 instead of -1e9 to avoid FP16 overflow (half max ~ -65504)
+            scores.masked_fill_(mask, -1e4)
             attn = torch.softmax(scores, dim=-1)
             out = (attn @ V).transpose(1, 2).contiguous().view(B, T, self.d_model)
             x = x + (out @ self.Wo.weight.t() + self.bo)
