@@ -128,8 +128,8 @@ echo "[0/3] Veri butcesi tavani: $MPCAP cift ($OTURUM_DK dk oturum, $EPOCHS epoc
 echo "      %75 kullanim, ${ENCDK} dk encode; ${MSHAM} ms/HAM-cift/epoch olcusunden)"
 MPCARGS="--max-pairs-cap $MPCAP"
 
-# Kapasite: varsayilan d=384 / 6 blok (~22.9M). Env ile asilabilir:
-#   LLM_CAP=256 LLM_BLOCKS=4 bash kaggle_start.sh train ...
+# Kapasite: varsayilan d=512 / 8 blok (~68M). Env ile asilabilir:
+#   LLM_CAP=512 LLM_BLOCKS=8 bash kaggle_start.sh train ...
 # max-seq-len 256 OZEL BIR SAYI DEGIL, olcumle secildi (knowledge_map.jsonl,
 # 1000 RAG ornegi + 68794 ciftin gercek karmasi):
 #   kb_budget = max_seq - max_ctx - 8 oldugu icin kucuk degerde YANIT yer
@@ -143,7 +143,7 @@ MPCARGS="--max-pairs-cap $MPCAP"
 #   Uretimde de on-ek 128'de 26 -> 256'da ~160 token bosluk birakir.
 #   Bu train_llm.py MAX_SEQ_LEN varsayilaniyla AYNI olmali (tek kaynak);
 #   Colab notebooku da bu degere bagli.
-DPARGS="--d-model ${LLM_CAP:-384} --num-blocks ${LLM_BLOCKS:-6} --max-seq-len ${LLM_SEQ:-256}"
+DPARGS="--d-model ${LLM_CAP:-512} --num-blocks ${LLM_BLOCKS:-8} --max-seq-len ${LLM_SEQ:-256}"
 
 # Duzenlestirme: gomme<->cikis bagliligi + AdamW. Varsayilanlar train_llm.py
 # ile ayni; burada ACIK yazilir ki Kaggle logu kendi kendini belgelensin.
@@ -174,7 +174,7 @@ REGARGS="$REGARGS --dropout $DROPOUT"
 DONE=''
 case "$MODE" in
   train)
-    echo "[1/3] RAG egitim (natural $NATURAL, dropout=$DROPOUT, grad_accum=$GRAD_ACCUM, epochs=$EPOCHS, patience=${PATIENCE} epoch, d=${LLM_CAP:-384}/${LLM_BLOCKS:-6}) -> llm_model.json"
+    echo "[1/3] RAG egitim (natural $NATURAL, dropout=$DROPOUT, grad_accum=$GRAD_ACCUM, epochs=$EPOCHS, patience=${PATIENCE} epoch, d=${LLM_CAP:-512}/${LLM_BLOCKS:-8}) -> llm_model.json"
     # --val-every 2 yalnizca VAL MALIYETI icin (olculmus: epoch 7.5 -> 7.1 dk).
     # Erken durdurma esigini ETKILEMEZ: patience artik epoch cinsinden.
     python train_llm.py --rag --kb-map knowledge_map.jsonl --natural "$NATURAL" $CGARG \

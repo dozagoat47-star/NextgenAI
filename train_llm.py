@@ -259,8 +259,8 @@ else:
     TorchLLM = None
 
 # ---------------- hiperparametreler (numpy inference ile AYNI mimari) ----------------
-D_MODEL = 256
-NUM_BLOCKS = 4
+D_MODEL = 512
+NUM_BLOCKS = 8
 NUM_HEADS = 8
 FF_MULT = 4
 DROPOUT = 0.10
