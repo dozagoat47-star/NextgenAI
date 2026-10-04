@@ -809,6 +809,34 @@ def main():
     except Exception as e:
         _log(f'Uyari: zip olusturulamadi: {e}')
 
+    # --- Kaggle Outputs: /kaggle/working/ icine kaydet + zip'le ---
+    # (Kaggle notebook'ta Output sekmesinden indirmek icin)
+    try:
+        import zipfile
+        work_dir = os.path.join(os.path.expanduser("~"), "kaggle", "working")
+        os.makedirs(work_dir, exist_ok=True)
+
+        # 1) llm_model.json - model yapilandirmasi
+        config_path = os.path.join(work_dir, "llm_model.json")
+        with open(config_path, "w", encoding="utf-8") as f:
+            json.dump(config, f, indent=4, ensure_ascii=False)
+
+        # 2) llm_model_weights.npz - agirliklar
+        weights_path = os.path.join(work_dir, "llm_model_weights.npz")
+        np.savez(weights_path, **weights)   # weights => train_llm.py'de olusturulan dict of ndarray
+
+        # 3) ZIP paketle
+        zip_path = os.path.join(work_dir, "model_outputs.zip")
+        with zipfile.ZipFile(zip_path, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+            zf.write(config_path, arcname="llm_model.json")
+            zf.write(weights_path, arcname="llm_model_weights.npz")
+            log_path = os.path.join(work_dir, "kaggle_train.log")
+            if os.path.exists(log_path):
+                zf.write(log_path, arcname="kaggle_train.log")
+        _log(f'Kaggle ciktilari hazirlandi: {zip_path}')
+    except Exception as e:
+        _log(f'Uyari: Kaggle cikti hazirlanamadi: {e}')
+
     return 0
 
 
