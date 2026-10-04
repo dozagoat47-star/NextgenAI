@@ -708,21 +708,102 @@ def main():
 
     _log(f'Toplam egitim suresi: {(time.time() - t0_all) / 60:.1f} dk')
 
+    # --- DISA AKTARMA: llm_model.json + llm_model_weights.npz (llm.load_llm uyumlu) ---
+    # YALNIZCA egitim SONRASI calisir: en iyi agirliklar (best_state) PyTorch
+    # state_dict'ten NumPy inference formatina cevrilir. Egitim dongusune,
+    # mimariye ve hesaplara hicbir sekilde dokunulmaz.
+    json_path = os.path.join(export_dir, 'llm_model.json')
+    npz_path = os.path.join(export_dir, 'llm_model_weights.npz')
+    export_ok = False
+    try:
+        sd = {}
+        for _k, _v in best_state.items():
+            if _k.startswith('module.'):
+                _k = _k[len('module.'):]
+            sd[_k] = _v.detach().cpu().float()
+
+        def _n(t):
+            return t.numpy().astype(np.float32, copy=False)
+
+        params = {'embed': _n(sd['embed.weight'])}
+        for i in range(nb):
+            p = f'blocks.{i}.'
+            for n in ('Wq', 'Wk', 'Wv', 'Wo'):
+                # torch: x @ W.T  ==  numpy: x @ p  ->  p = W.T
+                params[f'b{i}_{n}'] = _n(sd[p + n + '.weight']).T.copy()
+            for n in ('q', 'k', 'v', 'o'):
+                params[f'b{i}_b{n}'] = _n(sd[p + 'b' + n])
+            # torch: (g * (norm*W + B)) + b  ==  numpy ln(x; g', b') :
+            #   g' = g*W ,  b' = g*B + b   (sonuc birebir ayni)
+            for n in ('ln1', 'ln2'):
+                params[f'b{i}_{n}_g'] = _n(sd[p + n + '_g'] * sd[p + n + '.weight'])
+                params[f'b{i}_{n}_b'] = _n(sd[p + n + '_g'] * sd[p + n + '.bias'] + sd[p + n + '_b'])
+            params[f'b{i}_W1'] = _n(sd[p + 'W1.weight']).T.copy()
+            params[f'b{i}_b1'] = _n(sd[p + 'b1'])
+            params[f'b{i}_W2'] = _n(sd[p + 'W2.weight']).T.copy()
+            params[f'b{i}_b2'] = _n(sd[p + 'b2'])
+        params['out_ln_g'] = _n(sd['out_ln_g'] * sd['out_ln.weight'])
+        params['out_ln_b'] = _n(sd['out_ln_g'] * sd['out_ln.bias'] + sd['out_ln_b'])
+        if not tie_embed:
+            params['head'] = _n(sd['head.weight']).T.copy()
+        params['head_b'] = _n(sd['head_b'])
+
+        if tok is not None:
+            llm_np = LLM(d_model=dm, num_blocks=nb, num_heads=nh, ff_mult=ff,
+                         max_ctx_len=mxc, max_seq_len=mxs, tokenizer=tok)
+        else:
+            llm_np = LLM(vocab=vocab, d_model=dm, num_blocks=nb, num_heads=nh,
+                         ff_mult=ff, max_ctx_len=mxc, max_seq_len=mxs)
+        llm_np.params = params
+        llm_np.tied_embeddings = bool(tie_embed)
+        os.makedirs(export_dir, exist_ok=True)
+        header = llm_np.to_dict(weights_file='llm_model_weights.npz',
+                                include_params=False)
+        # from_dict/to_dict bunu yazar/okur; bayrak yuklemede sadece
+        # _validate_params icin gerekli (bagli modelde head beklenmez).
+        header['tied_embeddings'] = bool(tie_embed)
+        with io.open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(header, f, ensure_ascii=False)
+        np.savez(npz_path, **{k: np.asarray(v, dtype=np.float32)
+                              for k, v in params.items()})
+        export_ok = True
+        _log(f'Model export edildi: {json_path} '
+             f'({os.path.getsize(json_path) / 1048576:.2f} MB) + {npz_path} '
+             f'({os.path.getsize(npz_path) / 1048576:.1f} MB)')
+    except Exception as e:
+        _log(f'Uyari: model export edilemedi: {e}')
+
     # --- Egitim ciktilerini SAVE_DIR icinde zip'le (Kaggle Output icin) ---
+    # 3 temel dosya: llm_ckpt.pt + llm_model.json + llm_model_weights.npz
+    # + varsa kaggle_train.log. Zip icin bos kalmamasini dogrulariz.
     try:
         import zipfile
-        _OUTPUT_EXTS = {'.pt', '.pth', '.json', '.npz', '.log'}
         zip_path = os.path.join(SAVE_DIR, 'model_outputs.zip')
-        packed = []
-        for fn in os.listdir(SAVE_DIR):
-            if os.path.splitext(fn)[1].lower() in _OUTPUT_EXTS:
-                packed.append(fn)
-        if packed:
+        os.makedirs(SAVE_DIR, exist_ok=True)
+        files = []
+        ckpt_path = os.path.join(SAVE_DIR, 'llm_ckpt.pt')
+        if os.path.exists(ckpt_path):
+            files.append(ckpt_path)
+        if export_ok:
+            files.extend([json_path, npz_path])
+        for _d in (SAVE_DIR, BASE):
+            _lp = os.path.join(_d, 'kaggle_train.log')
+            if os.path.exists(_lp):
+                files.append(_lp)
+                break
+        if files:
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-                for fn in sorted(packed):
-                    zf.write(os.path.join(SAVE_DIR, fn), fn)
-            _log(f'Ciktilar ziplendi: {zip_path} ({len(packed)} dosya, '
-                 f'{os.path.getsize(zip_path) / 1048576:.1f} MB)')
+                for fp in files:
+                    zf.write(fp, os.path.basename(fp))
+            _names = {os.path.basename(f) for f in files}
+            _missing = [n for n in ('llm_ckpt.pt', 'llm_model.json',
+                                    'llm_model_weights.npz') if n not in _names]
+            _log(f'Ciktilar ziplendi: {zip_path} ({len(_names)} dosya, '
+                 f'{os.path.getsize(zip_path) / 1048576:.1f} MB): '
+                 + ', '.join(sorted(_names)))
+            if _missing:
+                _log(f'Uyari: zip 3 temel dosyanin tamamina sahip DEGIL, '
+                     f'eksik: {", ".join(_missing)}')
         else:
             _log('Uyari: zip icin dosya bulunamadi')
     except Exception as e:
