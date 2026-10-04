@@ -380,7 +380,11 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
 def llm_loss(logits, targets, mask):
     """Cross entropy loss only on response positions (mask=1)."""
     # logits: (B, T, V), targets: (B, T), mask: (B, T)
-    loss_fct = nn.CrossEntropyLoss(ignore_index=PAD, reduction='none')
+    # EOS token (id=3) gets higher weight to encourage proper termination
+    eos_weight = 5.0
+    weight = torch.ones(logits.size(-1), device=logits.device)
+    weight[3] = eos_weight  # EOS token id=3
+    loss_fct = nn.CrossEntropyLoss(ignore_index=PAD, reduction='none', weight=weight)
     loss = loss_fct(logits.view(-1, logits.size(-1)), targets.view(-1))
     loss = loss.view_as(targets) * mask
     return loss.sum() / mask.sum().clamp(min=1)

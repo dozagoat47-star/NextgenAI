@@ -143,6 +143,7 @@ class LLM:
         p['out_ln_b'] = np.zeros((1, d), np.float32)
         p['head'] = he((d, self.V), scale=0.02)
         p['head_b'] = np.zeros((1, self.V), np.float32)
+        p['head_b'][0, 3] = 2.0  # EOS token (id=3) positive bias
         return p
 
     def _sinusoidal(self, length):
