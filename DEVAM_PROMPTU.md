@@ -756,6 +756,7 @@ bugün hâlâ güvenli, ama veri büyüdükçe sessizce taşıracak.**
 | MAX_PAIRS bütçesi | 290.441 |
 | zaman tavanı | **1.251.733 → bütçeye TEĞMEDİ** |
 | ham çift | 288.802 (bütçenin **%23,1**'i) |
+| **DİKKAT: log modeli işaretlemiyor** | `kaggle_train.txt` bu koşunun Kaggle çıktısının logudur ancak **hangi model mimarisiyle** eğitildiğini (d_model/blocks/heads) içinde yazmıyor. `model/llm_model.json` ile **zorunlu olarak eşleştir** (mevcut aktif: `d_model=384, num_blocks=6`). Log aynı isimle birden çok koşuya ait olabilir; logu **yere kopyalamadan önce** her zaman model mimarisiyle çapraz doğrula. |
 | kırpma payı | **+1.639 çift (%+0,57)** |
 | işlevsel açılış sonrası | 303.892 (×1,0523) |
 | doğal varyant (×5) sonrası | 1.377.895 (×4,5342) |
