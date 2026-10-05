@@ -134,7 +134,7 @@ def rephrase(query, kb, tries):
         for _ in range(max(1, int(tries))):
             gen = bot.llm.sample(query, temperature=v['temp'], top_k=10,
                                  knowledge=knowledge[:500],
-                                 rep_penalty=0.4,
+                                 rep_penalty=0.5,
                                  knowledge_bias=bot.knowledge_bias)
             kabul = bool(bot._accept_kb_rephrase(gen, kb))
             gk = icerik_kelimeler(gen)

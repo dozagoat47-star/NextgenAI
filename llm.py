@@ -143,7 +143,7 @@ class LLM:
         p['out_ln_b'] = np.zeros((1, d), np.float32)
         p['head'] = he((d, self.V), scale=0.02)
         p['head_b'] = np.zeros((1, self.V), np.float32)
-        p['head_b'][0, 3] = 2.0  # EOS token (id=3) positive bias
+        p['head_b'][0, 3] = 3.0  # EOS token (id=3) positive bias
         return p
 
     def _sinusoidal(self, length):
@@ -287,7 +287,7 @@ class LLM:
         return int(np.random.choice(pool, p=ps))
 
     def sample(self, context, temperature=0.7, top_k=10, max_len=None,
-               knowledge=None, rep_penalty=0.3, knowledge_bias=0.0):
+               knowledge=None, rep_penalty=0.5, knowledge_bias=0.0):
         """Sorgu -> karakter karakter yanit uret (EOS'a ya da max_len'e kadar).
 
         Baslangic sekansi:
@@ -298,7 +298,7 @@ class LLM:
         ogrenir (train_llm.py --rag ile bu formatta egitilir).
 
         rep_penalty: daha once uretilmis token'lardan sonra logit dusurur
-        (0.0 = ceza yok; 0.3 = dengeli cesitlilik).
+        (0.0 = ceza yok; 0.5 = guclu cesitlilik / tekrar onleme).
 
         knowledge_bias > 0 iken bilgide gecen icerik kelimelerinin token'larina
         hafif additif logit bonusu uygulanir -> 'konu cekimi'. Bonus uretimin

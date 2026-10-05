@@ -250,7 +250,7 @@ def _measure(query, gold, generated, knowledge, stopwords):
     )
 
 
-def sample_report(model, items, temperature=0.7, top_k=10, rep_penalty=0.3,
+def sample_report(model, items, temperature=0.7, top_k=10, rep_penalty=0.5,
                   seed=7, stopwords=STOPWORDS, max_len=None,
                   knowledge_bias=0.0):
     """items: (sorgu, gold) ya da (sorgu, gold, bilgi) ucizlileri.
