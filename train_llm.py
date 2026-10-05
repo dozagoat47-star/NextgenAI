@@ -337,6 +337,53 @@ def coz_max_pairs(intents_path=None, ust_tavan=0, yaz=True):
     return n_butce
 
 
+def load_chatgrow_pairs(path, ctx_len=CTX_CHARS, resp_len=None, max_pairs=20000):
+    """chatgrow.py/seed ciktisi -> (sorgu, yanit) ciftleri.
+
+    path: tek dosya yolu ya da dosya yollari listesi. Birden cok dosya
+    sirayla okunur; tekrar eden ciftler bir kez eklenir. Kayit bicimi:
+    {"query": ..., "answer": [..]}. Normalizasyon intents hattiyla aynidir.
+    """
+    if resp_len is None:
+        resp_len = RESP_CHARS_MAX
+    paths = [path] if isinstance(path, str) else list(path)
+    seen = set()
+    pairs = []
+    for p in paths:
+        if not os.path.exists(p):
+            continue
+        with io.open(p, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except ValueError:
+                    continue
+                q = rec.get('query') or rec.get('soru')
+                ans = rec.get('answer') or rec.get('answers')
+                if isinstance(ans, str):
+                    ans = [ans]
+                if not q or not ans:
+                    continue
+                ctx = clean_chars(q, ctx_len)
+                if len(ctx) < 6:
+                    continue
+                for a in ans:
+                    r = clean_chars(a, resp_len)
+                    if len(r) < 6:
+                        continue
+                    key = (ctx, r)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    pairs.append(key)
+    rng = random.Random(11)
+    rng.shuffle(pairs)
+    return pairs[:max_pairs]
+
+
 def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
                  max_ctx_len=MAX_CTX_LEN, max_seq_len=MAX_SEQ_LEN,
                  batch_size=64, chatgrow_path=None, limit_pairs=0,
@@ -357,7 +404,6 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
     
     # Add chatgrow pairs if provided
     if chatgrow_path:
-        from seqgen import load_chatgrow_pairs
         cg_pairs = load_chatgrow_pairs(chatgrow_path, ctx_len=max_ctx_len, 
                                         resp_len=RESP_CHARS_MAX, max_pairs=limit_pairs)
         pairs.extend(cg_pairs)
