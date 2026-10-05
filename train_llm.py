@@ -321,11 +321,6 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
         pairs.extend(cg_pairs)
         _log(f'chatgrow pairs added: {len(cg_pairs)}')
     
-    # Naturalize pairs
-    if NATURAL > 0:
-        pairs = naturalize_pairs(pairs, k=NATURAL, seed=SEED)
-        _log(f'naturalize: {len(pairs)} pairs after x{NATURAL}')
-    
     # Limit pairs
     if limit_pairs > 0:
         pairs = pairs[:limit_pairs]
@@ -345,6 +340,11 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
     
     train_pairs = [(ctx, resp) for ctx, resp in pairs if ctx in train_ctxs]
     val_pairs = [(ctx, resp) for ctx, resp in pairs if ctx in val_ctxs]
+    
+    # Naturalize pairs AFTER split to prevent leakage
+    if NATURAL > 0:
+        train_pairs = naturalize_pairs(train_pairs, k=NATURAL, seed=SEED)
+        _log(f'naturalize: train set augmented to {len(train_pairs)} pairs after x{NATURAL}')
     
     _log(f'train: {len(train_pairs)} pairs, val: {len(val_pairs)} pairs')
     
@@ -813,33 +813,7 @@ def main():
     except Exception as e:
         _log(f'Uyari: zip olusturulamadi: {e}')
 
-    # --- Kaggle Outputs: /kaggle/working/ icine kaydet + zip'le ---
-    # (Kaggle notebook'ta Output sekmesinden indirmek icin)
-    try:
-        import zipfile
-        work_dir = os.path.join(os.path.expanduser("~"), "kaggle", "working")
-        os.makedirs(work_dir, exist_ok=True)
 
-        # 1) llm_model.json - model yapilandirmasi
-        config_path = os.path.join(work_dir, "llm_model.json")
-        with open(config_path, "w", encoding="utf-8") as f:
-            json.dump(config, f, indent=4, ensure_ascii=False)
-
-        # 2) llm_model_weights.npz - agirliklar
-        weights_path = os.path.join(work_dir, "llm_model_weights.npz")
-        np.savez(weights_path, **weights)   # weights => train_llm.py'de olusturulan dict of ndarray
-
-        # 3) ZIP paketle
-        zip_path = os.path.join(work_dir, "model_outputs.zip")
-        with zipfile.ZipFile(zip_path, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
-            zf.write(config_path, arcname="llm_model.json")
-            zf.write(weights_path, arcname="llm_model_weights.npz")
-            log_path = os.path.join(work_dir, "kaggle_train.log")
-            if os.path.exists(log_path):
-                zf.write(log_path, arcname="kaggle_train.log")
-        _log(f'Kaggle ciktilari hazirlandi: {zip_path}')
-    except Exception as e:
-        _log(f'Uyari: Kaggle cikti hazirlanamadi: {e}')
 
     return 0
 
