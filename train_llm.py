@@ -404,8 +404,9 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
     
     # Add chatgrow pairs if provided
     if chatgrow_path:
-        cg_pairs = load_chatgrow_pairs(chatgrow_path, ctx_len=max_ctx_len, 
-                                        resp_len=RESP_CHARS_MAX, max_pairs=limit_pairs)
+        cg_pairs = load_chatgrow_pairs(chatgrow_path, ctx_len=max_ctx_len,
+                                        resp_len=RESP_CHARS_MAX,
+                                        max_pairs=(limit_pairs if limit_pairs > 0 else 20000))
         pairs.extend(cg_pairs)
         _log(f'chatgrow pairs added: {len(cg_pairs)}')
     
