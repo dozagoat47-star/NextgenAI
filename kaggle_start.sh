@@ -90,6 +90,8 @@ CGARG=''
 if compgen -G 'chatgrow_*.jsonl' > /dev/null; then
   echo "[0/3] ChatGrow verisi bulundu, egitim hattina eklenecek."
   CGARG="--chatgrow $(ls chatgrow_*.jsonl | tr '\n' ' ')"
+else
+  echo "[0/3] UYARI: chatgrow_*.jsonl bulunamadi; sohbet cifti EGITIME GIRMEYECEK."
 fi
 
 # ---------------- VERI BUTCESI: SURE TAVANI (28.09) -----------------------
@@ -121,9 +123,9 @@ OTURUM_DK="${LLM_OTURUM_DK:-540}"
 # satiri koddaki degisikligi yansitmaz ve kaggle_train.txt olcum kaynagi
 # olarak yaniltir (29.09'da "7,31 dk/epoch" yazan yorum bu yuzden elle
 # guncellenmisti ve kodla arasi ayrilmisti).
-MPCAP=$(python -c "import train_llm as t; print(t.sure_ve_hesapla(oturum_dk=$OTURUM_DK, epochs=$EPOCHS))")
-MSHAM=$(python -c "import train_llm as t; print(t.MS_PER_HAM_CIFT_EPOCH)")
-ENCDK=$(python -c "import train_llm as t; print(t.ENCODE_DK)")
+MPCAP=$(python -c "import train_llm as t; print(t.sure_ve_hesapla(oturum_dk=$OTURUM_DK, epochs=$EPOCHS))" 2>/dev/null || echo 60000)
+MSHAM=$(python -c "import train_llm as t; print(t.MS_PER_HAM_CIFT_EPOCH)" 2>/dev/null || echo 0)
+ENCDK=$(python -c "import train_llm as t; print(t.ENCODE_DK)" 2>/dev/null || echo 0)
 echo "[0/3] Veri butcesi tavani: $MPCAP cift ($OTURUM_DK dk oturum, $EPOCHS epoch,"
 echo "      %75 kullanim, ${ENCDK} dk encode; ${MSHAM} ms/HAM-cift/epoch olcusunden)"
 MPCARGS="--max-pairs-cap $MPCAP"

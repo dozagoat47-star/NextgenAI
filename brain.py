@@ -1248,7 +1248,7 @@ class ChatBot:
 
         print("Training started...")
         losses = self.model.train(X, y, epochs=epochs, learning_rate=learning_rate,
-                                  batch_size=32, early_stop=True, patience=30,
+                                  batch_size=32, early_stop=True, patience=6,
                                   X_val=X_val, y_val=y_val)
 
         train_accuracy = self.model.evaluate(X, y)

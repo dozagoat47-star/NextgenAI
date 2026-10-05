@@ -278,6 +278,10 @@ CKPT_FREQ = 1
 MAX_PAIRS = 0
 MAX_PAIRS_CTX_CARPAN = 3.08
 MAX_PAIRS_INTENT_CARPAN = 18.85
+ENCODE_DK = 26.0
+VARSAYILAN_BOSLUK = 0.75
+MS_PER_HAM_CIFT_EPOCH = 7.3927
+MS_PER_PAIR = 1.5139
 MAX_CTX_LEN = 48
 MAX_SEQ_LEN = 256
 SEED = 7
@@ -295,6 +299,44 @@ def _log(msg, *args, **kwargs):
     print(msg, *args, **kwargs)
 
 
+def sure_ve_hesapla(oturum_dk=540, epochs=12, encode_dk=ENCODE_DK,
+                    bosluk=VARSAYILAN_BOSLUK,
+                    ms_per_ham=MS_PER_HAM_CIFT_EPOCH):
+    """SURE TAVANI: kac HAM cift bu oturumda sigar? (0b3cd75 oncesi sozlesme restore)."""
+    kalan_dk = oturum_dk * bosluk - encode_dk
+    if kalan_dk <= 0 or epochs <= 0:
+        return 0
+    dk_per_epoch = kalan_dk / epochs
+    return int(dk_per_epoch * 60 * 1000 / ms_per_ham)
+
+
+def coz_max_pairs(intents_path=None, ust_tavan=0, yaz=True):
+    """Veri butcesi + zaman tavani min(). (0b3cd75 oncesi sozlesme restore)."""
+    yol = intents_path or os.path.join(BASE, 'intents.json')
+    n = 0
+    if os.path.exists(yol):
+        with io.open(yol, 'r', encoding='utf-8') as f:
+            n = len(json.load(f).get('intents', []))
+    if MAX_PAIRS > 0:
+        n_butce, kaynak = MAX_PAIRS, 'elle (MAX_PAIRS)'
+    else:
+        n_butce = int(round(MAX_PAIRS_INTENT_CARPAN * n))
+        kaynak = 'otomatik (%s x %d intent)' % (MAX_PAIRS_INTENT_CARPAN, n)
+    tavan = ust_tavan or 0
+    if tavan and n_butce > tavan:
+        if yaz:
+            print('[butce] veri butcesi %s > zaman tavani %s: TAVAN '
+                  'KAZANDI, %s cift kullanilacak (ihtiyac: %s)'
+                  % (format(n_butce, ','), format(tavan, ','),
+                     format(tavan, ','), format(n_butce, ',')), flush=True)
+        n_butce = tavan
+    if yaz:
+        print('[butce] MAX_PAIRS=%s (%s, zaman tavani %s)'
+              % (format(n_butce, ','), kaynak,
+                 format(tavan, ',') if tavan else 'yok'), flush=True)
+    return n_butce
+
+
 def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
                  max_ctx_len=MAX_CTX_LEN, max_seq_len=MAX_SEQ_LEN,
                  batch_size=64, chatgrow_path=None, limit_pairs=0,
@@ -308,8 +350,8 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
         intents_path = os.path.join(BASE, 'intents.json')
     
     # Load pairs from intents.json
-    # max_pairs=0 means no limit (use default 20000 in load_pairs)
-    effective_max_pairs = max_pairs_cap if max_pairs_cap > 0 else 20000
+    # Butce: veri ihtiyaci + zaman tavani min() (coz_max_pairs sozlesmesi).
+    effective_max_pairs = coz_max_pairs(intents_path, ust_tavan=max_pairs_cap)
     pairs = load_pairs(intents_path, max_pairs=effective_max_pairs)
     _log(f'Loaded {len(pairs)} pairs from intents.json')
     
