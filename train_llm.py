@@ -629,7 +629,10 @@ def main():
     bad = 0
     start_ep = 0
     step = 0
-    
+    # total batch-level steps across all epochs; needs to exist BEFORE the
+    # checkpoint-load block below (else UnboundLocalError).
+    tot_steps = EPOCHS * max(1, (len(tr) + bs - 1) // bs)
+
     data_fp = f'{len(tr)}-{NATURAL}-{mxc}-{mxs}-b4-c{CTX_CHARS}-r{RESP_CHARS_MAX}'
     
     if args.fresh:
