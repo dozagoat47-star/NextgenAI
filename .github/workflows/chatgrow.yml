@@ -1,9 +1,7 @@
 name: ChatGrow Feed
 
 on:
-  schedule:
-    # Günde 4 kez: 05:17 / 11:17 / 17:17 / 23:17 UTC
-    - cron: '17 5,11,17,23 * * *'
+  # Scheduled data collection is paused while the dataset is audited.
   workflow_dispatch:
 
 concurrency:

@@ -1,8 +1,7 @@
 name: Crawl Corpus (mc4)
 
 on:
-  schedule:
-    - cron: '35 3 * * 1'
+  # Scheduled data collection is paused while the dataset is audited.
   workflow_dispatch:
 
 concurrency:

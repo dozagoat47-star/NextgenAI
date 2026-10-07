@@ -1,12 +1,7 @@
 name: Rebuild Knowledge Map
 
 on:
-  schedule:
-    # Gunluk. knowledge_map.jsonl = intents desenleri -> corpus parcasi
-    # eslesmesi; train_llm.py --kb-map ile modelin EGITIM VERISI.
-    # AutoGrow (saatlik) intents'i buyutuyor ama bu eslesmeyi yeniden
-    # uretmuyordu: knowledge_map 22.09'dan beri donmustu.
-    - cron: '40 4 * * *'
+  # Scheduled dataset processing is paused while the inputs are audited.
   workflow_dispatch:
 
 concurrency:

@@ -1,8 +1,7 @@
 name: Autogrow Deep Knowledge
 
 on:
-  schedule:
-    - cron: '0 3 * * *'
+  # Scheduled data collection is paused while the dataset is audited.
   workflow_dispatch:
 
 concurrency:
