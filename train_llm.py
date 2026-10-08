@@ -4,20 +4,19 @@ Kaggle/Colab/Lightning AI uyumlu PyTorch egitim scripti. Nucleo inference
 (llm.py) ile Torch modeli BIREBIR ayni cebiri calistirir; dropout yalnizca
 training'de, eval'da kapali -> parity bozulmaz.
 
-Veri formati (tek zincir, otoregresif):
+Veri formati (tek zincir, otoregresif; her konum sonraki token'i tahmin eder):
     <PAD> <BOS> <sorgu> <SEP> <yanit> <EOS>
     <PAD> <BOS> <sorgu> <SEP> <bilgi-parcasi> <SEP> <yanit> <EOS>   (--rag)
-  Kayip YALNIZCA yanit pozisyonlarinda; --rag ile bilgi parcasi bağlam
-  olur -> model verilen bilgiden OZGUN cumle kurmayi (akil yurutme) ogrenir.
+  Kayip, yanit token'lerini tahmin eden onceki konumlarda hesaplanir
+  (<SEP> -> yanitin ilk token'i dahil); --rag ile bilgi parcasi bağlam olur.
 
 Kullanim (yerel dogrulama icin torch gerektirmez):
-  python train_llm.py --dry-run [--rag] [--natural K]   # veri hattini dogrula
+  python train_llm.py --dry-run [--natural K]            # intents.json hattini dogrula
   SMOKE=1 python train_llm.py                            # 2 adim CPU hiz testi
 
 Kaggle'da egitim (GPU notebook):
-  python train_llm.py --rag --natural 5 --kb-map knowledge_map.jsonl   # oneri (d=256)
-  python train_llm.py --rag --natural 5 --kb-map knowledge_map.jsonl --d-model 384 --num-blocks 6
-  python train_llm.py --rag --natural 3 --kb-map knowledge_map.jsonl --max-ctx-len 48 --max-seq-len 256
+  python train_llm.py --natural 5   # intents.json; RAG egitimi henuz uygulanmadi
+  python train_llm.py --natural 5 --d-model 384 --num-blocks 6
   python train_llm.py --epochs 400 --patience 40 --batch-size 64 --val-every 2
 Veri boyu: MAX_PAIRS=70000 ham cift N5 ile ~330k cift -> epoch basina sure eski
 (60k cift) 60/gore ~5.5x artar; erken durdurma (patience) devrede -> genelde
@@ -275,6 +274,7 @@ GRAD_CLIP = 5.0
 WEIGHT_DECAY = 0.01
 TIE_EMBED = True
 CKPT_FREQ = 1
+TRAINING_OBJECTIVE = 'next_token_v1'
 MAX_PAIRS = 0
 MAX_PAIRS_CTX_CARPAN = 3.08
 MAX_PAIRS_INTENT_CARPAN = 18.85
@@ -390,6 +390,11 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
                  max_pairs_cap=0, intents_path=None):
     """chatgrow/intent verisinden (sorgu, yanit) ciftleri uretir.
     CPU tensors dondurur; GPU'ya batch isleme tasinir."""
+    if RAG or kb_map_path:
+        raise NotImplementedError(
+            'RAG training is not implemented in prepare_data; '
+            'omit --rag and --kb-map until the knowledge-map path is wired in.')
+
     if tokenizer is None:
         tokenizer = load_tokenizer()
     
@@ -467,20 +472,25 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
 
 
 def llm_loss(logits, targets, mask):
-    """Cross entropy loss only on response positions (mask=1)."""
-    # logits: (B, T, V), targets: (B, T), mask: (B, T)
+    """Next-token cross entropy on response positions (mask=1)."""
+    # Position i predicts token i+1; encode_llm masks source positions,
+    # including <SEP> so the first response token is supervised.
+    logits = logits[:, :-1, :]
+    targets = targets[:, 1:]
+    mask = mask[:, :-1]
     # EOS token (id=3) gets higher weight to encourage proper termination
     eos_weight = 10.0
     weight = torch.ones(logits.size(-1), device=logits.device)
     weight[3] = eos_weight  # EOS token id=3
     loss_fct = nn.CrossEntropyLoss(ignore_index=PAD, reduction='none', weight=weight)
-    loss = loss_fct(logits.view(-1, logits.size(-1)), targets.view(-1))
+    loss = loss_fct(logits.reshape(-1, logits.size(-1)),
+                    targets.reshape(-1))
     loss = loss.view_as(targets) * mask
     return loss.sum() / mask.sum().clamp(min=1)
 
 
 def masked_acc(logits, targets, mask):
-    """Accuracy on response positions only (fully vectorized, GPU-resident).
+    """Next-token accuracy on response positions (GPU-resident).
 
     Accepts any mix of batch / unbatched tensors:
       logits  – (B, T, V) or (T, V)
@@ -488,8 +498,10 @@ def masked_acc(logits, targets, mask):
       mask    – (B, T) or (T,)
     Returns a Python float (single .item() call at the end).
     """
-    # --- 1. preds from logits ------------------------------------------
-    preds = logits.argmax(dim=-1)          # (B, T) or (T,)
+    # Position i predicts token i+1, matching llm_loss and encode_llm.
+    preds = logits[..., :-1, :].argmax(dim=-1)
+    targets = targets[..., 1:]
+    mask = mask[..., :-1]
 
     # --- 2. Normalise to 2-D (B, T) ------------------------------------
     if preds.ndim == 1:
@@ -645,9 +657,11 @@ def main():
                      and arch.get('max_seq_len') == mxs and arch.get('V') == V
                      and bool(arch.get('tied_embeddings', False)) == bool(tie_embed)
                      and arch.get('drop') == drop)
+        same_objective = cp.get('training_objective') == TRAINING_OBJECTIVE
         same_data = cp.get('data') == data_fp
-        if not same_arch or not same_data:
-            _log(f'Uyari: checkpoint eski (arch: {same_arch}, data: {same_data}). Sifirdan basliyorum.')
+        if not same_arch or not same_data or not same_objective:
+            _log(f'Uyari: checkpoint eski (arch: {same_arch}, data: {same_data}, '
+                 f'objective: {same_objective}). Sifirdan basliyorum.')
         else:
             model.load_state_dict(cp['model'])
             opt.load_state_dict(cp['opt'])
@@ -795,6 +809,7 @@ def main():
                 'opt': opt.state_dict(), 'best_val': best_val,
                 'best_state': best_state, 'best_acc': best_acc,
                 'bad': bad, 'val_every': 1,
+                'training_objective': TRAINING_OBJECTIVE,
                 'arch': {'d_model': dm, 'num_blocks': nb, 'num_heads': nh,
                          'ff_mult': ff, 'max_seq_len': mxs, 'V': V,
                          'drop': drop, 'tied_embeddings': True},

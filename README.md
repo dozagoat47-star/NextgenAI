@@ -34,6 +34,14 @@ pip install -r requirements.txt
 > **Eğitim Kaggle'da GPU ile yapılır** (`kaggle_start.sh`). Yerel NumPy eğitimi
 > saatler sürer, pratikte değildir.
 
+Temel eğitim hattı yalnızca `intents.json` kullanır; `chatgrow_*.jsonl` dosyaları
+otomatik olarak eğitime eklenmez. `knowledge_map.jsonl` ile RAG eğitimi,
+`train_llm.py` içinde henüz uygulanmadığı için bu hat tarafından kullanılmaz.
+Eğitim hedefi otoregresif sonraki-token tahminidir: doğruluk ölçümü de
+yanıt token'lerini tahmin eden önceki konumlarda yapılır. Bu hedef düzeltmesini
+içeren kodla eğitim sıfırdan başlatılmalı; önceki sürümün checkpoint'i
+devam ettirilmemelidir.
+
 Kaggle.com → New Notebook. **Ayarlar:** Internet **ON**, Accelerator **GPU P100** (veya T4x2).
 
 ```python

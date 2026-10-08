@@ -86,13 +86,8 @@ EPOCHS="${2:-${LLM_EPOCHS:-12}}"
 # erken durma gevser. 12 epoch x ~18 dk = ~3,6 saat (9 saat oturuma sigar).
 PATIENCE="${LLM_PATIENCE:-4}"
 
-CGARG=''
-if compgen -G 'chatgrow_*.jsonl' > /dev/null; then
-  echo "[0/3] ChatGrow verisi bulundu, egitim hattina eklenecek."
-  CGARG="--chatgrow $(ls chatgrow_*.jsonl | tr '\n' ' ')"
-else
-  echo "[0/3] UYARI: chatgrow_*.jsonl bulunamadi; sohbet cifti EGITIME GIRMEYECEK."
-fi
+echo "[0/3] Veri kapsami: yalnizca intents.json; ChatGrow dosyalari egitime alinmayacak."
+echo "      RAG/knowledge_map egitim yolu dogrulanana kadar kapali."
 
 # ---------------- VERI BUTCESI: SURE TAVANI (28.09) -----------------------
 # MAX_PAIRS artik veriden OTOMATIK hesaplaniyor (train_llm.py
@@ -176,18 +171,18 @@ REGARGS="$REGARGS --dropout $DROPOUT"
 DONE=''
 case "$MODE" in
   train)
-    echo "[1/3] RAG egitim (natural $NATURAL, dropout=$DROPOUT, grad_accum=$GRAD_ACCUM, epochs=$EPOCHS, patience=${PATIENCE} epoch, d=${LLM_CAP:-512}/${LLM_BLOCKS:-8}) -> llm_model.json"
+    echo "[1/3] intents.json egitimi (natural $NATURAL, dropout=$DROPOUT, grad_accum=$GRAD_ACCUM, epochs=$EPOCHS, patience=${PATIENCE} epoch, d=${LLM_CAP:-512}/${LLM_BLOCKS:-8}) -> llm_model.json"
     # --val-every 2 yalnizca VAL MALIYETI icin (olculmus: epoch 7.5 -> 7.1 dk).
     # Erken durdurma esigini ETKILEMEZ: patience artik epoch cinsinden.
-    python train_llm.py --rag --kb-map knowledge_map.jsonl --natural "$NATURAL" $CGARG \
+    python train_llm.py --natural "$NATURAL" \
       --epochs "$EPOCHS" --patience "$PATIENCE" \
-      --batch-size 128 --val-every 2 --grad-accum "$GRAD_ACCUM" $DPARGS $REGARGS $MPCARGS 2>&1 | tee kaggle_train.log
+      --batch-size 64 --val-every 2 --grad-accum "$GRAD_ACCUM" $DPARGS $REGARGS $MPCARGS 2>&1 | tee kaggle_train.log
     DONE='yes'
     ;;
   bench)
     echo "[1/3] 1-epoch zamanlama (cache/encode + 1 epoch, birlikte olculur)"
-    python train_llm.py --rag --kb-map knowledge_map.jsonl --natural "$NATURAL" $CGARG \
-      --epochs 1 --batch-size 128 --val-every 1 --fresh --grad-accum "$GRAD_ACCUM" $DPARGS $REGARGS $MPCARGS 2>&1 | tee kaggle_bench.log
+    python train_llm.py --natural "$NATURAL" \
+      --epochs 1 --batch-size 64 --val-every 1 --fresh --grad-accum "$GRAD_ACCUM" $DPARGS $REGARGS $MPCARGS 2>&1 | tee kaggle_bench.log
     echo ""
     echo "[2/3] Son egitim satiri (epoch suresi '| NN.Ns' bolumundedir):"
     grep 'epoch ' kaggle_bench.log | tail -1
@@ -198,10 +193,10 @@ case "$MODE" in
     ;;
   verify)
     echo "[1/3] dry-run dogrulama (GPU gerekmez, ~1-2 dk; TAM encode YAPILMAZ)"
-    echo "      Ayni veri bayraklari -> onbellek parmak izi bench/train ile ayni."
-    python train_llm.py --dry-run --rag --kb-map knowledge_map.jsonl --natural "$NATURAL" \
-      --batch-size 128 --limit-pairs 4000 $CGARG $DPARGS $REGARGS $MPCARGS
-    echo "[2/3] OK - ilk-kelime hizalama ve RAG hatti hazir."
+    echo "      Veri kapsami yalnizca intents.json; ChatGrow ve RAG kullanilmaz."
+    python train_llm.py --dry-run --natural "$NATURAL" \
+      --batch-size 64 --limit-pairs 4000 $DPARGS $REGARGS $MPCARGS
+    echo "[2/3] OK - intents.json egitim hatti hazir."
     echo "[3/3] Tam egitim icin:  !bash kaggle_start.sh train"
     ;;
   *)
@@ -227,4 +222,3 @@ if [ -n "$DONE" ]; then
   echo "  sekmesinden 'Download All' ile iner; veya dosya adlariyla aratip tek tek."
   echo "  Iki dosya birlikte model/ klasorune kopyalanir (llm_model.json + llm_model_weights.npz)."
 fi
-
