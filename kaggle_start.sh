@@ -10,8 +10,8 @@
 #         !python -m pip install --quiet numpy
 #   4) Ikinci hucresine:
 #         !bash kaggle_start.sh train
-#      (EPOCH vermezsen EPOCHS=12 kullanilir; veri butcesi intents ile
-#       buyur, sure butcesi 1,4 milyon cift -> pratikte baglamaz)
+#      (EPOCH vermezsen EPOCHS=12 kullanilir; intents ve dogrulanmis diyalog
+#       verisi 50/50 dengelenir, toplam cift sayisi sure tavanina uyar)
 #      (once deneme istersen:  !bash kaggle_start.sh verify   )
 #      (1 epoch suresi olcmek icin:  !bash kaggle_start.sh bench )
 #   5) Egitim sonrasi indirme hucresi (asagidaki INDIRME notuna bak).
@@ -86,14 +86,13 @@ EPOCHS="${2:-${LLM_EPOCHS:-12}}"
 # erken durma gevser. 12 epoch x ~18 dk = ~3,6 saat (9 saat oturuma sigar).
 PATIENCE="${LLM_PATIENCE:-4}"
 
-echo "[0/3] Veri kapsami: yalnizca intents.json; ChatGrow dosyalari egitime alinmayacak."
-echo "      RAG/knowledge_map egitim yolu dogrulanana kadar kapali."
+echo "[0/3] Veri kapsami: intents.json + kaynak-etiketli sohbet/diyalog verisi."
+echo "      Bilgi/sohbet cifti 50/50 dengelenecek; RAG/knowledge_map kapali."
 
 # ---------------- VERI BUTCESI: SURE TAVANI (28.09) -----------------------
-# MAX_PAIRS artik veriden OTOMATIK hesaplaniyor (train_llm.py
-# coz_max_pairs): amaci 'butun ciftleri kullanmak' degil, 'benzersiz
-# ctx'nin cogunu kapsamak'. Intentler buyudugu icin butce de buyur
-# (6.364 intent -> ~120.000; 20.000 intent -> ~377.000).
+# MAX_PAIRS artik intents.json boyutundan OTOMATIK hesaplaniyor
+# (train_llm.py coz_max_pairs); bu toplam egitim cifti icin ust tavandir.
+# Sohbet verisi daha azsa bilgi cifti ona gore asagi orneklenir.
 #
 # BURADA sure tamani hesaplanir cunku oturum suresi ve EPOCHS sadece
 # burada biliniyor.Uc olculmus sabit kullanilir:
@@ -171,7 +170,7 @@ REGARGS="$REGARGS --dropout $DROPOUT"
 DONE=''
 case "$MODE" in
   train)
-    echo "[1/3] intents.json egitimi (natural $NATURAL, dropout=$DROPOUT, grad_accum=$GRAD_ACCUM, epochs=$EPOCHS, patience=${PATIENCE} epoch, d=${LLM_CAP:-512}/${LLM_BLOCKS:-8}) -> llm_model.json"
+    echo "[1/3] 50/50 bilgi + kaynak-etiketli diyalog egitimi (natural $NATURAL, dropout=$DROPOUT, grad_accum=$GRAD_ACCUM, epochs=$EPOCHS, patience=${PATIENCE} epoch, d=${LLM_CAP:-512}/${LLM_BLOCKS:-8}) -> llm_model.json"
     # --val-every 2 yalnizca VAL MALIYETI icin (olculmus: epoch 7.5 -> 7.1 dk).
     # Erken durdurma esigini ETKILEMEZ: patience artik epoch cinsinden.
     python train_llm.py --natural "$NATURAL" \
@@ -193,7 +192,7 @@ case "$MODE" in
     ;;
   verify)
     echo "[1/3] dry-run dogrulama (GPU gerekmez, ~1-2 dk; TAM encode YAPILMAZ)"
-    echo "      Veri kapsami yalnizca intents.json; ChatGrow ve RAG kullanilmaz."
+    echo "      Kaynagi onayli sohbet verisi otomatik taranir ve intents ile 50/50 dengelenir."
     python train_llm.py --dry-run --natural "$NATURAL" \
       --batch-size 64 --limit-pairs 4000 $DPARGS $REGARGS $MPCARGS
     echo "[2/3] OK - intents.json egitim hatti hazir."

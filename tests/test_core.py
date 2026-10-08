@@ -1067,6 +1067,13 @@ class TestLLMIntegration(unittest.TestCase):
         self.assertTrue(
             bot._accept_generated('merhaba dunya nasilsin canim', 'selam'))
 
+    def test_accept_generated_rejects_leaked_eos_word(self):
+        bot = self._bot('merhaba dunya nasilsin canim eos')
+        self.assertTrue(
+            bot._accept_generated('merhaba dunya nasilsin canim', 'selam'))
+        self.assertFalse(
+            bot._accept_generated('merhaba dunya nasilsin canim eos', 'selam'))
+
     def test_kb_rephrase_fallback_without_llm(self):
         """LLM yoksa bilgi yaniti oldugu gibi duser (guvenli fallback)."""
         from brain import ChatBot
@@ -1447,6 +1454,122 @@ class TestTopicGateAndKnowledge(unittest.TestCase):
         self.assertTrue(in_any, 'KB yaniti bir bilgi intentinin yanit bankasindan olmali')
 
 
+class TestSeqgenTrainingData(unittest.TestCase):
+    def test_six_pattern_sohbet_intent_is_not_knowledge(self):
+        import io
+        import json
+        from seqgen import load_pairs
+
+        intents = {'intents': [
+            {'tag': 'knowledge', 'patterns': [
+                'bilgi sorusu bir', 'bilgi sorusu iki', 'bilgi sorusu uc',
+                'bilgi sorusu dort', 'bilgi sorusu bes', 'bilgi sorusu alti',
+            ], 'responses': ['bilgi yaniti bir', 'bilgi yaniti iki']},
+            {'tag': 'chat', 'tur': 'sohbet', 'patterns': [
+                'sohbet kalibi bir', 'sohbet kalibi iki', 'sohbet kalibi uc',
+                'sohbet kalibi dort', 'sohbet kalibi bes',
+                'sohbet kalibi alti',
+            ], 'responses': ['sohbet cevabi bir', 'sohbet cevabi iki']},
+        ]}
+        fd, path = tempfile.mkstemp(suffix='.json')
+        os.close(fd)
+        try:
+            with io.open(path, 'w', encoding='utf-8') as f:
+                json.dump(intents, f)
+            pairs = load_pairs(path, max_pairs=100, use_query=True, ctx_len=64)
+        finally:
+            os.unlink(path)
+
+        knowledge = [pair for pair in pairs if pair[0].startswith('bilgi')]
+        chat = [pair for pair in pairs if pair[0].startswith('sohbet')]
+        self.assertEqual(len(knowledge), 12)
+        self.assertEqual(len(chat), 6)
+
+    def test_load_pairs_removes_literal_eos_marker(self):
+        import io
+        import json
+        from seqgen import load_pairs
+
+        intents = {
+            'intents': [{
+                'tag': 'selam',
+                'patterns': ['merhaba nasilsin'],
+                'responses': ['Merhaba, bugun nasilsin? <EOS>'],
+            }],
+        }
+        fd, path = tempfile.mkstemp(suffix='.json')
+        os.close(fd)
+        try:
+            with io.open(path, 'w', encoding='utf-8') as f:
+                json.dump(intents, f, ensure_ascii=False)
+            pairs = load_pairs(path, max_pairs=10, use_query=True, ctx_len=64)
+        finally:
+            os.unlink(path)
+
+        self.assertTrue(pairs)
+        self.assertTrue(all('eos' not in response for _context, response in pairs))
+
+    def test_clean_response_truncates_at_sentence_or_word_boundary(self):
+        from seqgen import clean_response
+
+        sentence = clean_response('bu birinci cumle tamam. '
+                                  + 'ikinci kelime ' * 10
+                                  + 'tamamlandi.', 32)
+        word = clean_response('tamamlanmis cumle kelimelerle devam ediyor',
+                              24)
+
+        self.assertEqual(sentence, 'bu birinci cumle tamam.')
+        self.assertLessEqual(len(word), 24)
+        self.assertEqual(word, 'tamamlanmis cumle')
+
+    def test_load_chatgrow_pairs_removes_literal_eos_marker(self):
+        import json
+        from train_llm import load_chatgrow_pairs
+
+        fd, path = tempfile.mkstemp(suffix='.jsonl')
+        os.close(fd)
+        try:
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(json.dumps({
+                    'query': 'merhaba nasilsin',
+                    'answer': ['Merhaba, bugun nasilsin? <EOS>'],
+                    'source': 'SoAp9035/everyday-conversations-tur',
+                }) + '\n')
+                f.write(json.dumps({
+                    'query': 'matematik islemi nedir',
+                    'answer': ['Talimat verisi olmali.'],
+                    'source': 'tascib/turkish-instruction',
+                }) + '\n')
+            pairs = load_chatgrow_pairs(path, max_pairs=10)
+        finally:
+            os.unlink(path)
+
+        self.assertTrue(pairs)
+        self.assertTrue(all('eos' not in response for _context, response in pairs))
+        self.assertEqual(len(pairs), 1, 'unapproved source must be excluded')
+
+    def test_intent_pair_balance_is_exact_and_bounded(self):
+        from train_llm import _balance_pair_groups
+
+        intent_pairs = [
+            ('fact one', 'factual answer one'),
+            ('fact two', 'factual answer two'),
+            ('intent chat', 'chat answer'),
+        ]
+        conversation_pairs = [
+            ('dialog one', 'dialog answer one'),
+            ('dialog two', 'dialog answer two'),
+        ]
+        balanced, knowledge_n, conversation_n, each = _balance_pair_groups(
+            intent_pairs, conversation_pairs,
+            {'fact one', 'fact two'}, max_pairs=4, seed=7)
+
+        self.assertEqual((knowledge_n, conversation_n, each), (2, 3, 2))
+        self.assertEqual(len(balanced), 4)
+        self.assertEqual(sum(ctx in {'fact one', 'fact two'}
+                             for ctx, _response in balanced), 2)
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
 
@@ -1604,14 +1727,23 @@ class TestResponseCapInvalidatesCaches(unittest.TestCase):
         self.assertNotEqual(self._cache_fp(70), self._cache_fp(204))
 
     def test_data_fp_carries_response_cap(self):
-        """Resume izi cap'i tasimali; eski surum reddedilmeli."""
-        from seqgen import RESP_CHARS_MAX
-        fp = '%d-%d-%d-%d-b4-c%d-gs1-r%d' % (50000, 5, 48, 256, 48,
-                                            RESP_CHARS_MAX)
+        """Resume izi cap ve egitim verisi revizyonunu tasimali."""
+        from seqgen import RESP_CHARS_MAX, TRAINING_DATA_VERSION
+        from train_llm import _training_data_fingerprint
+        fp = _training_data_fingerprint(50000, 5, 48, 256)
         self.assertIn('-r%d' % RESP_CHARS_MAX, fp)
-        # 70 epoch kosusunun kaydettigi eski bicim
-        eski = '50000-5-48-256-b4-c48-gs1'
+        self.assertIn('-d%d' % TRAINING_DATA_VERSION, fp)
+        # Same configuration under the pre-cleanup training-data version.
+        eski = '50000-5-48-256-b4-c48-r%d' % RESP_CHARS_MAX
         self.assertNotEqual(eski, fp)
+
+    def test_data_fp_changes_when_encoded_pairs_change(self):
+        from train_llm import _training_data_fingerprint
+        a = _training_data_fingerprint(
+            2, 5, 48, 256, encoded_pairs=[([1, 2], [0, 1])])
+        b = _training_data_fingerprint(
+            2, 5, 48, 256, encoded_pairs=[([1, 3], [0, 1])])
+        self.assertNotEqual(a, b)
 
 
 class TestRefusalIsASignal(unittest.TestCase):

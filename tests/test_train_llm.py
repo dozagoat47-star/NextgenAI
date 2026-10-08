@@ -845,12 +845,11 @@ class TestResponseBudget(unittest.TestCase):
         # Secilen yanit tavanı asmamali
         self.assertLessEqual(max(L), RESP_CHARS_MAX,
                              'tavan asilmis: %d > %d' % (max(L), RESP_CHARS_MAX))
-        # Tavan tam uygulanmali (uzun yanit kirpilip 204 olmali)
-        self.assertEqual(max(L), RESP_CHARS_MAX,
-                         'tavan tam uygulanmali: %d != %d'
-                         % (max(L), RESP_CHARS_MAX))
-        # Kisa yanit secilirse (deterministik hash), eski gibi kisa kalmali;
-        # uzun secilirse 204'e kirpilip gelmeli. Her iki durum da dogru.
+        # Uzun yanit butceye sigarken tam cumle sinirinda bitmeli.
+        self.assertTrue(any(r.endswith('.') for _c, r in pairs),
+                        'kirpilmis yanit cumle noktasinda bitmeli')
+        from seqgen import clean_response
+        self.assertEqual(pairs[0][1], clean_response(uzun, RESP_CHARS_MAX))
 
 
 class TestVeriHazirlamaOlcumleri(unittest.TestCase):

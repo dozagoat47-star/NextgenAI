@@ -34,9 +34,15 @@ pip install -r requirements.txt
 > **Eğitim Kaggle'da GPU ile yapılır** (`kaggle_start.sh`). Yerel NumPy eğitimi
 > saatler sürer, pratikte değildir.
 
-Temel eğitim hattı yalnızca `intents.json` kullanır; `chatgrow_*.jsonl` dosyaları
-otomatik olarak eğitime eklenmez. `knowledge_map.jsonl` ile RAG eğitimi,
-`train_llm.py` içinde henüz uygulanmadığı için bu hat tarafından kullanılmaz.
+Eğitim hattı `intents.json` içindeki bilgi/sohbet çiftlerini, kaynak etiketi
+onaylı `chatgrow_*.jsonl` diyaloglarıyla **50/50** dengeler. Kaynağı belirsiz
+veya talimat, hukuk, matematik/muhakeme odaklı ChatGrow kayıtları eğitim dışı
+bırakılır. Sohbet verisi daha küçük olduğu için bilgi çiftleri aşağı örneklenir;
+logda iki sınıfın ham çift sayısı gösterilir. Bu nedenle eğitim örnek sayısı
+önceki yalnızca intent kullanan koşudan daha az olacaktır.
+
+`knowledge_map.jsonl` ile RAG eğitimi, `train_llm.py` içinde henüz
+uygulanmadığı için bu hat tarafından kullanılmaz.
 Eğitim hedefi otoregresif sonraki-token tahminidir: doğruluk ölçümü de
 yanıt token'lerini tahmin eden önceki konumlarda yapılır. Bu hedef düzeltmesini
 içeren kodla eğitim sıfırdan başlatılmalı; önceki sürümün checkpoint'i

@@ -73,6 +73,7 @@ os.environ.setdefault('TORCH_NCCL_ASYNC_ERROR_HANDLING', '1')
 
 import argparse
 import contextlib
+import glob
 import hashlib
 import io
 import json
@@ -99,7 +100,8 @@ except Exception:
 BASE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE)
 
-from seqgen import RESP_CHARS_MAX, clean_chars, load_pairs
+from seqgen import (RESP_CHARS_MAX, TRAINING_DATA_VERSION, clean_chars,
+                    clean_response, load_pairs)
 from llm import PAD, LLM, build_llm_vocab, encode_llm, load_tokenizer
 from naturalize import naturalize_pairs
 
@@ -285,6 +287,12 @@ MS_PER_PAIR = 1.5139
 MAX_CTX_LEN = 48
 MAX_SEQ_LEN = 256
 SEED = 7
+CHATGROW_CONVERSATION_SOURCES = frozenset({
+    'SoAp9035/everyday-conversations-tur',
+    '3nesdeniz/turkish-daily-dialogues-5k',
+    'kilicai/turkish-sft-multi-turn-dialogue-10k',
+    'seed',
+})
 # Kaggle Output paneli yalnizca /kaggle/working/ kokunu gosterir.
 # Script git klonunun icinden calisir (/kaggle/working/NextgenAI/) ->
 # ciktilari ust dizine yonlendirmezse Output'ta gorunmez.
@@ -297,6 +305,55 @@ def _log(msg, *args, **kwargs):
     """Print with immediate flush for Kaggle real-time logs."""
     kwargs.setdefault('flush', True)
     print(msg, *args, **kwargs)
+
+
+def _training_data_fingerprint(train_count, natural, max_ctx, max_seq,
+                               encoded_pairs=()):
+    digest = hashlib.sha256()
+    for ids, mask in encoded_pairs:
+        digest.update(np.asarray(ids, dtype=np.int64).tobytes())
+        digest.update(np.asarray(mask, dtype=np.uint8).tobytes())
+        digest.update(b'\0')
+    return (f'{train_count}-{natural}-{max_ctx}-{max_seq}-b4-c{CTX_CHARS}'
+            f'-r{RESP_CHARS_MAX}-d{TRAINING_DATA_VERSION}'
+            f'-h{digest.hexdigest()[:16]}')
+
+
+def _knowledge_contexts(intents_path, ctx_len):
+    with io.open(intents_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    contexts = set()
+    for intent in data.get('intents', []):
+        if len(intent.get('patterns', [])) != 6 or intent.get('tur') == 'sohbet':
+            continue
+        contexts.update(
+            ctx for pattern in intent.get('patterns', [])
+            if len(ctx := clean_chars(pattern, ctx_len)) >= 6)
+    return contexts
+
+
+def _balance_pair_groups(intent_pairs, conversation_pairs,
+                         knowledge_contexts, max_pairs, seed=SEED):
+    knowledge = [pair for pair in intent_pairs
+                 if pair[0] in knowledge_contexts]
+    intent_chat = [pair for pair in intent_pairs
+                   if pair[0] not in knowledge_contexts]
+    conversation = list(dict.fromkeys(intent_chat + conversation_pairs))
+
+    conversation_contexts = {ctx for ctx, _response in conversation}
+    knowledge = [pair for pair in knowledge
+                 if pair[0] not in conversation_contexts]
+    per_group = min(len(knowledge), len(conversation), max_pairs // 2)
+    if per_group < 1:
+        raise ValueError(
+            'Balanced training needs at least one knowledge pair and one '
+            'approved conversation pair within the pair budget.')
+
+    rng = random.Random(seed)
+    balanced = rng.sample(knowledge, per_group)
+    balanced.extend(rng.sample(conversation, per_group))
+    rng.shuffle(balanced)
+    return balanced, len(knowledge), len(conversation), per_group
 
 
 def sure_ve_hesapla(oturum_dk=540, epochs=12, encode_dk=ENCODE_DK,
@@ -367,11 +424,13 @@ def load_chatgrow_pairs(path, ctx_len=CTX_CHARS, resp_len=None, max_pairs=20000)
                     ans = [ans]
                 if not q or not ans:
                     continue
+                if rec.get('source') not in CHATGROW_CONVERSATION_SOURCES:
+                    continue
                 ctx = clean_chars(q, ctx_len)
                 if len(ctx) < 6:
                     continue
                 for a in ans:
-                    r = clean_chars(a, resp_len)
+                    r = clean_response(a, resp_len)
                     if len(r) < 6:
                         continue
                     key = (ctx, r)
@@ -404,20 +463,28 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
     # Load pairs from intents.json
     # Butce: veri ihtiyaci + zaman tavani min() (coz_max_pairs sozlesmesi).
     effective_max_pairs = coz_max_pairs(intents_path, ust_tavan=max_pairs_cap)
-    pairs = load_pairs(intents_path, max_pairs=effective_max_pairs)
+    pairs = load_pairs(intents_path, max_pairs=effective_max_pairs,
+                       ctx_len=max_ctx_len)
     _log(f'Loaded {len(pairs)} pairs from intents.json')
     
-    # Add chatgrow pairs if provided
-    if chatgrow_path:
-        cg_pairs = load_chatgrow_pairs(chatgrow_path, ctx_len=max_ctx_len,
-                                        resp_len=RESP_CHARS_MAX,
-                                        max_pairs=(limit_pairs if limit_pairs > 0 else 20000))
-        pairs.extend(cg_pairs)
-        _log(f'chatgrow pairs added: {len(cg_pairs)}')
-    
-    # Limit pairs
-    if limit_pairs > 0:
-        pairs = pairs[:limit_pairs]
+    # Only source-labelled dialogue data is eligible; unknown, instruction,
+    # law, and reasoning records are excluded before the 50/50 balance.
+    if chatgrow_path is None:
+        chatgrow_path = sorted(glob.glob(os.path.join(BASE, 'chatgrow*.jsonl')))
+    cg_pairs = load_chatgrow_pairs(
+        chatgrow_path, ctx_len=max_ctx_len, resp_len=RESP_CHARS_MAX,
+        max_pairs=effective_max_pairs)
+    _log('Approved ChatGrow dialogue pairs: %d' % len(cg_pairs))
+
+    knowledge_contexts = _knowledge_contexts(intents_path, max_ctx_len)
+    pair_budget = min(effective_max_pairs,
+                      limit_pairs if limit_pairs > 0 else effective_max_pairs)
+    pairs, knowledge_count, conversation_count, balanced_count = (
+        _balance_pair_groups(pairs, cg_pairs, knowledge_contexts, pair_budget))
+    _log('Balanced data: %d knowledge + %d conversation pairs '
+         '(available: %d + %d; total cap: %d)'
+         % (balanced_count, balanced_count, knowledge_count,
+            conversation_count, pair_budget))
     
     # Split train/val by context groups (no leakage)
     ctx_groups = {}
@@ -645,7 +712,8 @@ def main():
     # checkpoint-load block below (else UnboundLocalError).
     tot_steps = EPOCHS * max(1, (len(tr) + bs - 1) // bs)
 
-    data_fp = f'{len(tr)}-{NATURAL}-{mxc}-{mxs}-b4-c{CTX_CHARS}-r{RESP_CHARS_MAX}'
+    data_fp = _training_data_fingerprint(len(tr), NATURAL, mxc, mxs,
+                                          encoded_pairs=tr + va)
     
     if args.fresh:
         _log('Uyari: --fresh verildi, sifirdan basliyorum')

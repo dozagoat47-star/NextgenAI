@@ -51,9 +51,11 @@ ALLOWED_EXTRAS = set(".,;:!?…()%’'\"-–/") | set(string.digits)
 #
 # 204 = 256 (MAX_SEQ_LEN) - 48 (MAX_CTX_LEN) - 4 (BOS/SEP/EOS). Bagimsiz
 # bir zihniyet degil, dizi butcesinin TAM doldurulmus hali: 48+204+4 = 256.
-# Artan yanit, train_llm.refine_resp(maxc=204) tarafindan son cumle noktasina
-# gore temizlenir -> model cumle sonunda durmayi ogrenir.
+# Uzun yanitlar egitimden once son tam cumleye, o yoksa son tam kelimeye
+# gore kirpilir; modelin kelime/cumle ortasinda biten hedefleri ezberlemesi
+# engellenir.
 RESP_CHARS_MAX = 204
+TRAINING_DATA_VERSION = 2
 
 
 def utf8_stdout():
@@ -79,6 +81,23 @@ def clean_chars(text, max_len):
     if max_len and len(s) > max_len:
         s = s[:max_len]
     return s
+
+
+def clean_response(text, max_len):
+    """Remove the textual EOS marker before normalizing training responses."""
+    text = re.sub(r'<\s*eos\s*>', ' ', text or '', flags=re.IGNORECASE)
+    cleaned = clean_chars(text, None)
+    if not max_len or len(cleaned) <= max_len:
+        return cleaned
+
+    sentence_ends = [match.end() for match in re.finditer(
+        r'[.!?](?=\s|$)', cleaned[:max_len])
+        if match.end() >= min(15, max_len)]
+    if sentence_ends:
+        return cleaned[:sentence_ends[-1]].rstrip()
+
+    word_end = cleaned.rfind(' ', 0, max_len + 1)
+    return cleaned[:word_end].rstrip() if word_end >= 0 else ''
 
 
 def build_vocab(texts, min_count=2):
@@ -357,13 +376,13 @@ def load_pairs(intents_path, max_pairs=20000, max_per_intent=40,
     intent_data = []
     for it in data.get('intents', []):
         tag = clean_chars(it.get('tag', ''), 32)
-        resps = [clean_chars(r, RESP_CHARS_MAX)
+        resps = [clean_response(r, RESP_CHARS_MAX)
                  for r in it.get('responses', [])]
         resps = [r for r in resps if len(r) >= 6]
         if not tag or not resps:
             continue
         n_patterns = len(it.get('patterns', []))
-        is_knowledge = (n_patterns == 6)  # 6 pattern = bilgi intenti
+        is_knowledge = (n_patterns == 6 and it.get('tur') != 'sohbet')
         if use_query:
             pats = [clean_chars(p, ctx_len) for p in it.get('patterns', [])]
             pats = [p for p in pats if len(p) >= 6] or [tag]

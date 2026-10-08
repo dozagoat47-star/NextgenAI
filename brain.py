@@ -2138,6 +2138,10 @@ class ChatBot:
         cand = self.tokenize(gen)
         if len(cand) < 3:
             return False
+        # A textual EOS leaked from training data is an ordinary word to BPE,
+        # not the special token that decode() removes.
+        if 'eos' in cand:
+            return False
         gen_set = set(cand)
         known = canned | kws
         inter = gen_set & known
