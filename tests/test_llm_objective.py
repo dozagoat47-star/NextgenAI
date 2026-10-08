@@ -14,7 +14,7 @@ BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE)
 
 from llm import LLM, encode_llm
-from train_llm import llm_loss, masked_acc
+from train_llm import _encode_training_pair, llm_loss, masked_acc
 
 requires_torch = unittest.skipIf(
     torch is None, 'PyTorch kurulu degil => objective testi skip')
@@ -23,8 +23,41 @@ VOCAB = ['<PAD>', '<BOS>', '<SEP>', '<EOS>', 'm', 'e', 'r', 'h', 'a',
          'b', ' ', 'n', 's', 'i', 'l', 'y', 'q', 'u', 'g', 'z', 'd', 'o']
 
 
+class _StubTokenizer:
+    bos_id = 1
+    sep_id = 2
+    eos_id = 3
+    tokens = {'q': 4, 'a': 5, 'b': 6}
+
+    def encode(self, text):
+        return [self.tokens[char] for char in text]
+
+
+class TestTrainingPairMask(unittest.TestCase):
+    def test_mask_supervises_separator_to_first_response_token(self):
+        ids, mask = _encode_training_pair(_StubTokenizer(), 'q', 'ab')
+        self.assertEqual(ids, [1, 4, 2, 5, 6, 3])
+        self.assertEqual(mask, [0, 0, 1, 1, 1, 0])
+
+
 @requires_torch
 class TestAutoregressiveObjective(unittest.TestCase):
+    def test_loss_penalizes_a_wrong_first_response_token(self):
+        ids, mask = _encode_training_pair(_StubTokenizer(), 'q', 'ab')
+        targets = torch.tensor([ids])
+        correct_logits = torch.zeros(1, len(ids), len(VOCAB))
+        incorrect_logits = correct_logits.clone()
+        for position in (2, 3, 4):
+            correct_logits[0, position, ids[position + 1]] = 12.0
+            incorrect_logits[0, position, ids[position + 1]] = 12.0
+        incorrect_logits[0, 2, ids[3]] = 0.0
+        incorrect_logits[0, 2, ids[3] + 1] = 12.0
+
+        response_mask = torch.tensor([mask], dtype=torch.float32)
+        self.assertLess(
+            llm_loss(correct_logits, targets, response_mask).item(),
+            llm_loss(incorrect_logits, targets, response_mask).item())
+
     def test_loss_and_accuracy_score_the_next_response_token(self):
         model = LLM(VOCAB, d_model=8, num_blocks=1, num_heads=2,
                     max_ctx_len=10, max_seq_len=24, seed=7)

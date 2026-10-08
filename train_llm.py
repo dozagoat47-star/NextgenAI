@@ -356,6 +356,18 @@ def _balance_pair_groups(intent_pairs, conversation_pairs,
     return balanced, len(knowledge), len(conversation), per_group
 
 
+def _encode_training_pair(tokenizer, ctx, resp):
+    """Encode one pair and mask source positions that predict response tokens."""
+    ctx_ids = ([tokenizer.bos_id] + tokenizer.encode(ctx)
+               + [tokenizer.sep_id])
+    response_ids = tokenizer.encode(resp)
+    ids = ctx_ids + response_ids + [tokenizer.eos_id]
+    mask = ([0] * (len(ctx_ids) - 1)
+            + [1] * (len(response_ids) + 1)
+            + [0])
+    return ids, mask
+
+
 def sure_ve_hesapla(oturum_dk=540, epochs=12, encode_dk=ENCODE_DK,
                     bosluk=VARSAYILAN_BOSLUK,
                     ms_per_ham=MS_PER_HAM_CIFT_EPOCH):
@@ -509,25 +521,14 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
     
     _log(f'train: {len(train_pairs)} pairs, val: {len(val_pairs)} pairs')
     
-    # Tokenize pairs
-    def encode_pair(ctx, resp):
-        # Format: <BOS> ctx <SEP> resp <EOS>
-        ids = [tokenizer.bos_id] + tokenizer.encode(ctx) + [tokenizer.sep_id] + tokenizer.encode(resp) + [tokenizer.eos_id]
-        return ids
-    
     tr = []
     for ctx, resp in train_pairs:
-        ids = encode_pair(ctx, resp)
-        # Mask: 1 for response tokens, 0 for context
-        ctx_ids = [tokenizer.bos_id] + tokenizer.encode(ctx) + [tokenizer.sep_id]
-        mask = [0] * len(ctx_ids) + [1] * (len(ids) - len(ctx_ids))
+        ids, mask = _encode_training_pair(tokenizer, ctx, resp)
         tr.append((ids, mask))
     
     va = []
     for ctx, resp in val_pairs:
-        ids = encode_pair(ctx, resp)
-        ctx_ids = [tokenizer.bos_id] + tokenizer.encode(ctx) + [tokenizer.sep_id]
-        mask = [0] * len(ctx_ids) + [1] * (len(ids) - len(ctx_ids))
+        ids, mask = _encode_training_pair(tokenizer, ctx, resp)
         va.append((ids, mask))
     
     _log(f'Encoded: train {len(tr)}, val {len(va)}')
