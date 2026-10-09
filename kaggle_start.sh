@@ -163,6 +163,7 @@ fi
 DROPOUT="${LLM_DROPOUT:-0.10}"
 NATURAL="${LLM_NATURAL:-5}"
 GRAD_ACCUM="${LLM_GRAD_ACCUM:-1}"
+ABLATION_STEPS="${LLM_ABLATION_STEPS:-600}"
 REGARGS="$REGARGS --dropout $DROPOUT"
 # Gradient accumulation: --grad-accum N. Effective batch = batch_size * N.
 # Tek GPU (LLM_DP_OFF=1) icin: LLM_GRAD_ACCUM=2 --batch-size 64 -> eff_batch 128, VRAM yarilanir.
@@ -190,6 +191,31 @@ case "$MODE" in
     echo "      Ort 7.31 dk/epoch ise 9h icin en fazla ~70 epoch:"
     echo "        !bash kaggle_start.sh train"
     ;;
+  ablation)
+    echo "[1/2] Kontrollu naturalize ablation: 4000 ham cift, $ABLATION_STEPS optimizer update"
+    for NAT in 0 5; do
+      OUT_DIR="/kaggle/working/ablation_natural${NAT}"
+      mkdir -p "$OUT_DIR"
+      echo "      natural=$NAT -> $OUT_DIR"
+      SAVE_DIR="$OUT_DIR" python train_llm.py \
+        --natural "$NAT" --limit-pairs 4000 --max-pairs-cap 4000 \
+        --max-steps "$ABLATION_STEPS" --fresh --grad-accum 1 \
+        --batch-size 64 --val-every 1 $DPARGS $REGARGS \
+        --export-dir "$OUT_DIR" 2>&1 | tee "$OUT_DIR/train.log"
+    done
+    (cd /kaggle/working && zip -q ablation_outputs.zip \
+      ablation_natural0/llm_ckpt.pt \
+      ablation_natural0/llm_model.json \
+      ablation_natural0/llm_model_weights.npz \
+      ablation_natural0/training_metadata.json \
+      ablation_natural0/train.log \
+      ablation_natural5/llm_ckpt.pt \
+      ablation_natural5/llm_model.json \
+      ablation_natural5/llm_model_weights.npz \
+      ablation_natural5/training_metadata.json \
+      ablation_natural5/train.log)
+    echo "[2/2] Bitti. Cikti: /kaggle/working/ablation_outputs.zip"
+    ;;
   verify)
     echo "[1/3] dry-run dogrulama (GPU gerekmez, ~1-2 dk; TAM encode YAPILMAZ)"
     echo "      Kaynagi onayli sohbet verisi otomatik taranir ve intents ile 50/50 dengelenir."
@@ -199,7 +225,7 @@ case "$MODE" in
     echo "[3/3] Tam egitim icin:  !bash kaggle_start.sh train"
     ;;
   *)
-    echo "Bilinmeyen mod: $MODE  (verify | train)"
+    echo "Bilinmeyen mod: $MODE  (verify | train | bench | ablation)"
     exit 2
     ;;
 esac

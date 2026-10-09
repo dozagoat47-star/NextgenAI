@@ -71,10 +71,21 @@ Betik üç modda çalışır:
 | `!bash kaggle_start.sh verify` | dry-run doğrulama, GPU gerekmez, tam encode yapılmaz | ~1-2 dk |
 | `!bash kaggle_start.sh bench` | 1 epoch zamanlama | ~10 dk + 1 epoch |
 | `!bash kaggle_start.sh train` | asıl eğitim | ~4,7 saat (12 epoch) |
+| `!bash kaggle_start.sh ablation` | aynı 4.000 ham çift ve 600 optimizer adımında `natural=0` / `natural=5` karşılaştırması | GPU süresine bağlı |
+
+Kök nedeni ayırmak için önce `ablation` modunu çalıştır. İki koşu aynı seed,
+veri bütçesi, model, optimizer, LR ufku ve optimizer güncelleme sayısını
+kullanır; `--max-steps` bu koşullarda `--fresh` ve `--grad-accum 1` ister.
+Her koşunun modeli, checkpoint'i ve `training_metadata.json` dosyası ayrı
+klasörlere kaydedilir ve `/kaggle/working/ablation_outputs.zip` içinde paketlenir.
+Metadata ham çift parmak izini ve genişletilmiş eğitim verisi parmak izini
+ayrı tutar; böylece varyant sayısı değişse de temel çift havuzunun aynı olduğu
+kontrol edilebilir. Adım sayısı `LLM_ABLATION_STEPS` ile değiştirilebilir.
 
 Ayar için ortam değişkenleri: `LLM_EPOCHS` (12), `LLM_PATIENCE` (4), `LLM_CAP` (384),
 `LLM_BLOCKS` (6), `LLM_SEQ` (256), `LLM_DROPOUT` (0.10), `LLM_NATURAL` (5),
-`LLM_OTURUM_DK` (540). Ayrıntı ve ölçülmüş süre sabitleri `DEVAM_PROMPTU.md` §4'te.
+`LLM_OTURUM_DK` (540), `LLM_ABLATION_STEPS` (600). Ayrıntı ve ölçülmüş süre
+sabitleri `DEVAM_PROMPTU.md` §4'te.
 
 Ayrıntılar ve alternatif yollar için `DEVAM_PROMPTU.md` §4'e bak.
 

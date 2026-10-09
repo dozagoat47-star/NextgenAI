@@ -16,6 +16,7 @@ Kullanim (yerel dogrulama icin torch gerektirmez):
 
 Kaggle'da egitim (GPU notebook):
   python train_llm.py --natural 5   # intents.json; RAG egitimi henuz uygulanmadi
+  python train_llm.py --natural 0 --limit-pairs 4000 --max-steps 600 --fresh
   python train_llm.py --natural 5 --d-model 384 --num-blocks 6
   python train_llm.py --epochs 400 --patience 40 --batch-size 64 --val-every 2
 Veri boyu: MAX_PAIRS=70000 ham cift N5 ile ~330k cift -> epoch basina sure eski
@@ -59,6 +60,7 @@ DUZENLESTIRME (varsayilan acik, kapatmak icin flag):
 Ciktilari:
   <SAVE_DIR>/llm_ckpt.pt    -> kaldigi yerden devam (restart/copma guvenli)
   <export-dir>/llm_model.json + llm_model_weights.npz
+  <export-dir>/training_metadata.json -> veri parmak izleri ve egitim ayarlari
 Notebook'ta SAVE_DIR='../working' ayarla; indirilen iki dosyayi yerel
 model/ klasorune kopyala (llm.load_llm otomatik agar).
 SAVE_DIR varsayilani script klasoru; ortam degiskeni ile asilabilir.
@@ -297,7 +299,8 @@ CHATGROW_CONVERSATION_SOURCES = frozenset({
 # Script git klonunun icinden calisir (/kaggle/working/NextgenAI/) ->
 # ciktilari ust dizine yonlendirmezse Output'ta gorunmez.
 _KAGGLE_OUT = '/kaggle/working'
-SAVE_DIR = _KAGGLE_OUT if os.path.isdir(_KAGGLE_OUT) else os.environ.get('SAVE_DIR', BASE)
+SAVE_DIR = os.environ.get('SAVE_DIR') or (
+    _KAGGLE_OUT if os.path.isdir(_KAGGLE_OUT) else BASE)
 CTX_CHARS = 48
 
 
@@ -317,6 +320,16 @@ def _training_data_fingerprint(train_count, natural, max_ctx, max_seq,
     return (f'{train_count}-{natural}-{max_ctx}-{max_seq}-b4-c{CTX_CHARS}'
             f'-r{RESP_CHARS_MAX}-d{TRAINING_DATA_VERSION}'
             f'-h{digest.hexdigest()[:16]}')
+
+
+def _pairs_fingerprint(pairs):
+    digest = hashlib.sha256()
+    for context, response in pairs:
+        for value in (context, response):
+            encoded = value.encode('utf-8')
+            digest.update(len(encoded).to_bytes(8, 'little'))
+            digest.update(encoded)
+    return digest.hexdigest()
 
 
 def _knowledge_contexts(intents_path, ctx_len):
@@ -493,6 +506,7 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
                       limit_pairs if limit_pairs > 0 else effective_max_pairs)
     pairs, knowledge_count, conversation_count, balanced_count = (
         _balance_pair_groups(pairs, cg_pairs, knowledge_contexts, pair_budget))
+    base_data_fingerprint = _pairs_fingerprint(pairs)
     _log('Balanced data: %d knowledge + %d conversation pairs '
          '(available: %d + %d; total cap: %d)'
          % (balanced_count, balanced_count, knowledge_count,
@@ -536,7 +550,8 @@ def prepare_data(RAG, NATURAL=0, tokenizer=None, kb_map_path=None,
     # Get vocab from tokenizer
     vocab = list(tokenizer.vocab().values()) if hasattr(tokenizer, 'vocab') else None
     
-    return {'vocab': vocab, 'tokenizer': tokenizer, 'tr': tr, 'va': va}
+    return {'vocab': vocab, 'tokenizer': tokenizer, 'tr': tr, 'va': va,
+            'base_data_fingerprint': base_data_fingerprint}
 
 
 def llm_loss(logits, targets, mask):
@@ -621,9 +636,18 @@ def main():
     ap.add_argument('--val-every', type=int, default=1)
     ap.add_argument('--lr-horizon', type=int, default=0, metavar='N')
     ap.add_argument('--grad-accum', type=int, default=1, metavar='N')
+    ap.add_argument('--max-steps', type=int, default=0, metavar='N',
+                    help='Run exactly N optimizer updates; requires --fresh and --grad-accum 1')
     ap.add_argument('--export-dir', default=None, metavar='PATH')
     ap.add_argument('--fresh', action='store_true')
     args = ap.parse_args()
+
+    if args.max_steps < 0:
+        ap.error('--max-steps must be zero or greater')
+    if args.max_steps and not args.fresh:
+        ap.error('--max-steps requires --fresh')
+    if args.max_steps and args.grad_accum != 1:
+        ap.error('--max-steps requires --grad-accum 1')
 
     EPOCHS = args.epochs
     RAG = args.rag
@@ -657,11 +681,15 @@ def main():
     d = prepare_data(RAG, NATURAL=NATURAL, tokenizer=load_tokenizer(),
                      kb_map_path=args.kb_map, max_ctx_len=mxc, max_seq_len=mxs,
                      batch_size=bs, chatgrow_path=args.chatgrow,
-                     max_pairs_cap=args.max_pairs_cap, intents_path=intents_path)
+                     max_pairs_cap=args.max_pairs_cap,
+                     limit_pairs=args.limit_pairs, intents_path=intents_path)
     vocab = d['vocab']
     tok = d['tokenizer']
     V = tok.vocab_size if tok is not None else len(vocab)
     tr, va = d['tr'], d['va']
+    base_data_fp = d.get('base_data_fingerprint')
+    if base_data_fp:
+        _log('Base pair fingerprint: %s' % base_data_fp)
 
     if args.dry_run:
         _log('DRY-RUN OK')
@@ -711,7 +739,8 @@ def main():
     step = 0
     # total batch-level steps across all epochs; needs to exist BEFORE the
     # checkpoint-load block below (else UnboundLocalError).
-    tot_steps = EPOCHS * max(1, (len(tr) + bs - 1) // bs)
+    tot_steps = (args.max_steps or
+                 EPOCHS * max(1, (len(tr) + bs - 1) // bs))
 
     data_fp = _training_data_fingerprint(len(tr), NATURAL, mxc, mxs,
                                           encoded_pairs=tr + va)
@@ -783,7 +812,15 @@ def main():
     # Training
     t0_all = time.time()
     done = False
-    tot_steps = EPOCHS * len(train_loader)  # simplified
+    if args.max_steps:
+        tot_steps = args.max_steps
+        EPOCHS = max(1, math.ceil(args.max_steps / len(train_loader)))
+        warmup_steps = min(WARMUP, max(1, tot_steps // 10))
+        _log('Fixed-step run: %d optimizer updates; LR horizon: %d'
+             % (args.max_steps, tot_steps))
+    else:
+        tot_steps = EPOCHS * len(train_loader)
+        warmup_steps = WARMUP
     
     # Memory cleanup before training
     import gc
@@ -801,10 +838,10 @@ def main():
         for x_batch, m_batch in train_loader:
             step += 1
             step_in_epoch += 1
-            if step <= WARMUP:
-                cur = lr_base * (step / WARMUP)
+            if step <= warmup_steps:
+                cur = lr_base * (step / warmup_steps)
             else:
-                prog = (step - WARMUP) / max(1, EPOCHS * len(train_loader) - WARMUP)
+                prog = (step - warmup_steps) / max(1, tot_steps - warmup_steps)
                 cur = lr_base * (LR_MIN + (1 - LR_MIN) * 0.5 * (1 + math.cos(math.pi * prog)))
             for g in opt.param_groups:
                 g['lr'] = cur
@@ -826,7 +863,10 @@ def main():
                 opt.zero_grad()
             
             tl += loss.item() * grad_accum
-            
+
+            if args.max_steps and step >= args.max_steps:
+                break
+
             if os.environ.get('SMOKE') and step >= 2:
                 _log(f'SMOKE OK: {float(loss.item() * grad_accum)}', flush=True)
                 return 0
@@ -840,7 +880,8 @@ def main():
             opt.zero_grad()
         
         tl /= step_in_epoch
-        do_val = (ep % val_every == 0 or ep == 1)
+        do_val = (step >= args.max_steps if args.max_steps else
+                  ep % val_every == 0 or ep == 1)
         if do_val:
             model.eval()
             vl = va_acc = 0.0
@@ -872,7 +913,8 @@ def main():
                     _log(f'Erken durdurma: epoch {ep}')
                     break
         
-        if ep % CKPT_FREQ == 0 or done:
+        if ep % CKPT_FREQ == 0 or done or (
+                args.max_steps and step >= args.max_steps):
             torch.save({
                 'epoch': ep, 'step': step, 'model': best_state,
                 'opt': opt.state_dict(), 'best_val': best_val,
@@ -882,9 +924,12 @@ def main():
                 'arch': {'d_model': dm, 'num_blocks': nb, 'num_heads': nh,
                          'ff_mult': ff, 'max_seq_len': mxs, 'V': V,
                          'drop': drop, 'tied_embeddings': True},
-                'data': data_fp
+                'data': data_fp, 'base_data': base_data_fp
             }, os.path.join(SAVE_DIR, 'llm_ckpt.pt'))
             _log(f'checkpoint saved')
+
+        if args.max_steps and step >= args.max_steps:
+            break
 
     _log(f'Toplam egitim suresi: {(time.time() - t0_all) / 60:.1f} dk')
 
@@ -946,6 +991,37 @@ def main():
             json.dump(header, f, ensure_ascii=False)
         np.savez(npz_path, **{k: np.asarray(v, dtype=np.float32)
                               for k, v in params.items()})
+        metadata = {
+            'schema_version': 1,
+            'seed': SEED,
+            'natural': NATURAL,
+            'limit_pairs': args.limit_pairs or None,
+            'base_data_fingerprint': base_data_fp,
+            'training_data_fingerprint': data_fp,
+            'training_objective': TRAINING_OBJECTIVE,
+            'epoch': ep,
+            'batch_steps': step,
+            'optimizer_updates': math.ceil(step / grad_accum),
+            'max_steps': args.max_steps or None,
+            'train_examples': len(tr),
+            'validation_examples': len(va),
+            'best_validation_loss': best_val,
+            'best_validation_accuracy': best_acc,
+            'batch_size': bs,
+            'gradient_accumulation': grad_accum,
+            'd_model': dm,
+            'num_blocks': nb,
+            'num_heads': nh,
+            'ff_mult': ff,
+            'max_context_length': mxc,
+            'max_sequence_length': mxs,
+            'dropout': drop,
+            'learning_rate': lr_base,
+            'weight_decay': wd,
+        }
+        metadata_path = os.path.join(export_dir, 'training_metadata.json')
+        with io.open(metadata_path, 'w', encoding='utf-8') as f:
+            json.dump(metadata, f, ensure_ascii=False, indent=2)
         export_ok = True
         _log(f'Model export edildi: {json_path} '
              f'({os.path.getsize(json_path) / 1048576:.2f} MB) + {npz_path} '
@@ -965,7 +1041,7 @@ def main():
         if os.path.exists(ckpt_path):
             files.append(ckpt_path)
         if export_ok:
-            files.extend([json_path, npz_path])
+            files.extend([json_path, npz_path, metadata_path])
         for _d in (SAVE_DIR, BASE):
             _lp = os.path.join(_d, 'kaggle_train.log')
             if os.path.exists(_lp):

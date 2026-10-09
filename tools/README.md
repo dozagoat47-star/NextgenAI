@@ -137,6 +137,27 @@ olcutulen sey etiket degil, **sohbet sinifina girmemesi**. Bilgi yoluna
 yonlendirmek kabul sayilir - modelin ciktisina gore ayarlanmis bir esik
 degil.
 
+## paired_llm_eval.py - kontrollu ablation'i ham ve uygulama ciktisinda olcer
+
+`kaggle_start.sh ablation` iki modeli `ablation_natural0/` ve
+`ablation_natural5/` altina, her biri `llm_model.json`, agirliklar,
+checkpoint ve `training_metadata.json` ile kaydeder. Kaggle'dan
+`ablation_outputs.zip` dosyasini indirip iki klasoru yerel projede `model/`
+altina cikarttiktan sonra:
+
+```
+python tools/paired_llm_eval.py model/ablation_natural0 model/ablation_natural5 --out olcum_raporlari/ablation_paired.json
+```
+
+Arac once iki raporun ayni temel veri fingerprint'ini, seed/model/optimizer
+ayarlarini ve optimizer update sayisini dogrular. Her soru icin ayni seed ile
+iki seyi ayri kaydeder: tek bir dogrudan `LLM.sample` ciktisi (`raw_model_output`)
+ve Flask `/chat` rotasinin kullaniciya verdigi yanit
+(`application_final_response`). Uygulama yolunda ag fallback'i ve ogrenme
+kapatilir; corpus yazma girisimleri engellenir ve corpus dosya hash'leri
+degismedigi son kontrolde dogrulanir. Bu nedenle rapor, harici internet
+fallback'ini degil, model + mevcut uygulama katmanlarini karsilastirir.
+
 ## kapi_ab.py - OZGUNLUK ESIGI taramasi (esik 0.15 -> 0.00)
 
 Kapinin `ozgunluk >= %15` kuralini 8 esikte **paired** olarak tarar ve her
